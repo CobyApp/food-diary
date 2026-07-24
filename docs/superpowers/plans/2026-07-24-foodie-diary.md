@@ -2387,6 +2387,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ## Notes / Assumptions for the implementer
 
 - TCA API assumes 1.17+ (`@Reducer`, `@ObservableState`, `@Presents`, `StackState`, `store.scope` bindings). If macro/API names differ in the resolved version, adapt to that version's current spelling — behavior is the contract.
+- **DEVIATION (2026-07-24) — ClientKit package products:** `@DependencyClient` (from `DependenciesMacros`) expands to code referencing the `DependenciesMacros` runtime and, transitively, `IssueReporting`. With Tuist native Xcode package integration these transitive products are not auto-linked, so `ClientKit` explicitly depends on three package products in `Project.swift`: `ComposableArchitecture`, `DependenciesMacros`, and `IssueReporting`. Verified: ClientKit builds and tests link. (Referenced as `tca`, `depMacros`, `issueReporting` constants.)
 - `tuist test <TargetName>` filters to one test target; `tuist test` runs all. If a Tuist version rejects the target-filter form, fall back to `tuist test` or `tuist test --test-targets <name>`.
 - Two test image assets must be added by hand: `Tests/ClientKitTests/Resources/test-food.jpg` (clear plated dish) and `gps-tagged.jpg` (GPS EXIF). The plan notes how to tag GPS with exiftool.
 - Vision cutout counts depend on the photo; the CaptureView always lets the user keep/deselect candidates, and 0-candidate photos simply produce an empty selection (user retakes).

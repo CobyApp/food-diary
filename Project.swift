@@ -36,6 +36,11 @@ func testTarget(_ name: String, sources: String, dependencies: [TargetDependency
 }
 
 let tca: TargetDependency = .package(product: "ComposableArchitecture")
+// @DependencyClient (used by the ClientKit clients) expands to code that
+// references the DependenciesMacros runtime library, so it must be linked
+// explicitly — it is only a transitive product of TCA otherwise.
+let depMacros: TargetDependency = .package(product: "DependenciesMacros")
+let issueReporting: TargetDependency = .package(product: "IssueReporting")
 
 let project = Project(
     name: "FoodDiary",
@@ -56,7 +61,7 @@ let project = Project(
         target("Models", product: .framework, sources: "Models",
                dependencies: [tca]),
         target("ClientKit", product: .framework, sources: "ClientKit",
-               dependencies: [.target(name: "Models"), tca]),
+               dependencies: [.target(name: "Models"), tca, depMacros, issueReporting]),
         target("FeatureKit", product: .framework, sources: "FeatureKit",
                dependencies: [.target(name: "ClientKit"), tca]),
         .target(
