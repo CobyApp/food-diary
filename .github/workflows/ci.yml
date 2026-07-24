@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build & Test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          # The app targets iOS 18 / Swift 6. Bump to a fixed version if the
+          # runner's latest-stable ever lags behind what the sources need.
+          xcode-version: latest-stable
+
+      - name: Install Tuist
+        run: brew install tuist
+
+      - name: Set up Ruby (Fastlane)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      # Runs Scripts/setup.sh (tuist generate) then the unit tests via
+      # xcodebuild/scan — same path as local `fastlane test`, and it avoids
+      # Tuist's selective-testing binary cache.
+      - name: Run tests
+        run: bundle exec fastlane test
+        env:
+          CI: "true"

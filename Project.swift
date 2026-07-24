@@ -2,6 +2,8 @@ import ProjectDescription
 
 let bundlePrefix = "com.coby.food"
 let deploymentTargets: DeploymentTargets = .iOS("18.0")
+// Apple Developer team for code signing (used by Xcode + Fastlane automatic signing).
+let teamId = "3Y8YH8GWMM"
 
 func target(
     _ name: String,
@@ -98,7 +100,11 @@ let project = Project(
                 "NSLocationWhenInUseUsageDescription": "사진을 찍은 위치 근처의 식당을 추천하기 위해 위치 정보가 필요합니다.",
             ]),
             sources: ["Sources/FoodDiary/**"],
-            dependencies: [.target(name: "FeatureKit")]
+            dependencies: [.target(name: "FeatureKit")],
+            settings: .settings(base: [
+                "DEVELOPMENT_TEAM": .string(teamId),
+                "CODE_SIGN_STYLE": "Automatic",
+            ])
         ),
         testTarget("ModelsTests", sources: "ModelsTests",
                    dependencies: [.target(name: "Models")]),
