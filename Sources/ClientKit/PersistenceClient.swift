@@ -25,9 +25,12 @@ public struct PersistenceClient: Sendable {
 
 @ModelActor
 actor PersistenceActor {
-    var imageStore: ImageStore!
-
-    func save(place: PlaceInfo?, memo: String, rating: Int?, cutouts: [NewCutout]) throws -> MealSnapshot {
+    // ImageStore (Sendable) is passed per call rather than stored, so live()
+    // needs no async setter and there is no window where it is unset.
+    func save(
+        place: PlaceInfo?, memo: String, rating: Int?, cutouts: [NewCutout],
+        imageStore: ImageStore
+    ) throws -> MealSnapshot {
         let meal = Meal(memo: memo, rating: rating)
         meal.place = place
         for new in cutouts {
@@ -53,7 +56,7 @@ actor PersistenceActor {
         return try modelContext.fetch(descriptor).first?.snapshot()
     }
 
-    func delete(id: UUID) throws {
+    func delete(id: UUID, imageStore: ImageStore) throws {
         let descriptor = FetchDescriptor<Meal>(predicate: #Predicate { $0.id == id })
         guard let meal = try modelContext.fetch(descriptor).first else { return }
         for cutout in meal.cutouts { try? imageStore.delete(cutout.fileName) }
@@ -65,20 +68,18 @@ actor PersistenceActor {
 public extension PersistenceClient {
     static func live(container: ModelContainer, imageStore: ImageStore) -> PersistenceClient {
         let actor = PersistenceActor(modelContainer: container)
-        Task { await actor.setImageStore(imageStore) }
         return PersistenceClient(
             saveMeal: { place, memo, rating, cutouts in
-                try await actor.save(place: place, memo: memo, rating: rating, cutouts: cutouts)
+                try await actor.save(
+                    place: place, memo: memo, rating: rating, cutouts: cutouts,
+                    imageStore: imageStore
+                )
             },
             allCutouts: { try await actor.allCutouts() },
             meal: { id in try await actor.meal(id: id) },
-            deleteMeal: { id in try await actor.delete(id: id) }
+            deleteMeal: { id in try await actor.delete(id: id, imageStore: imageStore) }
         )
     }
-}
-
-extension PersistenceActor {
-    func setImageStore(_ store: ImageStore) { self.imageStore = store }
 }
 
 extension PersistenceClient: TestDependencyKey {
