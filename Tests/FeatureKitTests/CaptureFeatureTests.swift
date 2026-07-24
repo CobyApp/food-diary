@@ -76,6 +76,40 @@ final class CaptureFeatureTests: XCTestCase {
         }
 
         await store.send(.saveTapped)
-        await store.receive(\.saved) { $0.savedMeal = savedMeal }
+        await store.receive(\.saved) {
+            $0 = CaptureFeature.State()
+            $0.savedMeal = savedMeal
+        }
+    }
+
+    @MainActor
+    func test_placeSelected_dismissesPickerAndKeepsChosenPlace() async {
+        let place = PlaceInfo(id: "1", name: "라멘집", address: "후쿠오카")
+        let savedMeal = MealSnapshot(id: UUID(), eatenAt: Date(), place: place,
+                                     memo: "", rating: nil, cutouts: [])
+        let store = TestStore(initialState: CaptureFeature.State()) {
+            CaptureFeature()
+        } withDependencies: {
+            $0.persistence.saveMeal = { chosenPlace, _, _, _ in
+                XCTAssertEqual(chosenPlace, place)
+                return savedMeal
+            }
+        }
+
+        await store.send(.choosePlaceTapped) {
+            $0.placePicker = PlacePickerFeature.State()
+        }
+        // The child reducer sets `selected` first, then CaptureFeature's own
+        // case intercepts it: copies it to `chosenPlace` and dismisses the sheet.
+        await store.send(.placePicker(.presented(.placeSelected(place)))) {
+            $0.chosenPlace = place
+            $0.placePicker = nil
+        }
+
+        await store.send(.saveTapped)
+        await store.receive(\.saved) {
+            $0 = CaptureFeature.State()
+            $0.savedMeal = savedMeal
+        }
     }
 }

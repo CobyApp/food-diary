@@ -25,6 +25,7 @@ public struct CaptureFeature {
         public var memo: String
         public var rating: Int?
         @Presents public var placePicker: PlacePickerFeature.State?
+        public var chosenPlace: PlaceInfo?
         public var savedMeal: MealSnapshot?
 
         public init(
@@ -32,16 +33,16 @@ public struct CaptureFeature {
             coordinate: Coordinate? = nil,
             candidates: [CutoutCandidate] = [],
             memo: String = "",
-            rating: Int? = nil
+            rating: Int? = nil,
+            chosenPlace: PlaceInfo? = nil
         ) {
             self.photoData = photoData
             self.coordinate = coordinate
             self.candidates = candidates
             self.memo = memo
             self.rating = rating
+            self.chosenPlace = chosenPlace
         }
-
-        public var selectedPlace: PlaceInfo? { placePicker?.selected }
     }
 
     public enum Action: Equatable {
@@ -103,11 +104,16 @@ public struct CaptureFeature {
                 state.placePicker = PlacePickerFeature.State(coordinate: state.coordinate)
                 return .none
 
+            case .placePicker(.presented(.placeSelected)), .placePicker(.presented(.useManualEntry)):
+                state.chosenPlace = state.placePicker?.selected
+                state.placePicker = nil
+                return .none
+
             case .placePicker:
                 return .none
 
             case .saveTapped:
-                let place = state.placePicker?.selected
+                let place = state.chosenPlace
                 let memo = state.memo
                 let rating = state.rating
                 let selected = state.candidates
@@ -119,6 +125,7 @@ public struct CaptureFeature {
                 }
 
             case let .saved(meal):
+                state = State()
                 state.savedMeal = meal
                 return .none
             }
