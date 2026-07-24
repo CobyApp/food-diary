@@ -53,6 +53,19 @@ final class PersistenceClientTests: XCTestCase {
         XCTAssertEqual(all.last?.label, "old")
     }
 
+    func test_mealByCutout_returnsOwningMeal() async throws {
+        let container = try ModelContainer(
+            for: Meal.self, FoodCutout.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let store = ImageStore(save: { _ in "n.png" }, load: { _ in nil }, delete: { _ in })
+        let client = PersistenceClient.live(container: container, imageStore: store)
+        let snap = try await client.saveMeal(nil, "m", nil, [NewCutout(pngData: Data([1]), label: nil)])
+        let cutoutID = snap.cutouts[0].id
+        let owning = try await client.mealByCutout(cutoutID)
+        XCTAssertEqual(owning?.id, snap.id)
+    }
+
     func test_deleteMeal_removesMealAndItsCutouts() async throws {
         let client = try makeClient()
 

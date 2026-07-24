@@ -20,6 +20,7 @@ public struct PersistenceClient: Sendable {
     ) async throws -> MealSnapshot
     public var allCutouts: @Sendable () async throws -> [CutoutSnapshot]
     public var meal: @Sendable (_ id: UUID) async throws -> MealSnapshot?
+    public var mealByCutout: @Sendable (_ cutoutID: UUID) async throws -> MealSnapshot?
     public var deleteMeal: @Sendable (_ id: UUID) async throws -> Void
 }
 
@@ -56,6 +57,11 @@ actor PersistenceActor {
         return try modelContext.fetch(descriptor).first?.snapshot()
     }
 
+    func mealByCutout(id: UUID) throws -> MealSnapshot? {
+        let descriptor = FetchDescriptor<FoodCutout>(predicate: #Predicate { $0.id == id })
+        return try modelContext.fetch(descriptor).first?.meal?.snapshot()
+    }
+
     func delete(id: UUID, imageStore: ImageStore) throws {
         let descriptor = FetchDescriptor<Meal>(predicate: #Predicate { $0.id == id })
         guard let meal = try modelContext.fetch(descriptor).first else { return }
@@ -77,6 +83,7 @@ public extension PersistenceClient {
             },
             allCutouts: { try await actor.allCutouts() },
             meal: { id in try await actor.meal(id: id) },
+            mealByCutout: { id in try await actor.mealByCutout(id: id) },
             deleteMeal: { id in try await actor.delete(id: id, imageStore: imageStore) }
         )
     }
@@ -94,6 +101,7 @@ extension PersistenceClient: TestDependencyKey {
         },
         allCutouts: { [] },
         meal: { _ in nil },
+        mealByCutout: { _ in nil },
         deleteMeal: { _ in }
     )
 }
