@@ -30,6 +30,28 @@ final class CaptureFeatureTests: XCTestCase {
     }
 
     @MainActor
+    func test_photoPicked_whenExtractionFails_endsProcessingWithNoCandidates() async {
+        struct ExtractError: Error {}
+        let store = TestStore(initialState: CaptureFeature.State()) {
+            CaptureFeature()
+        } withDependencies: {
+            $0.foodCutout.extract = { _ in throw ExtractError() }
+            $0.photoLocation.coordinate = { _ in nil }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.photoPicked(Data([9]))) {
+            $0.photoData = Data([9])
+            $0.isProcessing = true
+        }
+        await store.receive(\.processingFinished) {
+            $0.isProcessing = false
+            $0.coordinate = nil
+            $0.candidates = []
+        }
+    }
+
+    @MainActor
     func test_saveTapped_persistsSelectedCutouts() async {
         let savedMeal = MealSnapshot(id: UUID(), eatenAt: Date(), place: nil,
                                      memo: "맛있다", rating: 5, cutouts: [])

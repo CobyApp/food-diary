@@ -73,6 +73,11 @@ public struct CaptureFeature {
                     let coordinate = photoLocation.coordinate(data)
                     let pngs = try await cutouts.map(\.pngData)
                     await send(.processingFinished(coordinate: coordinate, cutouts: pngs))
+                } catch: { _, send in
+                    // Extraction can fail (e.g. Vision has no inference context in
+                    // the simulator); end processing with no candidates instead of
+                    // leaving the spinner stuck forever.
+                    await send(.processingFinished(coordinate: nil, cutouts: []))
                 }
 
             case let .processingFinished(coordinate, cutouts):
