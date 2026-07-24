@@ -27,7 +27,6 @@
 
 **Files:**
 - Create: `Tuist.swift`
-- Create: `Tuist/Package.swift`
 - Create: `Project.swift`
 - Create: `Configurations/Secrets.example.xcconfig`
 - Create: `Configurations/Secrets.xcconfig` (git-ignored, dev placeholder)
@@ -42,27 +41,9 @@
 **Interfaces:**
 - Produces: four targets `Models`, `ClientKit`, `FeatureKit`, `FoodDiary` and test targets `ModelsTests`, `ClientKitTests`, `FeatureKitTests`. External SPM product `ComposableArchitecture` available to `FeatureKit`, `ClientKit`, and their tests.
 
-- [ ] **Step 1: Write `Tuist/Package.swift`** (external dependency declaration)
+- [ ] **Step 1: (removed) — external dependencies use native Xcode package integration**
 
-```swift
-// swift-tools-version: 6.0
-import PackageDescription
-
-#if TUIST
-import ProjectDescription
-
-let packageSettings = PackageSettings(
-    productTypes: ["ComposableArchitecture": .framework]
-)
-#endif
-
-let package = Package(
-    name: "FoodDiaryDependencies",
-    dependencies: [
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.17.0"),
-    ]
-)
-```
+> **DEVIATION (2026-07-24):** The original plan declared TCA via `Tuist/Package.swift` + `tuist install` (Tuist's SwiftPM integration). Under this machine's toolchain (Xcode 26.6 / Swift 6.3.3), Tuist's per-package `.xcodeproj` generation fails to wire TCA's transitive **macro** plugins (`CasePathsMacrosSupport`, etc.), giving `header '…-Swift.h' not found` at build. Fix: declare the package with `packages:` in `Project.swift` and depend via `.package(product: "ComposableArchitecture")`, which delegates macro resolution to Xcode's native SwiftPM. No `Tuist/Package.swift` and no `tuist install` step. (A benign warning remains: "ComposableArchitecture … static product linked from multiple targets" — verified not to cause duplicate-symbol errors; build and tests pass.)
 
 - [ ] **Step 2: Write `Tuist.swift`**
 
@@ -126,8 +107,16 @@ func testTarget(_ name: String, sources: String, dependencies: [TargetDependency
     )
 }
 
+let tca: TargetDependency = .package(product: "ComposableArchitecture")
+
 let project = Project(
     name: "FoodDiary",
+    packages: [
+        .remote(
+            url: "https://github.com/pointfreeco/swift-composable-architecture",
+            requirement: .upToNextMajor(from: "1.17.0")
+        ),
+    ],
     settings: .settings(
         base: [:],
         configurations: [
@@ -137,11 +126,11 @@ let project = Project(
     ),
     targets: [
         target("Models", product: .framework, sources: "Models",
-               dependencies: [.external(name: "ComposableArchitecture")]),
+               dependencies: [tca]),
         target("ClientKit", product: .framework, sources: "ClientKit",
-               dependencies: [.target(name: "Models"), .external(name: "ComposableArchitecture")]),
+               dependencies: [.target(name: "Models"), tca]),
         target("FeatureKit", product: .framework, sources: "FeatureKit",
-               dependencies: [.target(name: "ClientKit"), .external(name: "ComposableArchitecture")]),
+               dependencies: [.target(name: "ClientKit"), tca]),
         .target(
             name: "FoodDiary",
             destinations: .iOS,
@@ -210,8 +199,8 @@ final class SmokeTests: XCTestCase {
 
 - [ ] **Step 7: Generate & build**
 
-Run: `cd /Users/doyoung_kim/Documents/Git/food-dairy && tuist install && tuist generate --no-open && tuist build`
-Expected: `Build Succeeded`. (If `tuist build` needs a scheme, run `tuist build FoodDiary`.)
+Run: `cd /Users/doyoung_kim/Documents/Git/food-dairy && tuist generate --no-open && tuist build FoodDiary`
+Expected: `Build Succeeded`. (No `tuist install` — native package integration resolves via xcodebuild during `tuist generate`. `tuist build` prints a deprecation notice favoring `tuist xcodebuild`; still functional.)
 
 - [ ] **Step 8: Commit**
 

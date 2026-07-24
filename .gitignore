@@ -22,3 +22,8 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output/
+.superpowers/
+
+# Tuist native package resolution / cache
+.package.resolved
+Tuist/.build/
