@@ -1,0 +1,22 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Generate project, then run all unit tests"
+  lane :test do
+    sh("cd .. && tuist generate --no-open")
+    run_tests(scheme: "FoodDiary")
+  end
+
+  desc "Generate project and build the app"
+  lane :build do
+    sh("cd .. && tuist generate --no-open")
+    build_app(scheme: "FoodDiary", skip_archive: true, destination: "generic/platform=iOS Simulator")
+  end
+
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    sh("cd .. && tuist generate --no-open")
+    build_app(scheme: "FoodDiary")
+    upload_to_testflight(skip_waiting_for_build_processing: true)
+  end
+end
