@@ -3,6 +3,7 @@ import ComposableArchitecture
 
 public struct MealDetailView: View {
     @Bindable var store: StoreOf<MealDetailFeature>
+    @State private var confirmingDelete = false
     public init(store: StoreOf<MealDetailFeature>) { self.store = store }
 
     let columns = [GridItem(.adaptive(minimum: 100), spacing: 12)]
@@ -29,8 +30,12 @@ public struct MealDetailView: View {
         .navigationTitle("한 끼 기록")
         .toolbar {
             ToolbarItem(placement: .destructiveAction) {
-                Button("삭제", role: .destructive) { store.send(.deleteTapped) }
+                Button("삭제", role: .destructive) { confirmingDelete = true }
             }
+        }
+        .confirmationDialog("이 기록을 삭제할까요?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+            Button("삭제", role: .destructive) { store.send(.deleteTapped) }
+            Button("취소", role: .cancel) {}
         }
         .task { store.send(.task) }
     }
