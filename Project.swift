@@ -44,6 +44,9 @@ let issueReporting: TargetDependency = .package(product: "IssueReporting")
 // TCA re-exports Dependencies at compile time only; DependencyKey / DependencyValues
 // runtime witnesses must be linked explicitly under Tuist native package integration.
 let dependencies: TargetDependency = .package(product: "Dependencies")
+// @Reducer synthesizes a CasePathable conformance on Action that references
+// CasePathsCore runtime symbols; link it explicitly for FeatureKit.
+let casePaths: TargetDependency = .package(product: "CasePathsCore")
 
 let project = Project(
     name: "FoodDiary",
@@ -61,12 +64,27 @@ let project = Project(
         ]
     ),
     targets: [
-        target("Models", product: .framework, sources: "Models",
-               dependencies: [tca]),
-        target("ClientKit", product: .framework, sources: "ClientKit",
-               dependencies: [.target(name: "Models"), tca, dependencies, depMacros, issueReporting]),
-        target("FeatureKit", product: .framework, sources: "FeatureKit",
-               dependencies: [.target(name: "ClientKit"), tca, dependencies, issueReporting]),
+        // Internal modules are STATIC frameworks: the app and each test bundle
+        // become the single link points that pull in the Point-Free package
+        // products fully. Dynamic frameworks instead embed those static libs
+        // and dead-strip unused symbols, starving downstream test bundles
+        // (TestStore / CasePathsCore) at link time.
+        // Each external package product is declared once, on the lowest module
+        // that imports it, and propagates through the static-framework chain to
+        // the app and test bundles. Declaring a product on multiple targets (or
+        // re-declaring on test targets) links the TCA closure more than once and
+        // produces duplicate symbols.
+        target("Models", product: .staticFramework, sources: "Models",
+               dependencies: []),
+        // ClientKit is the single owner of every external package product, so
+        // each is linked exactly once and propagates up the static chain to
+        // FeatureKit, the app, and every test bundle (FeatureKit imports TCA
+        // transitively). Splitting them across modules double-links the shared
+        // TCA closure (Dependencies/IssueReporting/Clocks) → duplicate symbols.
+        target("ClientKit", product: .staticFramework, sources: "ClientKit",
+               dependencies: [.target(name: "Models"), tca, dependencies, depMacros, issueReporting, casePaths]),
+        target("FeatureKit", product: .staticFramework, sources: "FeatureKit",
+               dependencies: [.target(name: "ClientKit")]),
         .target(
             name: "FoodDiary",
             destinations: .iOS,
