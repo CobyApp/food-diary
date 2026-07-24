@@ -43,7 +43,7 @@ public struct CaptureView: View {
                             HStack {
                                 Text("식당")
                                 Spacer()
-                                Text(store.placePicker?.selected?.name ?? "선택 안 함")
+                                Text(store.chosenPlace?.name ?? "선택 안 함")
                                     .foregroundStyle(.secondary)
                             }
                         }
