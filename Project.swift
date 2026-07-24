@@ -121,6 +121,10 @@ let project = Project(
             name: "FoodDiary",
             shared: true,
             buildAction: .buildAction(targets: ["FoodDiary"]),
+            testAction: .targets(
+                ["ModelsTests", "ClientKitTests", "FeatureKitTests"],
+                configuration: "Debug"
+            ),
             runAction: .runAction(configuration: "Debug")
         ),
     ]
