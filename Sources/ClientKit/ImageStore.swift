@@ -33,6 +33,9 @@ public extension ImageStore {
                 try? Data(contentsOf: directory.appendingPathComponent(name))
             },
             delete: { name in
+                // Use FileManager.default directly rather than capturing `fm`,
+                // which is not Sendable, in this @Sendable closure.
+                let fm = FileManager.default
                 let url = directory.appendingPathComponent(name)
                 if fm.fileExists(atPath: url.path) { try fm.removeItem(at: url) }
             }
