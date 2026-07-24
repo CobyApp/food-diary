@@ -21,4 +21,20 @@ final class CollectionFeatureTests: XCTestCase {
             $0.cutouts = sample
         }
     }
+
+    @MainActor
+    func test_onAppear_whenLoadFails_clearsLoadingAndShowsEmpty() async {
+        struct LoadError: Error {}
+        let store = TestStore(initialState: CollectionFeature.State()) {
+            CollectionFeature()
+        } withDependencies: {
+            $0.persistence.allCutouts = { throw LoadError() }
+        }
+
+        await store.send(.onAppear) { $0.isLoading = true }
+        await store.receive(\.cutoutsLoaded) {
+            $0.isLoading = false
+            $0.cutouts = []
+        }
+    }
 }

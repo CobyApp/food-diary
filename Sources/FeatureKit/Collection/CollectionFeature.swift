@@ -30,6 +30,8 @@ public struct CollectionFeature {
                 return .run { send in
                     let cutouts = try await persistence.allCutouts()
                     await send(.cutoutsLoaded(cutouts))
+                } catch: { _, send in
+                    await send(.cutoutsLoaded([]))
                 }
             case let .cutoutsLoaded(cutouts):
                 state.isLoading = false
