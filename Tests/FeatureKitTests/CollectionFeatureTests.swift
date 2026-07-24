@@ -1,0 +1,24 @@
+import XCTest
+import ComposableArchitecture
+import Models
+@testable import FeatureKit
+
+final class CollectionFeatureTests: XCTestCase {
+    @MainActor
+    func test_onAppear_loadsCutouts() async {
+        let sample = [
+            CutoutSnapshot(id: UUID(), fileName: "a.png", createdAt: Date(), label: "라멘"),
+        ]
+        let store = TestStore(initialState: CollectionFeature.State()) {
+            CollectionFeature()
+        } withDependencies: {
+            $0.persistence.allCutouts = { sample }
+        }
+
+        await store.send(.onAppear) { $0.isLoading = true }
+        await store.receive(\.cutoutsLoaded) {
+            $0.isLoading = false
+            $0.cutouts = sample
+        }
+    }
+}
