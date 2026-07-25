@@ -100,6 +100,7 @@ let project = Project(
                 "NSLocationWhenInUseUsageDescription": "사진을 찍은 위치 근처의 식당을 추천하기 위해 위치 정보가 필요합니다.",
             ]),
             sources: ["Sources/FoodDiary/**"],
+            resources: ["Sources/FoodDiary/Resources/**"],
             dependencies: [.target(name: "FeatureKit")],
             settings: .settings(base: [
                 "DEVELOPMENT_TEAM": .string(teamId),

@@ -13,9 +13,10 @@ platform :ios do
   desc "Generate project, then run all unit tests"
   lane :test do
     sh("cd .. && bash Scripts/setup.sh")
-    # xcodebuild_formatter: "" -> raw xcodebuild output so compiler errors are
-    # visible in CI logs (xcbeautify otherwise swallows them).
-    run_tests(workspace: WORKSPACE, scheme: SCHEME, xcodebuild_formatter: "")
+    # -skipMacroValidation: trust the Point-Free SPM macros (CasePaths/TCA/
+    # Dependencies/SwiftNavigation/Perception) without the interactive
+    # "enable macro" prompt, which fails headless CI.
+    run_tests(workspace: WORKSPACE, scheme: SCHEME, xcargs: "-skipMacroValidation")
   end
 
   desc "Build and upload to TestFlight"
@@ -60,6 +61,7 @@ platform :ios do
         "CURRENT_PROJECT_VERSION=#{build_number}",
         "CODE_SIGN_STYLE=Automatic",
         "DEVELOPMENT_TEAM=#{TEAM_ID}",
+        "-skipMacroValidation",
         "-allowProvisioningUpdates",
         "-authenticationKeyPath \"#{ENV.fetch("AUTH_KEY_PATH")}\"",
         "-authenticationKeyID \"#{ENV.fetch("APPSTORE_KEY_ID")}\"",
