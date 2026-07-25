@@ -19,6 +19,7 @@ public struct PersistenceClient: Sendable {
         _ place: PlaceInfo?, _ memo: String, _ rating: Int?, _ cutouts: [NewCutout]
     ) async throws -> MealSnapshot
     public var allCutouts: @Sendable () async throws -> [CutoutSnapshot]
+    public var allMeals: @Sendable () async throws -> [MealSnapshot]
     public var meal: @Sendable (_ id: UUID) async throws -> MealSnapshot?
     public var mealByCutout: @Sendable (_ cutoutID: UUID) async throws -> MealSnapshot?
     public var deleteMeal: @Sendable (_ id: UUID) async throws -> Void
@@ -48,6 +49,13 @@ actor PersistenceActor {
     func allCutouts() throws -> [CutoutSnapshot] {
         let descriptor = FetchDescriptor<FoodCutout>(
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor).map { $0.snapshot() }
+    }
+
+    func allMeals() throws -> [MealSnapshot] {
+        let descriptor = FetchDescriptor<Meal>(
+            sortBy: [SortDescriptor(\.eatenAt, order: .reverse)]
         )
         return try modelContext.fetch(descriptor).map { $0.snapshot() }
     }
@@ -82,6 +90,7 @@ public extension PersistenceClient {
                 )
             },
             allCutouts: { try await actor.allCutouts() },
+            allMeals: { try await actor.allMeals() },
             meal: { id in try await actor.meal(id: id) },
             mealByCutout: { id in try await actor.mealByCutout(id: id) },
             deleteMeal: { id in try await actor.delete(id: id, imageStore: imageStore) }
@@ -100,6 +109,7 @@ extension PersistenceClient: TestDependencyKey {
                          })
         },
         allCutouts: { [] },
+        allMeals: { [] },
         meal: { _ in nil },
         mealByCutout: { _ in nil },
         deleteMeal: { _ in }

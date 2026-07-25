@@ -66,6 +66,18 @@ final class PersistenceClientTests: XCTestCase {
         XCTAssertEqual(owning?.id, snap.id)
     }
 
+    func test_allMeals_returnsSavedMealsNewestFirst() async throws {
+        let client = try makeClient()
+        _ = try await client.saveMeal(PlaceInfo(id: "a", name: "A", address: ""), "older", nil,
+                                      [NewCutout(pngData: Data([1]), label: nil)])
+        _ = try await client.saveMeal(PlaceInfo(id: "b", name: "B", address: ""), "newer", nil,
+                                      [NewCutout(pngData: Data([2]), label: nil)])
+        let meals = try await client.allMeals()
+        XCTAssertEqual(meals.count, 2)
+        XCTAssertEqual(meals.first?.memo, "newer")
+        XCTAssertEqual(meals.first?.place?.name, "B")
+    }
+
     func test_deleteMeal_removesMealAndItsCutouts() async throws {
         let client = try makeClient()
 
