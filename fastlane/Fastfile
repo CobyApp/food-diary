@@ -13,7 +13,9 @@ platform :ios do
   desc "Generate project, then run all unit tests"
   lane :test do
     sh("cd .. && bash Scripts/setup.sh")
-    run_tests(workspace: WORKSPACE, scheme: SCHEME)
+    # xcodebuild_formatter: "" -> raw xcodebuild output so compiler errors are
+    # visible in CI logs (xcbeautify otherwise swallows them).
+    run_tests(workspace: WORKSPACE, scheme: SCHEME, xcodebuild_formatter: "")
   end
 
   desc "Build and upload to TestFlight"
