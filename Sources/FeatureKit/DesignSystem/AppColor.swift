@@ -1,0 +1,45 @@
+import SwiftUI
+
+public extension Color {
+    init(hex: UInt) {
+        self.init(
+            .sRGB,
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255,
+            opacity: 1
+        )
+    }
+
+    static let appMilk = Color(hex: 0xFCF8F5)
+    static let appCard = Color.white
+    static let appBlue = Color(hex: 0x8FBEEA)
+    static let appBlueInk = Color(hex: 0x5385C4)
+    static let appPink = Color(hex: 0xF7C2D6)
+    static let appPinkInk = Color(hex: 0xC67191)
+    static let appButter = Color(hex: 0xFBE6A6)
+    static let appButterInk = Color(hex: 0xB99329)
+    static let appInk = Color(hex: 0x4B4A57)
+    static let appMuted = Color(hex: 0xA6A2B0)
+
+    static let appTilePink = Color(hex: 0xFDEBF2)
+    static let appTileBlue = Color(hex: 0xEAF3FC)
+    static let appTileButter = Color(hex: 0xFCF3D6)
+}
+
+public enum StickerTint: CaseIterable {
+    case pink, blue, butter, plain
+
+    public var color: Color {
+        switch self {
+        case .pink: return .appTilePink
+        case .blue: return .appTileBlue
+        case .butter: return .appTileButter
+        case .plain: return .appCard
+        }
+    }
+
+    public static func rotating(_ index: Int) -> StickerTint {
+        allCases[((index % allCases.count) + allCases.count) % allCases.count]
+    }
+}
