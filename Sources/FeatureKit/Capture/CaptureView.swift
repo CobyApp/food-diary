@@ -7,63 +7,84 @@ public struct CaptureView: View {
     @State private var pickerItem: PhotosPickerItem?
     public init(store: StoreOf<CaptureFeature>) { self.store = store }
 
+    private let candidateColumns = [GridItem(.adaptive(minimum: 90), spacing: 10)]
+
     public var body: some View {
         NavigationStack {
-            Form {
-                Section {
+            ScreenScaffold(title: "한 끼 담기", doodle: nil) {
+                VStack(alignment: .leading, spacing: 16) {
                     PhotosPicker(selection: $pickerItem, matching: .images) {
-                        Label("음식 사진 고르기", systemImage: "camera")
+                        DropZoneCard { Label("음식 사진 고르기", systemImage: "camera") }
                     }
-                }
-                if store.isProcessing { ProgressView("음식 누끼 따는 중…") }
+                    .buttonStyle(.plain)
 
-                if !store.candidates.isEmpty {
-                    Section("담을 누끼 고르기") {
-                        ScrollView(.horizontal) {
-                            HStack {
-                                ForEach(store.candidates) { candidate in
-                                    Button { store.send(.toggleCandidate(candidate.id)) } label: {
+                    if store.isProcessing {
+                        HStack(spacing: 8) {
+                            ProgressView().tint(.appBlue)
+                            Text("음식 누끼 따는 중…").font(.appBody).foregroundStyle(.appMuted)
+                        }
+                    }
+
+                    if !store.candidates.isEmpty {
+                        Text("담을 누끼 고르기").font(.appSection).foregroundStyle(.appInk)
+                        LazyVGrid(columns: candidateColumns, spacing: 10) {
+                            ForEach(Array(store.candidates.enumerated()), id: \.element.id) { index, candidate in
+                                Button { store.send(.toggleCandidate(candidate.id)) } label: {
+                                    StickerTile(tint: .rotating(index)) {
                                         CutoutImage(data: candidate.pngData)
-                                            .frame(width: 90, height: 90)
-                                            .overlay(alignment: .topTrailing) {
-                                                Image(systemName: candidate.isSelected
-                                                      ? "checkmark.circle.fill" : "circle")
-                                                    .padding(4)
-                                            }
                                     }
-                                    .buttonStyle(.plain)
+                                    .overlay(alignment: .topTrailing) {
+                                        Image(systemName: candidate.isSelected ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(candidate.isSelected ? Color.appBlue : Color.appMuted)
+                                            .padding(6)
+                                    }
+                                    .opacity(candidate.isSelected ? 1 : 0.5)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+
+                        SoftCard {
+                            VStack(spacing: 12) {
+                                Button { store.send(.choosePlaceTapped) } label: {
+                                    HStack {
+                                        Text("식당").font(.appSection).foregroundStyle(.appInk)
+                                        Spacer()
+                                        PastelChip(store.chosenPlace?.name ?? "선택 안 함",
+                                                   glyph: "✦", tone: .blue)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                Divider()
+                                HStack {
+                                    Text("메모").font(.appSection).foregroundStyle(.appInk)
+                                    Spacer()
+                                    TextField("한 줄 남기기", text: Binding(
+                                        get: { store.memo },
+                                        set: { store.send(.memoChanged($0)) }
+                                    ))
+                                    .font(.appBody)
+                                    .multilineTextAlignment(.trailing)
+                                }
+                                Divider()
+                                HStack {
+                                    Text("별점").font(.appSection).foregroundStyle(.appInk)
+                                    Spacer()
+                                    StarRating(rating: store.rating,
+                                               onChange: { store.send(.ratingChanged($0)) })
                                 }
                             }
                         }
-                    }
-                    Section("한 끼 정보") {
-                        Button {
-                            store.send(.choosePlaceTapped)
-                        } label: {
-                            HStack {
-                                Text("식당")
-                                Spacer()
-                                Text(store.chosenPlace?.name ?? "선택 안 함")
-                                    .foregroundStyle(.secondary)
-                            }
+
+                        PillButton("다이어리에 저장 ♡",
+                                   enabled: store.candidates.contains(where: \.isSelected)) {
+                            store.send(.saveTapped)
                         }
-                        TextField("메모", text: Binding(
-                            get: { store.memo },
-                            set: { store.send(.memoChanged($0)) }
-                        ))
-                        Stepper("별점: \(store.rating.map(String.init) ?? "-")",
-                                value: Binding(
-                                    get: { store.rating ?? 0 },
-                                    set: { store.send(.ratingChanged($0)) }
-                                ), in: 0...5)
-                    }
-                    Section {
-                        Button("다이어리에 저장") { store.send(.saveTapped) }
-                            .disabled(!store.candidates.contains(where: \.isSelected))
+                        .padding(.top, 4)
                     }
                 }
             }
-            .navigationTitle("한 끼 담기")
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $store.scope(state: \.placePicker, action: \.placePicker)) { pickerStore in
                 NavigationStack { PlacePickerView(store: pickerStore) }
             }
