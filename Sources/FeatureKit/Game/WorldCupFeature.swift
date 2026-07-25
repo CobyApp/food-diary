@@ -1,0 +1,104 @@
+import ComposableArchitecture
+import Foundation
+import Models
+import ClientKit
+
+@Reducer
+public struct WorldCupFeature {
+    @ObservableState
+    public struct State: Equatable {
+        public var cutouts: [CutoutSnapshot]
+        public var currentRound: [CutoutSnapshot] = []
+        public var nextRound: [CutoutSnapshot] = []
+        public var pairIndex = 0
+        public var champion: CutoutSnapshot?
+        public var championPlace: String?
+        public init(cutouts: [CutoutSnapshot]) { self.cutouts = cutouts }
+
+        public var currentPair: (CutoutSnapshot, CutoutSnapshot)? {
+            guard pairIndex + 1 < currentRound.count else { return nil }
+            return (currentRound[pairIndex], currentRound[pairIndex + 1])
+        }
+
+        public var roundName: String {
+            switch currentRound.count {
+            case 2: return "결승"
+            case 4: return "4강"
+            case 8: return "8강"
+            case 16: return "16강"
+            default: return "\(currentRound.count)강"
+            }
+        }
+    }
+
+    public enum Action: Equatable {
+        case start
+        case pick(CutoutSnapshot)
+        case placeLoaded(String?)
+        case playAgain
+        case close
+    }
+
+    @Dependency(\.random) var random
+    @Dependency(\.persistence) var persistence
+
+    public init() {}
+
+    // Largest power of two <= count, clamped to 2...16.
+    private func bracketSize(_ count: Int) -> Int {
+        guard count >= 2 else { return 0 }
+        var size = 1
+        while size * 2 <= min(count, 16) { size *= 2 }
+        return size
+    }
+
+    public var body: some ReducerOf<Self> {
+        Reduce { state, action in
+            switch action {
+            case .start:
+                let size = bracketSize(state.cutouts.count)
+                guard size >= 2 else { return .none }
+                state.currentRound = Array(random.shuffled(state.cutouts).prefix(size))
+                state.nextRound = []
+                state.pairIndex = 0
+                state.champion = nil
+                state.championPlace = nil
+                return .none
+
+            case let .pick(winner):
+                state.nextRound.append(winner)
+                state.pairIndex += 2
+                if state.pairIndex >= state.currentRound.count {
+                    // Round finished: promote to the next round or crown the champion.
+                    if state.nextRound.count == 1 {
+                        let champ = state.nextRound[0]
+                        state.champion = champ
+                        return .run { send in
+                            let place = try? await persistence.mealByCutout(champ.id)?.place?.name
+                            await send(.placeLoaded(place ?? nil))
+                        }
+                    }
+                    state.currentRound = state.nextRound
+                    state.nextRound = []
+                    state.pairIndex = 0
+                }
+                return .none
+
+            case let .placeLoaded(place):
+                state.championPlace = place
+                return .none
+
+            case .playAgain:
+                state.currentRound = []
+                state.nextRound = []
+                state.pairIndex = 0
+                state.champion = nil
+                state.championPlace = nil
+                return .send(.start)
+
+            case .close:
+                return .none
+            }
+        }
+    }
+}
