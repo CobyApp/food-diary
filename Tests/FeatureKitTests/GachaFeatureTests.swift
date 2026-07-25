@@ -27,7 +27,29 @@ final class GachaFeatureTests: XCTestCase {
         await store.send(.pullLever) {
             $0.isSpinning = true
             $0.result = picked
+            $0.drawnIDs = [picked.id]
         }
         await store.receive(\.placeLoaded) { $0.resultPlace = "라멘집" }
+    }
+
+    @MainActor
+    func test_playAgainDoesNotRepeatUntilPoolIsUsed() async {
+        let items = [snap(1), snap(2), snap(3)]
+        let store = TestStore(initialState: GachaFeature.State(cutouts: items)) {
+            GachaFeature()
+        } withDependencies: {
+            $0.random.pick = { $0.first }
+            $0.persistence.mealByCutout = { _ in nil }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.pullLever)
+        await store.receive(\.placeLoaded)
+        let firstID = store.state.result?.id
+        await store.send(.playAgain)
+        await store.send(.pullLever)
+        await store.receive(\.placeLoaded)
+
+        XCTAssertNotEqual(store.state.result?.id, firstID)
     }
 }

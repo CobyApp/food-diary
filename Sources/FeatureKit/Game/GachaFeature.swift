@@ -11,6 +11,7 @@ public struct GachaFeature {
         public var result: CutoutSnapshot?
         public var resultPlace: String?
         public var isSpinning = false
+        public var drawnIDs: Set<UUID> = []
         public init(cutouts: [CutoutSnapshot]) { self.cutouts = cutouts }
     }
 
@@ -31,10 +32,16 @@ public struct GachaFeature {
         Reduce { state, action in
             switch action {
             case .pullLever:
-                guard let pick = random.pick(state.cutouts) else { return .none }
+                var pool = state.cutouts.filter { !state.drawnIDs.contains($0.id) }
+                if pool.isEmpty {
+                    state.drawnIDs = []
+                    pool = state.cutouts
+                }
+                guard let pick = random.pick(pool) else { return .none }
                 state.isSpinning = true
                 state.result = pick
                 state.resultPlace = nil
+                state.drawnIDs.insert(pick.id)
                 return .run { send in
                     let place = try? await persistence.mealByCutout(pick.id)?.place?.name
                     await send(.placeLoaded(place ?? nil))

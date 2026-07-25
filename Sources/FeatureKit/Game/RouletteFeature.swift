@@ -12,6 +12,7 @@ public struct RouletteFeature {
         public var result: CutoutSnapshot?
         public var resultPlace: String?
         public var isSpinning = false
+        public var lastResultID: UUID?
         public init(cutouts: [CutoutSnapshot]) { self.cutouts = cutouts }
     }
 
@@ -39,10 +40,12 @@ public struct RouletteFeature {
                 return .none
 
             case .spin:
-                guard let pick = random.pick(state.cutouts) else { return .none }
+                let fresh = state.cutouts.filter { $0.id != state.lastResultID }
+                guard let pick = random.pick(fresh.isEmpty ? state.cutouts : fresh) else { return .none }
                 state.isSpinning = true
                 state.result = pick
                 state.resultPlace = nil
+                state.lastResultID = pick.id
                 return .run { send in
                     let place = try? await persistence.mealByCutout(pick.id)?.place?.name
                     await send(.placeLoaded(place ?? nil))

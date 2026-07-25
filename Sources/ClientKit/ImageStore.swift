@@ -30,7 +30,10 @@ public extension ImageStore {
                 return name
             },
             load: { name in
-                try? Data(contentsOf: directory.appendingPathComponent(name))
+                try? Data(
+                    contentsOf: directory.appendingPathComponent(name),
+                    options: [.mappedIfSafe]
+                )
             },
             delete: { name in
                 // Use FileManager.default directly rather than capturing `fm`,

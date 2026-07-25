@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "美食日记";
+"NSCameraUsageDescription" = "使用相机拍下美食，并制作成抠图贴纸。";
+"NSPhotoLibraryUsageDescription" = "使用照片图库选择美食照片，并制作成抠图贴纸。";
+"NSLocationWhenInUseUsageDescription" = "使用位置信息推荐照片拍摄地点附近的餐厅。";

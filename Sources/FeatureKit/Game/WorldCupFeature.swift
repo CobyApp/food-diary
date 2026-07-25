@@ -22,11 +22,8 @@ public struct WorldCupFeature {
 
         public var roundName: String {
             switch currentRound.count {
-            case 2: return "결승"
-            case 4: return "4강"
-            case 8: return "8강"
-            case 16: return "16강"
-            default: return "\(currentRound.count)강"
+            case 2: return L10n.text("결승")
+            default: return L10n.format("round.count", currentRound.count)
             }
         }
     }

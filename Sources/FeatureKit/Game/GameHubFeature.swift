@@ -17,21 +17,36 @@ public enum GameKind: Equatable, CaseIterable {
     case gacha, worldCup, cardFlip, roulette
     public var title: String {
         switch self {
-        case .gacha: return "가챠 뽑기"
-        case .worldCup: return "음식 월드컵"
-        case .cardFlip: return "카드 뒤집기"
-        case .roulette: return "룰렛 슬롯"
+        case .gacha: return L10n.text("가챠 뽑기")
+        case .worldCup: return L10n.text("음식 월드컵")
+        case .cardFlip: return L10n.text("카드 뒤집기")
+        case .roulette: return L10n.text("룰렛 슬롯")
         }
     }
-    public var emoji: String {
+    public var symbol: String {
         switch self {
-        case .gacha: return "🎰"
-        case .worldCup: return "🏆"
-        case .cardFlip: return "🃏"
-        case .roulette: return "🎡"
+        case .gacha: return "capsule.portrait.fill"
+        case .worldCup: return "crown.fill"
+        case .cardFlip: return "rectangle.on.rectangle.angled"
+        case .roulette: return "dial.high.fill"
         }
     }
-    public var minimum: Int { self == .worldCup ? 2 : 1 }
+    public var subtitle: String {
+        switch self {
+        case .gacha: return L10n.text("캡슐 속 랜덤 한 끼")
+        case .worldCup: return L10n.text("끝까지 고르는 취향전")
+        case .cardFlip: return L10n.text("운명처럼 한 장 픽")
+        case .roulette: return L10n.text("빠르게 돌려 즉석 결정")
+        }
+    }
+    public var minimum: Int {
+        switch self {
+        case .gacha: return 3
+        case .worldCup: return 2
+        case .cardFlip: return 3
+        case .roulette: return 2
+        }
+    }
 }
 
 @Reducer

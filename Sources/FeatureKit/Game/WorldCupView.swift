@@ -1,39 +1,101 @@
-import SwiftUI
 import ComposableArchitecture
 import Models
+import SwiftUI
 
 public struct WorldCupView: View {
     @Bindable var store: StoreOf<WorldCupFeature>
+    @State private var selectedID: UUID?
+
     public init(store: StoreOf<WorldCupFeature>) { self.store = store }
 
     public var body: some View {
         ZStack {
-            Color.appMilk.ignoresSafeArea()
-            if let champ = store.champion {
-                ResultCard(cutout: champ, place: store.championPlace,
-                           onAgain: { store.send(.playAgain) },
-                           onClose: { store.send(.close) })
+            PaperBackground()
+            if let champion = store.champion {
+                ResultCard(
+                    cutout: champion,
+                    place: store.championPlace,
+                    onAgain: {
+                        selectedID = nil
+                        store.send(.playAgain)
+                    },
+                    onClose: { store.send(.close) }
+                )
             } else if let pair = store.currentPair {
-                VStack(spacing: 20) {
-                    Text(store.roundName).font(.appDisplay).foregroundStyle(.appBlueInk)
-                    contender(pair.0)
-                    Text("VS").font(.appTitle).foregroundStyle(.appMuted)
-                    contender(pair.1)
-                    Button("닫기") { store.send(.close) }.foregroundStyle(.appMuted).padding(.top, 4)
+                VStack(spacing: 18) {
+                    VStack(spacing: 8) {
+                        Text("FOOD TASTE MATCH")
+                            .font(.appCaption).tracking(1.6).foregroundStyle(.appPinkInk)
+                        Text(store.roundName).font(.appDisplay).foregroundStyle(.appInk)
+                        ProgressView(
+                            value: Double(store.pairIndex + 2),
+                            total: Double(max(store.currentRound.count, 2))
+                        )
+                        .tint(.appCherry)
+                        .frame(maxWidth: 220)
+                    }
+
+                    HStack(spacing: 10) {
+                        contender(pair.0, index: 0)
+                        Text("VS")
+                            .font(.system(size: 17, weight: .black, design: .rounded))
+                            .foregroundStyle(.appCard)
+                            .frame(width: 46, height: 46)
+                            .background(Color.appCherry, in: Circle())
+                            .overlay { Circle().stroke(Color.appCard, lineWidth: 3) }
+                            .zIndex(2)
+                        contender(pair.1, index: 1)
+                    }
+
+                    Text("더 먹고 싶은 쪽을 탭하세요")
+                        .font(.appCaption).foregroundStyle(.appMuted)
+                    Button("게임 나가기") { store.send(.close) }
+                        .font(.appCaption).foregroundStyle(.appMuted)
                 }
-                .padding(24)
+                .padding(20)
+                .id(store.pairIndex)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
             } else {
-                ProgressView().tint(.appBlue).task { store.send(.start) }
+                KitschLoadingView(
+                    "대진표를 섞는 중",
+                    messages: ["맛있는 후보들이 입장하고 있어요"]
+                )
+                .padding(24)
+                .task { store.send(.start) }
             }
         }
-        .animation(.spring(duration: 0.35), value: store.pairIndex)
+        .animation(.spring(response: 0.48, dampingFraction: 0.78), value: store.pairIndex)
+        .sensoryFeedback(.selection, trigger: selectedID)
     }
 
-    private func contender(_ cutout: CutoutSnapshot) -> some View {
-        Button { store.send(.pick(cutout)) } label: {
-            StickerTile(tint: .rotating(cutout.id.hashValue)) { CutoutImage(fileName: cutout.fileName) }
-                .frame(maxWidth: .infinity).frame(height: 150)
+    private func contender(_ cutout: CutoutSnapshot, index: Int) -> some View {
+        Button {
+            selectedID = cutout.id
+            store.send(.pick(cutout))
+        } label: {
+            VStack(spacing: 10) {
+                StickerTile(tint: .rotating(index)) {
+                    CutoutImage(fileName: cutout.fileName)
+                }
+                Text(index == 0 ? "LEFT PICK" : "RIGHT PICK")
+                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .tracking(1)
+                    .foregroundStyle(.appChocolate)
+            }
+            .padding(8)
+            .background(Color.appCard)
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(Color.appChocolate.opacity(0.14), lineWidth: 1.5)
+            }
+            .scaleEffect(selectedID == cutout.id ? 1.06 : 1)
+            .rotationEffect(.degrees(index == 0 ? -1.5 : 1.5))
+            .softShadow()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KitschPressStyle())
     }
 }

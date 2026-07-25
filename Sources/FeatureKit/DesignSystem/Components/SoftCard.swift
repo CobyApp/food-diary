@@ -6,15 +6,19 @@ public struct SoftCard<Content: View>: View {
 
     public var body: some View {
         content
-            .padding(14)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.appCard)
             .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
+                    .stroke(Color.appChocolate.opacity(0.12), lineWidth: 1.5)
+            }
             .softShadow()
     }
 }
 
 #Preview {
-    SoftCard { Text("존맛탱 🥹").font(.appBody).foregroundStyle(Color.appInk) }
+    SoftCard { Text("오늘의 맛있는 기록").font(.appBody).foregroundStyle(Color.appInk) }
         .padding().background(Color.appMilk)
 }

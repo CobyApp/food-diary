@@ -24,6 +24,7 @@ final class RouletteFeatureTests: XCTestCase {
         await store.send(.spin) {
             $0.isSpinning = true
             $0.result = picked
+            $0.lastResultID = picked.id
         }
     }
 }

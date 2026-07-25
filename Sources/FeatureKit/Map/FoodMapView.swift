@@ -22,7 +22,7 @@ public struct FoodMapView: View {
             }
             .ignoresSafeArea()
 
-            Text("맛집 지도 🗺️")
+            Text("맛집 지도")
                 .font(.appTitle).foregroundStyle(.appInk)
                 .padding(.horizontal, 14).padding(.vertical, 8)
                 .background(.ultraThinMaterial, in: Capsule())
@@ -51,7 +51,9 @@ public struct FoodMapView: View {
             if let first = meal.cutouts.first {
                 CutoutImage(fileName: first.fileName).frame(width: 40, height: 40)
             } else {
-                Text("🍽").font(.system(size: 22))
+                Image(systemName: "fork.knife")
+                    .font(.title3.bold())
+                    .foregroundStyle(.appPinkInk)
             }
         }
         .overlay(Circle().strokeBorder(Color.appBlue, lineWidth: 2))
@@ -61,7 +63,11 @@ public struct FoodMapView: View {
         SoftCard {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    PastelChip(meal.place?.name ?? "한 끼", glyph: "✦", tone: .blue)
+                    PastelChip(
+                        meal.place?.name ?? L10n.text("한 끼"),
+                        symbol: "mappin",
+                        tone: .blue
+                    )
                     Spacer()
                     Button { store.send(.dismissCard) } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.appMuted)

@@ -11,17 +11,19 @@ public struct FloatingTabBar: View {
 
     public var body: some View {
         HStack(spacing: 4) {
-            item(.collection, systemImage: "square.grid.2x2.fill", title: "컬렉션")
-            item(.capture, systemImage: "plus.circle.fill", title: "담기")
-            item(.game, systemImage: "die.face.5.fill", title: "뭐먹지")
-            item(.map, systemImage: "map.fill", title: "지도")
+            item(.collection, systemImage: "square.grid.2x2", title: "컬렉션")
+            item(.capture, systemImage: "plus", title: "담기")
+            item(.game, systemImage: "dice", title: "뭐먹지")
+            item(.map, systemImage: "map", title: "지도")
         }
-        .padding(6)
+        .padding(7)
         .background(Color.appCard)
         .clipShape(Capsule())
+        .overlay { Capsule().stroke(Color.appChocolate.opacity(0.14), lineWidth: 1.5) }
         .softShadow()
         .padding(.horizontal, 14)
         .padding(.bottom, 6)
+        .frame(maxWidth: 560)
     }
 
     private func item(_ tab: RootFeature.Tab, systemImage: String, title: String) -> some View {
@@ -29,15 +31,25 @@ public struct FloatingTabBar: View {
         return Button { onSelect(tab) } label: {
             HStack(spacing: 4) {
                 Image(systemName: systemImage)
-                Text(title)
+                    .fontWeight(.black)
+                    .symbolEffect(.bounce, value: active)
+                Text(L10n.text(title))
             }
             .font(.appCaption)
-            .foregroundStyle(active ? Color.appBlueInk : Color.appMuted)
+            .minimumScaleFactor(0.78)
+            .lineLimit(1)
+            .foregroundStyle(active ? Color.appChocolate : Color.appMuted)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
-            .background(active ? Color.appTileBlue : Color.clear)
+            .background(active ? Color.appPink.opacity(0.72) : Color.clear)
             .clipShape(Capsule())
+            .overlay {
+                if active {
+                    Capsule().stroke(Color.appCard, lineWidth: 2)
+                }
+            }
+            .offset(y: active ? -2 : 0)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KitschPressStyle())
     }
 }

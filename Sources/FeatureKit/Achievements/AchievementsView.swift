@@ -9,18 +9,22 @@ public struct AchievementsView: View {
 
     public var body: some View {
         ZStack {
-            Color.appMilk.ignoresSafeArea()
+            PaperBackground()
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
-                        Text("음식 도감 🏆").font(.appDisplay).foregroundStyle(.appInk)
+                        Text("음식 도감").font(.appDisplay).foregroundStyle(.appInk)
                         Spacer()
                         Button { store.send(.close) } label: {
                             Image(systemName: "xmark.circle.fill").font(.title2).foregroundStyle(.appMuted)
                         }
                         .buttonStyle(.plain)
                     }
-                    Text("\(store.unlockedCount) / \(store.achievements.count) 달성")
+                    Text(L10n.format(
+                        "achievements.progress",
+                        store.unlockedCount,
+                        store.achievements.count
+                    ))
                         .font(.appSection).foregroundStyle(.appBlueInk)
 
                     LazyVGrid(columns: columns, spacing: 14) {
@@ -36,14 +40,18 @@ public struct AchievementsView: View {
     private func badge(_ a: Achievement) -> some View {
         SoftCard {
             VStack(spacing: 8) {
-                Text(a.emoji)
-                    .font(.system(size: 40))
+                KitschIcon(
+                    a.symbol,
+                    tint: a.unlocked ? .appChocolate : .appMuted,
+                    background: a.unlocked ? .appButter : .appTileBlue,
+                    size: 58
+                )
                     .opacity(a.unlocked ? 1 : 0.35)
                     .grayscale(a.unlocked ? 0 : 1)
                 Text(a.title).font(.appSection)
                     .foregroundStyle(a.unlocked ? Color.appInk : Color.appMuted)
                 if a.unlocked {
-                    Text("달성!").font(.appCaption).foregroundStyle(.appPinkInk)
+                    Text("COLLECTED").font(.appCaption).foregroundStyle(.appPinkInk)
                 } else {
                     ProgressView(value: a.progress).tint(.appBlue)
                     Text("\(a.current)/\(a.target)").font(.appCaption).foregroundStyle(.appMuted)

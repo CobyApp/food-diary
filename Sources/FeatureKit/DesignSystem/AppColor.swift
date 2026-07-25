@@ -11,16 +11,19 @@ public extension Color {
         )
     }
 
-    static let appMilk = Color(hex: 0xFCF8F5)
-    static let appCard = Color.white
-    static let appBlue = Color(hex: 0x8FBEEA)
-    static let appBlueInk = Color(hex: 0x5385C4)
-    static let appPink = Color(hex: 0xF7C2D6)
-    static let appPinkInk = Color(hex: 0xC67191)
-    static let appButter = Color(hex: 0xFBE6A6)
-    static let appButterInk = Color(hex: 0xB99329)
-    static let appInk = Color(hex: 0x4B4A57)
-    static let appMuted = Color(hex: 0xA6A2B0)
+    static let appMilk = Color(hex: 0xFFF9F0)
+    static let appCard = Color(hex: 0xFFFEFA)
+    static let appBlue = Color(hex: 0xA8C7E8)
+    static let appBlueInk = Color(hex: 0x507AA7)
+    static let appPink = Color(hex: 0xF7B7C8)
+    static let appPinkInk = Color(hex: 0xB64D6A)
+    static let appButter = Color(hex: 0xF7D889)
+    static let appButterInk = Color(hex: 0x9D6D19)
+    static let appLavender = Color(hex: 0xC9B9E8)
+    static let appCherry = Color(hex: 0xD94A61)
+    static let appChocolate = Color(hex: 0x62483F)
+    static let appInk = Color(hex: 0x493E3B)
+    static let appMuted = Color(hex: 0x948782)
 
     static let appTilePink = Color(hex: 0xFDEBF2)
     static let appTileBlue = Color(hex: 0xEAF3FC)
@@ -39,6 +42,9 @@ public extension ShapeStyle where Self == Color {
     static var appPinkInk: Color { .appPinkInk }
     static var appButter: Color { .appButter }
     static var appButterInk: Color { .appButterInk }
+    static var appLavender: Color { .appLavender }
+    static var appCherry: Color { .appCherry }
+    static var appChocolate: Color { .appChocolate }
     static var appInk: Color { .appInk }
     static var appMuted: Color { .appMuted }
     static var appTilePink: Color { .appTilePink }

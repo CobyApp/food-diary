@@ -7,7 +7,7 @@ public struct PlacePickerView: View {
 
     public var body: some View {
         ZStack {
-            Color.appMilk.ignoresSafeArea()
+            PaperBackground()
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("근처 식당").font(.appSection).foregroundStyle(.appMuted)
@@ -45,7 +45,14 @@ public struct PlacePickerView: View {
                 }
                 .padding(18)
             }
-            if store.isLoading { ProgressView().tint(.appBlue) }
+            if store.isLoading {
+                KitschLoadingView(
+                    "근처 맛집을 찾는 중",
+                    messages: ["사진 속 위치를 살펴보고 있어요"],
+                    compact: true
+                )
+                .padding(24)
+            }
         }
         .navigationTitle("식당 선택")
         .navigationBarTitleDisplayMode(.inline)

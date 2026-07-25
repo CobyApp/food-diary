@@ -9,19 +9,22 @@ public struct CardFlipFeature {
     public struct State: Equatable {
         public var cutouts: [CutoutSnapshot]
         public var cards: [CutoutSnapshot] = []
-        public var revealedIndex: Int?
+        public var firstRevealedIndex: Int?
+        public var secondRevealedIndex: Int?
+        public var moves = 0
+        public var result: CutoutSnapshot?
         public var resultPlace: String?
         public init(cutouts: [CutoutSnapshot]) { self.cutouts = cutouts }
 
-        public var result: CutoutSnapshot? {
-            guard let i = revealedIndex, cards.indices.contains(i) else { return nil }
-            return cards[i]
+        public var revealedIndices: Set<Int> {
+            Set([firstRevealedIndex, secondRevealedIndex].compactMap { $0 })
         }
     }
 
     public enum Action: Equatable {
         case start
         case flip(Int)
+        case hideMismatch
         case placeLoaded(String?)
         case playAgain
         case close
@@ -36,27 +39,50 @@ public struct CardFlipFeature {
         Reduce { state, action in
             switch action {
             case .start:
-                state.cards = Array(random.shuffled(state.cutouts).prefix(6))
-                state.revealedIndex = nil
+                let picks = Array(random.shuffled(state.cutouts).prefix(3))
+                state.cards = random.shuffled(picks + picks)
+                state.firstRevealedIndex = nil
+                state.secondRevealedIndex = nil
+                state.moves = 0
+                state.result = nil
                 state.resultPlace = nil
                 return .none
 
             case let .flip(index):
-                guard state.revealedIndex == nil, state.cards.indices.contains(index) else { return .none }
-                state.revealedIndex = index
-                let picked = state.cards[index]
+                guard
+                    state.cards.indices.contains(index),
+                    !state.revealedIndices.contains(index),
+                    state.secondRevealedIndex == nil,
+                    state.result == nil
+                else { return .none }
+
+                if state.firstRevealedIndex == nil {
+                    state.firstRevealedIndex = index
+                    return .none
+                }
+
+                state.secondRevealedIndex = index
+                state.moves += 1
+                let first = state.cards[state.firstRevealedIndex!]
+                let second = state.cards[index]
+                guard first.id == second.id else { return .none }
+                state.result = second
                 return .run { send in
-                    let place = try? await persistence.mealByCutout(picked.id)?.place?.name
+                    let place = try? await persistence.mealByCutout(second.id)?.place?.name
                     await send(.placeLoaded(place ?? nil))
                 }
+
+            case .hideMismatch:
+                guard state.result == nil else { return .none }
+                state.firstRevealedIndex = nil
+                state.secondRevealedIndex = nil
+                return .none
 
             case let .placeLoaded(place):
                 state.resultPlace = place
                 return .none
 
             case .playAgain:
-                state.revealedIndex = nil
-                state.resultPlace = nil
                 return .send(.start)
 
             case .close:

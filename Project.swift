@@ -14,7 +14,7 @@ func target(
 ) -> Target {
     .target(
         name: name,
-        destinations: .iOS,
+        destinations: [.iPhone],
         product: product,
         bundleId: "\(bundlePrefix).\(name.lowercased())",
         deploymentTargets: deploymentTargets,
@@ -27,7 +27,7 @@ func target(
 func testTarget(_ name: String, sources: String, dependencies: [TargetDependency]) -> Target {
     .target(
         name: name,
-        destinations: .iOS,
+        destinations: [.iPhone],
         product: .unitTests,
         bundleId: "\(bundlePrefix).\(name.lowercased())",
         deploymentTargets: deploymentTargets,
@@ -89,7 +89,7 @@ let project = Project(
                dependencies: [.target(name: "ClientKit")]),
         .target(
             name: "FoodDiary",
-            destinations: .iOS,
+            destinations: [.iPhone],
             product: .app,
             bundleId: "com.coby.food.dairy",
             deploymentTargets: deploymentTargets,
@@ -98,13 +98,43 @@ let project = Project(
                 "NSPhotoLibraryUsageDescription": "음식 사진에서 음식만 추출해 다이어리에 담기 위해 사진 접근이 필요합니다.",
                 "NSCameraUsageDescription": "밥 먹을 때 음식 사진을 찍어 다이어리에 담기 위해 카메라 접근이 필요합니다.",
                 "NSLocationWhenInUseUsageDescription": "사진을 찍은 위치 근처의 식당을 추천하기 위해 위치 정보가 필요합니다.",
+                "UISupportedInterfaceOrientations": [
+                    "UIInterfaceOrientationPortrait",
+                ],
             ]),
             sources: ["Sources/FoodDiary/**"],
             resources: ["Sources/FoodDiary/Resources/**"],
-            dependencies: [.target(name: "FeatureKit")],
+            entitlements: .file(path: "Sources/FoodDiary/FoodDiary.entitlements"),
+            dependencies: [
+                .target(name: "FeatureKit"),
+                .target(name: "FoodDiaryWidget"),
+            ],
             settings: .settings(base: [
                 "DEVELOPMENT_TEAM": .string(teamId),
                 "CODE_SIGN_STYLE": "Automatic",
+            ])
+        ),
+        .target(
+            name: "FoodDiaryWidget",
+            destinations: [.iPhone],
+            product: .appExtension,
+            bundleId: "com.coby.food.dairy.widget",
+            deploymentTargets: deploymentTargets,
+            infoPlist: .extendingDefault(with: [
+                "CFBundleDisplayName": "오늘의 누끼",
+                "NSExtension": [
+                    "NSExtensionPointIdentifier": "com.apple.widgetkit-extension",
+                ],
+            ]),
+            sources: ["Sources/FoodDiaryWidget/**"],
+            resources: ["Sources/FoodDiaryWidget/Resources/**"],
+            entitlements: .file(path: "Sources/FoodDiaryWidget/FoodDiaryWidget.entitlements"),
+            dependencies: [.target(name: "Models")],
+            settings: .settings(base: [
+                "DEVELOPMENT_TEAM": .string(teamId),
+                "CODE_SIGN_STYLE": "Automatic",
+                "APPLICATION_EXTENSION_API_ONLY": "YES",
+                "SKIP_INSTALL": "YES",
             ])
         ),
         testTarget("ModelsTests", sources: "ModelsTests",

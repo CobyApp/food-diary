@@ -10,16 +10,16 @@ public struct MealDetailView: View {
 
     public var body: some View {
         ZStack {
-            Color.appMilk.ignoresSafeArea()
+            PaperBackground()
             ScrollView {
                 if let meal = store.meal {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text(meal.place?.name ?? "한 끼 기록")
+                        Text(meal.place?.name ?? L10n.text("한 끼 기록"))
                             .font(.appDisplay).foregroundStyle(.appInk)
 
                         HStack(spacing: 8) {
                             PastelChip(meal.eatenAt.formatted(.dateTime.month().day().weekday()),
-                                       glyph: "📅", tone: .pink)
+                                       symbol: "calendar", tone: .pink)
                             if meal.rating != nil { StarRating(rating: meal.rating) }
                         }
 
@@ -40,7 +40,13 @@ public struct MealDetailView: View {
                     .padding(18)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    ProgressView().tint(.appBlue).padding(.top, 80)
+                    KitschLoadingView(
+                        "한 끼 기록을 펼치는 중",
+                        messages: ["잠시만 기다려주세요"],
+                        compact: true
+                    )
+                    .padding(.horizontal, 24)
+                    .padding(.top, 60)
                 }
             }
         }

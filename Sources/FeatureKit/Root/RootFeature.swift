@@ -5,7 +5,7 @@ import ClientKit
 
 @Reducer
 public struct RootFeature {
-    public enum Tab: Equatable { case collection, capture, game, map }
+    public enum Tab: Equatable, Hashable { case collection, capture, game, map }
 
     @ObservableState
     public struct State: Equatable {
@@ -29,6 +29,7 @@ public struct RootFeature {
     }
 
     @Dependency(\.persistence) var persistence
+    @Dependency(\.widgetData) var widgetData
 
     public init() {}
 
@@ -56,14 +57,34 @@ public struct RootFeature {
                 return .none
 
             // When a save finishes on the capture tab, refresh the collection and switch to it.
-            case .capture(.saved):
+            case let .capture(.saved(meal)):
                 state.tab = .collection
-                return .send(.collection(.onAppear))
+                return .merge(
+                    .send(.collection(.onAppear)),
+                    .send(.collection(.streakOnAppear)),
+                    .run { send in
+                        let meals = (try? await persistence.allMeals()) ?? [meal]
+                        let streak = MealStreak.calculate(meals: meals, now: Date()).current
+                        await widgetData.update(meal, streak)
+                    }
+                )
 
             // Pop detail after a delete.
             case let .path(.element(id: id, action: .deleted)):
                 state.path.pop(from: id)
-                return .send(.collection(.onAppear))
+                return .merge(
+                    .send(.collection(.onAppear)),
+                    .send(.collection(.streakOnAppear)),
+                    .run { _ in
+                        let meals = (try? await persistence.allMeals()) ?? []
+                        guard let latest = meals.first else {
+                            await widgetData.clear()
+                            return
+                        }
+                        let streak = MealStreak.calculate(meals: meals, now: Date()).current
+                        await widgetData.update(latest, streak)
+                    }
+                )
 
             case .collection, .capture, .gameHub, .foodMap, .path:
                 return .none

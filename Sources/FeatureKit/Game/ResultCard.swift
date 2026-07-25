@@ -8,24 +8,36 @@ struct ResultCard: View {
     let onClose: () -> Void
 
     var body: some View {
-        VStack(spacing: 18) {
-            Text("오늘은 여기! 🍜").font(.appTitle).foregroundStyle(.appInk)
-            StickerTile(tint: .pink) { CutoutImage(fileName: cutout.fileName) }
-                .frame(width: 210, height: 210)
-                .transition(.scale.combined(with: .opacity))
-            Text(place ?? cutout.label ?? "맛있는 거")
-                .font(.appDisplay).foregroundStyle(.appBlueInk)
-                .multilineTextAlignment(.center)
-            HStack(spacing: 12) {
-                PillButton("다시 뽑기") { onAgain() }
-                Button { onClose() } label: {
-                    Text("닫기").font(.appSection).foregroundStyle(.appMuted)
-                        .padding(.vertical, 14).padding(.horizontal, 22)
-                        .background(Color.appCard).clipShape(Capsule()).softShadow()
+        ZStack {
+            ConfettiBurst()
+                .frame(width: 280, height: 280)
+                .offset(y: -45)
+
+            VStack(spacing: 18) {
+                Text("TODAY'S PICK")
+                    .font(.appCaption)
+                    .tracking(2)
+                    .foregroundStyle(.appPinkInk)
+                StickerTile(tint: .pink) { CutoutImage(fileName: cutout.fileName) }
+                    .frame(width: 224, height: 224)
+                    .rotationEffect(.degrees(-2))
+                    .overlay(alignment: .top) { WashiTape(.appButter).offset(y: -7) }
+                    .transition(.scale(scale: 0.4).combined(with: .opacity))
+                Text(place ?? L10n.text("오늘의 한 끼"))
+                    .font(.appDisplay).foregroundStyle(.appChocolate)
+                    .multilineTextAlignment(.center)
+                HStack(spacing: 12) {
+                    PillButton("한 번 더") { onAgain() }
+                    Button { onClose() } label: {
+                        Text("닫기").font(.appSection).foregroundStyle(.appMuted)
+                            .padding(.vertical, 14).padding(.horizontal, 22)
+                            .background(Color.appCard).clipShape(Capsule()).softShadow()
+                    }
+                    .buttonStyle(KitschPressStyle())
                 }
-                .buttonStyle(.plain)
             }
+            .padding(24)
         }
-        .padding(24)
+        .sensoryFeedback(.success, trigger: cutout.id)
     }
 }

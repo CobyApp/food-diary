@@ -10,7 +10,7 @@ final class GameHubFeatureTests: XCTestCase {
 
     @MainActor
     func test_onAppear_loadsCutouts() async {
-        let items = [snap(1), snap(2)]
+        let items = [snap(1), snap(2), snap(3)]
         let store = TestStore(initialState: GameHubFeature.State()) {
             GameHubFeature()
         } withDependencies: {
@@ -22,7 +22,7 @@ final class GameHubFeatureTests: XCTestCase {
 
     @MainActor
     func test_gameTapped_presentsGachaWithPool() async {
-        let items = [snap(1), snap(2)]
+        let items = [snap(1), snap(2), snap(3)]
         let store = TestStore(initialState: GameHubFeature.State(cutouts: items)) {
             GameHubFeature()
         }

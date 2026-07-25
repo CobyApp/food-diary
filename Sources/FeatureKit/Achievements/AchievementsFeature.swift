@@ -6,7 +6,7 @@ import ClientKit
 public struct Achievement: Equatable, Identifiable {
     public let id: String
     public let title: String
-    public let emoji: String
+    public let symbol: String
     public let target: Int
     public let current: Int
     public var unlocked: Bool { current >= target }
@@ -18,20 +18,20 @@ enum AchievementMetric { case cutouts, places, meals }
 private struct AchievementDef {
     let id: String
     let title: String
-    let emoji: String
+    let symbol: String
     let metric: AchievementMetric
     let target: Int
 }
 
 private let achievementCatalog: [AchievementDef] = [
-    .init(id: "cut1", title: "첫 누끼", emoji: "🍽", metric: .cutouts, target: 1),
-    .init(id: "cut10", title: "누끼 10개", emoji: "🥉", metric: .cutouts, target: 10),
-    .init(id: "cut50", title: "누끼 50개", emoji: "🥈", metric: .cutouts, target: 50),
-    .init(id: "cut100", title: "누끼 100개", emoji: "🥇", metric: .cutouts, target: 100),
-    .init(id: "plc1", title: "첫 맛집", emoji: "📍", metric: .places, target: 1),
-    .init(id: "plc5", title: "맛집 5곳", emoji: "🗺️", metric: .places, target: 5),
-    .init(id: "plc10", title: "맛집 10곳", emoji: "🌏", metric: .places, target: 10),
-    .init(id: "meal30", title: "기록 30개", emoji: "📔", metric: .meals, target: 30),
+    .init(id: "cut1", title: "첫 누끼", symbol: "fork.knife", metric: .cutouts, target: 1),
+    .init(id: "cut10", title: "누끼 10개", symbol: "seal.fill", metric: .cutouts, target: 10),
+    .init(id: "cut50", title: "누끼 50개", symbol: "star.circle.fill", metric: .cutouts, target: 50),
+    .init(id: "cut100", title: "누끼 100개", symbol: "crown.fill", metric: .cutouts, target: 100),
+    .init(id: "plc1", title: "첫 맛집", symbol: "mappin", metric: .places, target: 1),
+    .init(id: "plc5", title: "맛집 5곳", symbol: "map.fill", metric: .places, target: 5),
+    .init(id: "plc10", title: "맛집 10곳", symbol: "globe.asia.australia.fill", metric: .places, target: 10),
+    .init(id: "meal30", title: "기록 30개", symbol: "book.closed.fill", metric: .meals, target: 30),
 ]
 
 func makeAchievements(cutouts: Int, places: Int, meals: Int) -> [Achievement] {
@@ -42,7 +42,7 @@ func makeAchievements(cutouts: Int, places: Int, meals: Int) -> [Achievement] {
         case .places: current = places
         case .meals: current = meals
         }
-        return Achievement(id: def.id, title: def.title, emoji: def.emoji,
+        return Achievement(id: def.id, title: L10n.text(def.title), symbol: def.symbol,
                            target: def.target, current: current)
     }
 }

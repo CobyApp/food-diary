@@ -7,12 +7,22 @@ import ClientKit
 public struct CaptureFeature {
     public struct CutoutCandidate: Equatable, Identifiable {
         public let id: UUID
-        public let pngData: Data
+        public var pngData: Data
         public var isSelected: Bool
-        public init(id: UUID = UUID(), pngData: Data, isSelected: Bool = true) {
+        public var decoration: CutoutDecoration
+        public var isRotating: Bool
+        public init(
+            id: UUID = UUID(),
+            pngData: Data,
+            isSelected: Bool = true,
+            decoration: CutoutDecoration = .none,
+            isRotating: Bool = false
+        ) {
             self.id = id
             self.pngData = pngData
             self.isSelected = isSelected
+            self.decoration = decoration
+            self.isRotating = isRotating
         }
     }
 
@@ -22,6 +32,7 @@ public struct CaptureFeature {
         public var coordinate: Coordinate?
         public var candidates: [CutoutCandidate]
         public var isProcessing = false
+        public var isSaving = false
         public var memo: String
         public var rating: Int?
         @Presents public var placePicker: PlacePickerFeature.State?
@@ -49,12 +60,16 @@ public struct CaptureFeature {
         case photoPicked(Data)
         case processingFinished(coordinate: Coordinate?, cutouts: [Data])
         case toggleCandidate(UUID)
+        case cycleDecoration(UUID)
+        case rotateCandidate(UUID)
+        case rotationFinished(id: UUID, pngData: Data?)
         case memoChanged(String)
         case ratingChanged(Int?)
         case choosePlaceTapped
         case placePicker(PresentationAction<PlacePickerFeature.Action>)
         case saveTapped
         case saved(MealSnapshot)
+        case saveFailed
     }
 
     @Dependency(\.foodCutout) var foodCutout
@@ -83,6 +98,7 @@ public struct CaptureFeature {
 
             case let .processingFinished(coordinate, cutouts):
                 state.isProcessing = false
+                state.photoData = nil
                 state.coordinate = coordinate
                 state.candidates = cutouts.map { CutoutCandidate(pngData: $0, isSelected: true) }
                 return .none
@@ -90,6 +106,33 @@ public struct CaptureFeature {
             case let .toggleCandidate(id):
                 guard let idx = state.candidates.firstIndex(where: { $0.id == id }) else { return .none }
                 state.candidates[idx].isSelected.toggle()
+                return .none
+
+            case let .cycleDecoration(id):
+                guard let idx = state.candidates.firstIndex(where: { $0.id == id }) else { return .none }
+                state.candidates[idx].decoration = state.candidates[idx].decoration.next
+                return .none
+
+            case let .rotateCandidate(id):
+                guard
+                    let idx = state.candidates.firstIndex(where: { $0.id == id }),
+                    !state.candidates[idx].isRotating
+                else { return .none }
+                state.candidates[idx].isRotating = true
+                let data = state.candidates[idx].pngData
+                return .run { send in
+                    let rotated = await foodCutout.rotateClockwise(data)
+                    await send(.rotationFinished(id: id, pngData: rotated))
+                }
+
+            case let .rotationFinished(id, pngData):
+                guard let idx = state.candidates.firstIndex(where: { $0.id == id }) else {
+                    return .none
+                }
+                state.candidates[idx].isRotating = false
+                if let pngData {
+                    state.candidates[idx].pngData = pngData
+                }
                 return .none
 
             case let .memoChanged(memo):
@@ -113,20 +156,30 @@ public struct CaptureFeature {
                 return .none
 
             case .saveTapped:
+                guard !state.isSaving, !state.candidates.contains(where: \.isRotating) else {
+                    return .none
+                }
+                state.isSaving = true
                 let place = state.chosenPlace
                 let memo = state.memo
                 let rating = state.rating
                 let selected = state.candidates
                     .filter(\.isSelected)
-                    .map { NewCutout(pngData: $0.pngData, label: nil) }
+                    .map { NewCutout(pngData: $0.pngData, label: $0.decoration.label) }
                 return .run { send in
                     let meal = try await persistence.saveMeal(place, memo, rating, selected)
                     await send(.saved(meal))
+                } catch: { _, send in
+                    await send(.saveFailed)
                 }
 
             case let .saved(meal):
                 state = State()
                 state.savedMeal = meal
+                return .none
+
+            case .saveFailed:
+                state.isSaving = false
                 return .none
             }
         }

@@ -13,15 +13,18 @@ public struct PillButton: View {
 
     public var body: some View {
         Button(action: action) {
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(.system(size: 17, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(enabled ? Color.appBlue : Color.appMuted)
+                .background(enabled ? Color.appCherry : Color.appMuted.opacity(0.55))
                 .clipShape(Capsule())
+                .overlay {
+                    Capsule().stroke(Color.appCard, lineWidth: 3).padding(2)
+                }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(KitschPressStyle())
         .disabled(!enabled)
         .softShadow()
     }
@@ -29,7 +32,7 @@ public struct PillButton: View {
 
 #Preview {
     VStack {
-        PillButton("다이어리에 저장 ♡") {}
+        PillButton("다이어리에 저장") {}
         PillButton("비활성", enabled: false) {}
     }
     .padding().background(Color.appMilk)

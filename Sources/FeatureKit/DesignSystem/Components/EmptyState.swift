@@ -12,16 +12,18 @@ public struct EmptyState: View {
     }
 
     public var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: systemImage)
-                .font(.system(size: 34))
-                .foregroundStyle(Color.appBlue)
-            Text(title).font(.appTitle).foregroundStyle(.appInk)
-            Text(subtitle).font(.appBody).foregroundStyle(.appMuted)
+        VStack(spacing: 10) {
+            KitschIcon(systemImage, tint: .appChocolate, background: .appPink, size: 70)
+            Text(LocalizedStringKey(title)).font(.appTitle).foregroundStyle(.appInk)
+            Text(LocalizedStringKey(subtitle)).font(.appBody).foregroundStyle(.appMuted)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 80)
+        .padding(.vertical, 64)
+        .padding(.horizontal, 22)
+        .background(Color.appCard.opacity(0.75))
+        .clipShape(RoundedRectangle(cornerRadius: 28))
+        .overlay { RoundedRectangle(cornerRadius: 28).stroke(Color.appChocolate.opacity(0.1)) }
     }
 }
 

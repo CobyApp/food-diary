@@ -4,12 +4,12 @@ public struct PastelChip: View {
     public enum Tone { case blue, pink, butter }
 
     private let text: String
-    private let glyph: String?
+    private let symbol: String?
     private let tone: Tone
 
-    public init(_ text: String, glyph: String? = nil, tone: Tone = .blue) {
+    public init(_ text: String, symbol: String? = nil, tone: Tone = .blue) {
         self.text = text
-        self.glyph = glyph
+        self.symbol = symbol
         self.tone = tone
     }
 
@@ -30,7 +30,7 @@ public struct PastelChip: View {
 
     public var body: some View {
         HStack(spacing: 4) {
-            if let glyph { Text(glyph) }
+            if let symbol { Image(systemName: symbol).fontWeight(.black) }
             Text(text)
         }
         .font(.appCaption)
@@ -39,13 +39,14 @@ public struct PastelChip: View {
         .padding(.vertical, 6)
         .background(background)
         .clipShape(Capsule())
+        .overlay { Capsule().stroke(foreground.opacity(0.16), lineWidth: 1) }
     }
 }
 
 #Preview {
     HStack {
-        PastelChip("라멘집", glyph: "✦", tone: .blue)
-        PastelChip("7.24 목", glyph: "📅", tone: .pink)
+        PastelChip("라멘집", symbol: "mappin", tone: .blue)
+        PastelChip("7.24 목", symbol: "calendar", tone: .pink)
         PastelChip("메모", tone: .butter)
     }
     .padding().background(Color.appMilk)

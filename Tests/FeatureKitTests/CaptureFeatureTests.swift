@@ -52,6 +52,31 @@ final class CaptureFeatureTests: XCTestCase {
     }
 
     @MainActor
+    func test_rotateCandidate_replacesPixelsBeforeSaving() async {
+        let id = UUID()
+        let store = TestStore(
+            initialState: CaptureFeature.State(
+                candidates: [.init(id: id, pngData: Data([1]))]
+            )
+        ) {
+            CaptureFeature()
+        } withDependencies: {
+            $0.foodCutout.rotateClockwise = { data in
+                XCTAssertEqual(data, Data([1]))
+                return Data([2])
+            }
+        }
+
+        await store.send(.rotateCandidate(id)) {
+            $0.candidates[0].isRotating = true
+        }
+        await store.receive(\.rotationFinished) {
+            $0.candidates[0].pngData = Data([2])
+            $0.candidates[0].isRotating = false
+        }
+    }
+
+    @MainActor
     func test_saveTapped_persistsSelectedCutouts() async {
         let savedMeal = MealSnapshot(id: UUID(), eatenAt: Date(), place: nil,
                                      memo: "맛있다", rating: 5, cutouts: [])
@@ -69,13 +94,22 @@ final class CaptureFeatureTests: XCTestCase {
         } withDependencies: {
             $0.persistence.saveMeal = { _, memo, rating, cutouts in
                 XCTAssertEqual(cutouts.count, 1) // only the selected one
+                XCTAssertEqual(cutouts.first?.label, "heart")
                 XCTAssertEqual(memo, "맛있다")
                 XCTAssertEqual(rating, 5)
                 return savedMeal
             }
         }
 
-        await store.send(.saveTapped)
+        await store.send(.cycleDecoration(store.state.candidates[0].id)) {
+            $0.candidates[0].decoration = .sparkle
+        }
+        await store.send(.cycleDecoration(store.state.candidates[0].id)) {
+            $0.candidates[0].decoration = .heart
+        }
+        await store.send(.saveTapped) {
+            $0.isSaving = true
+        }
         await store.receive(\.saved) {
             $0 = CaptureFeature.State()
             $0.savedMeal = savedMeal
@@ -106,7 +140,9 @@ final class CaptureFeatureTests: XCTestCase {
             $0.placePicker = nil
         }
 
-        await store.send(.saveTapped)
+        await store.send(.saveTapped) {
+            $0.isSaving = true
+        }
         await store.receive(\.saved) {
             $0 = CaptureFeature.State()
             $0.savedMeal = savedMeal

@@ -51,4 +51,49 @@ final class CollectionFeatureTests: XCTestCase {
             $0.achievements = nil
         }
     }
+
+    @MainActor
+    func test_recapButton_presentsAndDismisses() async {
+        let store = TestStore(initialState: CollectionFeature.State()) {
+            CollectionFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+        await store.send(.recapButtonTapped) {
+            $0.recap = RecapFeature.State()
+        }
+        await store.send(.recap(.presented(.close))) {
+            $0.recap = nil
+        }
+    }
+
+    @MainActor
+    func test_profileCheck_presentsOnboardingForNewUser() async {
+        let store = TestStore(initialState: CollectionFeature.State()) {
+            CollectionFeature()
+        } withDependencies: {
+            $0.profileSettings.load = { ProfileSnapshot() }
+        }
+
+        await store.send(.profileCheck)
+        await store.receive(\.profileLoaded) {
+            $0.profile = ProfileFeature.State(profile: ProfileSnapshot(), isOnboarding: true)
+        }
+    }
+
+    @MainActor
+    func test_profileButton_opensCompletedProfile() async {
+        let profile = ProfileSnapshot(
+            name: "푸디", avatar: "ribbon", favoriteFood: "라멘", hasCompletedOnboarding: true
+        )
+        let store = TestStore(initialState: CollectionFeature.State()) {
+            CollectionFeature()
+        } withDependencies: {
+            $0.profileSettings.load = { profile }
+        }
+
+        await store.send(.profileButtonTapped)
+        await store.receive(\.profileEditorLoaded) {
+            $0.profile = ProfileFeature.State(profile: profile)
+        }
+    }
 }

@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "푸디 다이어리";
+"NSCameraUsageDescription" = "먹은 순간을 바로 찍어 누끼 스티커로 만들기 위해 카메라를 사용해요.";
+"NSPhotoLibraryUsageDescription" = "음식 사진을 골라 나만의 누끼 스티커로 만들기 위해 사진 보관함을 사용해요.";
+"NSLocationWhenInUseUsageDescription" = "사진을 찍은 장소 주변의 식당을 추천하기 위해 위치를 사용해요.";
