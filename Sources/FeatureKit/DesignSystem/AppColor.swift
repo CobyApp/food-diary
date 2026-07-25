@@ -27,6 +27,25 @@ public extension Color {
     static let appTileButter = Color(hex: 0xFCF3D6)
 }
 
+// Bridge the palette into ShapeStyle so `.foregroundStyle(.appInk)`,
+// `.fill(.appBlue)` etc. resolve via implicit-member shorthand (a plain
+// `Color` static does not satisfy a generic `ShapeStyle` parameter).
+public extension ShapeStyle where Self == Color {
+    static var appMilk: Color { .appMilk }
+    static var appCard: Color { .appCard }
+    static var appBlue: Color { .appBlue }
+    static var appBlueInk: Color { .appBlueInk }
+    static var appPink: Color { .appPink }
+    static var appPinkInk: Color { .appPinkInk }
+    static var appButter: Color { .appButter }
+    static var appButterInk: Color { .appButterInk }
+    static var appInk: Color { .appInk }
+    static var appMuted: Color { .appMuted }
+    static var appTilePink: Color { .appTilePink }
+    static var appTileBlue: Color { .appTileBlue }
+    static var appTileButter: Color { .appTileButter }
+}
+
 public enum StickerTint: CaseIterable {
     case pink, blue, butter, plain
 
