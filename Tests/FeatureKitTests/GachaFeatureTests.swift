@@ -1,0 +1,33 @@
+import XCTest
+import ComposableArchitecture
+import Models
+@testable import FeatureKit
+
+final class GachaFeatureTests: XCTestCase {
+    private func snap(_ n: Int) -> CutoutSnapshot {
+        CutoutSnapshot(id: UUID(), fileName: "\(n).png", createdAt: Date(), label: "food\(n)")
+    }
+
+    @MainActor
+    func test_pullLever_revealsPickedCutout_andLoadsPlace() async {
+        let items = [snap(1), snap(2)]
+        let picked = items[1]
+        let store = TestStore(initialState: GachaFeature.State(cutouts: items)) {
+            GachaFeature()
+        } withDependencies: {
+            $0.random.pick = { _ in picked }
+            $0.persistence.mealByCutout = { _ in
+                MealSnapshot(id: UUID(), eatenAt: Date(),
+                             place: PlaceInfo(id: "p", name: "라멘집", address: ""),
+                             memo: "", rating: nil, cutouts: [])
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.pullLever) {
+            $0.isSpinning = true
+            $0.result = picked
+        }
+        await store.receive(\.placeLoaded) { $0.resultPlace = "라멘집" }
+    }
+}
