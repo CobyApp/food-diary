@@ -1,4 +1,6 @@
 import Foundation
+import CoreLocation
+import MapKit
 import Dependencies
 import DependenciesMacros
 import Models
@@ -8,24 +10,35 @@ public struct PlaceSearchClient: Sendable {
     public var nearby: @Sendable (_ coordinate: Coordinate) async throws -> [PlaceInfo]
 }
 
+extension PlaceInfo {
+    init?(mapItem: MKMapItem) {
+        guard let name = mapItem.name else { return nil }
+        let c = mapItem.placemark.coordinate
+        self.init(
+            id: mapItem.identifier?.rawValue ?? "\(name)_\(c.latitude)_\(c.longitude)",
+            name: name,
+            address: mapItem.placemark.title ?? "",
+            coordinate: Coordinate(latitude: c.latitude, longitude: c.longitude),
+            googlePlaceId: nil
+        )
+    }
+}
+
 extension PlaceSearchClient: DependencyKey {
-    // v1: Google Places is not wired yet. Return deterministic mock data near
-    // the requested coordinate so the flow is fully exercisable offline.
+    // Apple MapKit points-of-interest search (free, no API key). Searches food
+    // POIs within ~500m of the photo's coordinate.
     public static let liveValue = PlaceSearchClient(
         nearby: { coordinate in
-            let names = ["라멘 이치란", "스시로", "규카츠 모토무라", "이키나리 스테이크", "코메다 커피"]
-            return names.enumerated().map { index, name in
-                PlaceInfo(
-                    id: "mock_\(index)",
-                    name: name,
-                    address: "후쿠오카시 근처 \(index + 1)번지",
-                    coordinate: Coordinate(
-                        latitude: coordinate.latitude + Double(index) * 0.0003,
-                        longitude: coordinate.longitude + Double(index) * 0.0003
-                    ),
-                    googlePlaceId: nil
-                )
-            }
+            let request = MKLocalPointsOfInterestRequest(
+                center: CLLocationCoordinate2D(latitude: coordinate.latitude,
+                                               longitude: coordinate.longitude),
+                radius: 500
+            )
+            request.pointOfInterestFilter = MKPointOfInterestFilter(
+                including: [.restaurant, .cafe, .bakery, .foodMarket]
+            )
+            let response = try await MKLocalSearch(request: request).start()
+            return response.mapItems.compactMap(PlaceInfo.init(mapItem:))
         }
     )
 }
