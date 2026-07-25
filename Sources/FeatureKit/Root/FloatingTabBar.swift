@@ -14,19 +14,20 @@ public struct FloatingTabBar: View {
             item(.collection, systemImage: "square.grid.2x2.fill", title: "컬렉션")
             item(.capture, systemImage: "plus.circle.fill", title: "담기")
             item(.game, systemImage: "die.face.5.fill", title: "뭐먹지")
+            item(.map, systemImage: "map.fill", title: "지도")
         }
         .padding(6)
         .background(Color.appCard)
         .clipShape(Capsule())
         .softShadow()
-        .padding(.horizontal, 60)
+        .padding(.horizontal, 14)
         .padding(.bottom, 6)
     }
 
     private func item(_ tab: RootFeature.Tab, systemImage: String, title: String) -> some View {
         let active = selected == tab
         return Button { onSelect(tab) } label: {
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 Image(systemName: systemImage)
                 Text(title)
             }

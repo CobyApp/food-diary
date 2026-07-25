@@ -5,7 +5,7 @@ import ClientKit
 
 @Reducer
 public struct RootFeature {
-    public enum Tab: Equatable { case collection, capture, game }
+    public enum Tab: Equatable { case collection, capture, game, map }
 
     @ObservableState
     public struct State: Equatable {
@@ -13,6 +13,7 @@ public struct RootFeature {
         public var collection = CollectionFeature.State()
         public var capture = CaptureFeature.State()
         public var gameHub = GameHubFeature.State()
+        public var foodMap = FoodMapFeature.State()
         public var path = StackState<MealDetailFeature.State>()
         public init() {}
     }
@@ -22,6 +23,7 @@ public struct RootFeature {
         case collection(CollectionFeature.Action)
         case capture(CaptureFeature.Action)
         case gameHub(GameHubFeature.Action)
+        case foodMap(FoodMapFeature.Action)
         case pushDetail(UUID)
         case path(StackAction<MealDetailFeature.State, MealDetailFeature.Action>)
     }
@@ -34,6 +36,7 @@ public struct RootFeature {
         Scope(state: \.collection, action: \.collection) { CollectionFeature() }
         Scope(state: \.capture, action: \.capture) { CaptureFeature() }
         Scope(state: \.gameHub, action: \.gameHub) { GameHubFeature() }
+        Scope(state: \.foodMap, action: \.foodMap) { FoodMapFeature() }
 
         Reduce { state, action in
             switch action {
@@ -62,7 +65,7 @@ public struct RootFeature {
                 state.path.pop(from: id)
                 return .send(.collection(.onAppear))
 
-            case .collection, .capture, .gameHub, .path:
+            case .collection, .capture, .gameHub, .foodMap, .path:
                 return .none
             }
         }

@@ -20,6 +20,8 @@ public struct RootView: View {
                 CaptureView(store: store.scope(state: \.capture, action: \.capture))
             case .game:
                 GameHubView(store: store.scope(state: \.gameHub, action: \.gameHub))
+            case .map:
+                FoodMapView(store: store.scope(state: \.foodMap, action: \.foodMap))
             }
 
             FloatingTabBar(selected: store.tab) { store.send(.tabChanged($0)) }
