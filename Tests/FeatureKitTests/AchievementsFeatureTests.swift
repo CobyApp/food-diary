@@ -12,7 +12,7 @@ final class AchievementsFeatureTests: XCTestCase {
         let meals = [
             MealSnapshot(id: UUID(), eatenAt: Date(),
                          place: PlaceInfo(id: "p1", name: "A", address: ""),
-                         memo: "", rating: nil, cutouts: [])
+                         memo: "다시 먹고 싶다", rating: 5, cutouts: [])
         ]
         let store = TestStore(initialState: AchievementsFeature.State()) {
             AchievementsFeature()
@@ -23,9 +23,13 @@ final class AchievementsFeatureTests: XCTestCase {
 
         await store.send(.onAppear)
         await store.receive(\.statsLoaded) {
-            $0.cutoutCount = 10
-            $0.mealCount = 1
-            $0.placeCount = 1
+            $0.stats.cutouts = 10
+            $0.stats.meals = 1
+            $0.stats.places = 1
+            $0.stats.bestStreak = 1
+            $0.stats.ratedMeals = 1
+            $0.stats.fiveStarMeals = 1
+            $0.stats.memoMeals = 1
         }
         let a = store.state.achievements
         XCTAssertTrue(a.first { $0.id == "cut1" }!.unlocked)
@@ -33,5 +37,9 @@ final class AchievementsFeatureTests: XCTestCase {
         XCTAssertFalse(a.first { $0.id == "cut50" }!.unlocked)
         XCTAssertTrue(a.first { $0.id == "plc1" }!.unlocked)
         XCTAssertFalse(a.first { $0.id == "plc5" }!.unlocked)
+        XCTAssertTrue(a.first { $0.id == "rating1" }!.unlocked)
+        XCTAssertTrue(a.first { $0.id == "five1" }!.unlocked)
+        XCTAssertTrue(a.first { $0.id == "memo1" }!.unlocked)
+        XCTAssertFalse(a.first { $0.id == "streak3" }!.unlocked)
     }
 }

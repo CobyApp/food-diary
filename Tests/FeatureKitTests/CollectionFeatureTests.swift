@@ -23,6 +23,62 @@ final class CollectionFeatureTests: XCTestCase {
     }
 
     @MainActor
+    func test_multiSelect_thenDelete_removesOnlySelectedCutouts() async {
+        let first = CutoutSnapshot(
+            id: UUID(), fileName: "first.png", createdAt: Date(), label: nil
+        )
+        let second = CutoutSnapshot(
+            id: UUID(), fileName: "second.png", createdAt: Date(), label: nil
+        )
+        var initialState = CollectionFeature.State()
+        initialState.cutouts = [first, second]
+        let store = TestStore(initialState: initialState) {
+            CollectionFeature()
+        } withDependencies: {
+            $0.persistence.deleteCutouts = { ids in
+                XCTAssertEqual(ids, [first.id])
+            }
+        }
+
+        await store.send(.editButtonTapped) {
+            $0.isEditing = true
+        }
+        await store.send(.selectionToggled(first.id)) {
+            $0.selectedCutoutIDs = [first.id]
+        }
+        await store.send(.deleteSelectedConfirmed) {
+            $0.isDeleting = true
+        }
+        await store.receive(\.cutoutsDeleted) {
+            $0.cutouts = [second]
+            $0.selectedCutoutIDs = []
+            $0.isDeleting = false
+            $0.isEditing = false
+        }
+    }
+
+    @MainActor
+    func test_selectAll_togglesEveryCutout() async {
+        let cutouts = [
+            CutoutSnapshot(id: UUID(), fileName: "a.png", createdAt: Date(), label: nil),
+            CutoutSnapshot(id: UUID(), fileName: "b.png", createdAt: Date(), label: nil),
+        ]
+        var initialState = CollectionFeature.State()
+        initialState.cutouts = cutouts
+        initialState.isEditing = true
+        let store = TestStore(initialState: initialState) {
+            CollectionFeature()
+        }
+
+        await store.send(.selectAllTapped) {
+            $0.selectedCutoutIDs = Set(cutouts.map(\.id))
+        }
+        await store.send(.selectAllTapped) {
+            $0.selectedCutoutIDs = []
+        }
+    }
+
+    @MainActor
     func test_onAppear_whenLoadFails_clearsLoadingAndShowsEmpty() async {
         struct LoadError: Error {}
         let store = TestStore(initialState: CollectionFeature.State()) {

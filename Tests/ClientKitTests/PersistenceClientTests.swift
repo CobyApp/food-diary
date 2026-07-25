@@ -94,4 +94,23 @@ final class PersistenceClientTests: XCTestCase {
         let all = try await client.allCutouts()
         XCTAssertTrue(all.isEmpty, "cascade delete should remove the meal's cutouts")
     }
+
+    func test_deleteCutouts_removesOnlySelectedImages() async throws {
+        let client = try makeClient()
+        let meal = try await client.saveMeal(
+            nil, "keep meal", nil,
+            [
+                NewCutout(pngData: Data([1]), label: "first"),
+                NewCutout(pngData: Data([2]), label: "second"),
+            ]
+        )
+
+        try await client.deleteCutouts([meal.cutouts[0].id])
+
+        let remaining = try await client.allCutouts()
+        let remainingMeal = try await client.meal(meal.id)
+        XCTAssertEqual(remaining.count, 1)
+        XCTAssertEqual(remaining.first?.id, meal.cutouts[1].id)
+        XCTAssertEqual(remainingMeal?.memo, "keep meal")
+    }
 }

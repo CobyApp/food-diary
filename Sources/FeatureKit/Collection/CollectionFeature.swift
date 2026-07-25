@@ -9,6 +9,10 @@ public struct CollectionFeature {
     public struct State: Equatable {
         public var cutouts: [CutoutSnapshot] = []
         public var isLoading = false
+        public var isEditing = false
+        public var isDeleting = false
+        public var isDeleteErrorPresented = false
+        public var selectedCutoutIDs: Set<UUID> = []
         public var streak = MealStreak()
         @Presents public var achievements: AchievementsFeature.State?
         @Presents public var recap: RecapFeature.State?
@@ -20,6 +24,13 @@ public struct CollectionFeature {
         case onAppear
         case cutoutsLoaded([CutoutSnapshot])
         case cutoutTapped(UUID)
+        case editButtonTapped
+        case selectionToggled(UUID)
+        case selectAllTapped
+        case deleteSelectedConfirmed
+        case cutoutsDeleted(Set<UUID>)
+        case cutoutDeletionFailed
+        case dismissDeleteError
         case streakOnAppear
         case streakLoaded(MealStreak)
         case achievementsButtonTapped
@@ -51,9 +62,55 @@ public struct CollectionFeature {
             case let .cutoutsLoaded(cutouts):
                 state.isLoading = false
                 state.cutouts = cutouts
+                state.selectedCutoutIDs.formIntersection(Set(cutouts.map(\.id)))
+                if cutouts.isEmpty {
+                    state.isEditing = false
+                }
                 return .none
             case .cutoutTapped:
                 // Navigation handled by the parent (RootFeature).
+                return .none
+            case .editButtonTapped:
+                state.isEditing.toggle()
+                state.selectedCutoutIDs.removeAll()
+                return .none
+            case let .selectionToggled(id):
+                guard state.isEditing, state.cutouts.contains(where: { $0.id == id }) else {
+                    return .none
+                }
+                if state.selectedCutoutIDs.contains(id) {
+                    state.selectedCutoutIDs.remove(id)
+                } else {
+                    state.selectedCutoutIDs.insert(id)
+                }
+                return .none
+            case .selectAllTapped:
+                guard state.isEditing else { return .none }
+                let allIDs = Set(state.cutouts.map(\.id))
+                state.selectedCutoutIDs = state.selectedCutoutIDs == allIDs ? [] : allIDs
+                return .none
+            case .deleteSelectedConfirmed:
+                let ids = state.selectedCutoutIDs
+                guard !ids.isEmpty, !state.isDeleting else { return .none }
+                state.isDeleting = true
+                return .run { send in
+                    try await persistence.deleteCutouts(ids)
+                    await send(.cutoutsDeleted(ids))
+                } catch: { _, send in
+                    await send(.cutoutDeletionFailed)
+                }
+            case let .cutoutsDeleted(ids):
+                state.cutouts.removeAll { ids.contains($0.id) }
+                state.selectedCutoutIDs.removeAll()
+                state.isDeleting = false
+                state.isEditing = false
+                return .none
+            case .cutoutDeletionFailed:
+                state.isDeleting = false
+                state.isDeleteErrorPresented = true
+                return .none
+            case .dismissDeleteError:
+                state.isDeleteErrorPresented = false
                 return .none
             case .streakOnAppear:
                 return .run { [now = Date()] send in

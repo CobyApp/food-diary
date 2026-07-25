@@ -54,6 +54,36 @@
 "맛집 5곳" = "5 Favorites";
 "맛집 10곳" = "10 Favorites";
 "기록 30개" = "30 Entries";
+"누끼 30개" = "30 Stickers";
+"기록 3개" = "3 Entries";
+"기록 10개" = "10 Entries";
+"기록 100개" = "100 Entries";
+"맛집 25곳" = "25 Favorites";
+"3일 연속 기록" = "3-Day Streak";
+"7일 연속 기록" = "7-Day Streak";
+"14일 연속 기록" = "14-Day Streak";
+"30일 연속 기록" = "30-Day Streak";
+"첫 별점" = "First Rating";
+"별점 10번" = "10 Ratings";
+"첫 만점" = "First 5 Stars";
+"만점 10번" = "Ten 5-Star Meals";
+"첫 메모" = "First Note";
+"메모 10개" = "10 Notes";
+"첫 꾸미기" = "First Decoration";
+"꾸민 누끼 20개" = "20 Decorated";
+
+"여러 개 선택" = "Select Multiple";
+"전체 선택" = "Select All";
+"선택 해제" = "Deselect All";
+"완료" = "Done";
+"선택한 누끼 삭제" = "Delete Selected Stickers";
+"삭제하는 중" = "Tidying up selected stickers";
+"collection.selected.count" = "%d selected";
+"collection.delete.count" = "Delete %d";
+"collection.delete.confirm" = "Delete %d selected stickers?";
+"삭제하지 못했어요" = "Couldn't delete";
+"잠시 후 다시 시도해주세요." = "Please try again in a moment.";
+"확인" = "OK";
 
 "이번 주 카드를 만드는 중" = "Making this week's card";
 "맛있는 순간을 한 장에 모으고 있어요" = "Gathering your tasty moments in one place";

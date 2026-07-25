@@ -52,6 +52,17 @@ public struct RootFeature {
                     }
                 }
 
+            case .collection(.cutoutsDeleted):
+                return .run { _ in
+                    let meals = (try? await persistence.allMeals()) ?? []
+                    guard let latest = meals.first else {
+                        await widgetData.clear()
+                        return
+                    }
+                    let streak = MealStreak.calculate(meals: meals, now: Date()).current
+                    await widgetData.update(latest, streak)
+                }
+
             case let .pushDetail(mealID):
                 state.path.append(MealDetailFeature.State(mealID: mealID))
                 return .none
