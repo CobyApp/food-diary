@@ -29,5 +29,16 @@ public struct CollectionView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .task { store.send(.onAppear) }
+        .overlay(alignment: .topTrailing) {
+            Button { store.send(.achievementsButtonTapped) } label: {
+                Text("🏆").font(.title2)
+                    .padding(10).background(Color.appCard, in: Circle()).softShadow()
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 18).padding(.top, 6)
+        }
+        .sheet(item: $store.scope(state: \.achievements, action: \.achievements)) { achStore in
+            AchievementsView(store: achStore)
+        }
     }
 }

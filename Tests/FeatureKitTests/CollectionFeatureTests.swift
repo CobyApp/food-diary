@@ -37,4 +37,18 @@ final class CollectionFeatureTests: XCTestCase {
             $0.cutouts = []
         }
     }
+
+    @MainActor
+    func test_achievementsButton_presentsAndDismisses() async {
+        let store = TestStore(initialState: CollectionFeature.State()) {
+            CollectionFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+        await store.send(.achievementsButtonTapped) {
+            $0.achievements = AchievementsFeature.State()
+        }
+        await store.send(.achievements(.presented(.close))) {
+            $0.achievements = nil
+        }
+    }
 }

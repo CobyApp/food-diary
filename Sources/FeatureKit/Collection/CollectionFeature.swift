@@ -9,6 +9,7 @@ public struct CollectionFeature {
     public struct State: Equatable {
         public var cutouts: [CutoutSnapshot] = []
         public var isLoading = false
+        @Presents public var achievements: AchievementsFeature.State?
         public init() {}
     }
 
@@ -16,6 +17,8 @@ public struct CollectionFeature {
         case onAppear
         case cutoutsLoaded([CutoutSnapshot])
         case cutoutTapped(UUID)
+        case achievementsButtonTapped
+        case achievements(PresentationAction<AchievementsFeature.Action>)
     }
 
     @Dependency(\.persistence) var persistence
@@ -40,7 +43,18 @@ public struct CollectionFeature {
             case .cutoutTapped:
                 // Navigation handled by the parent (RootFeature).
                 return .none
+            case .achievementsButtonTapped:
+                state.achievements = AchievementsFeature.State()
+                return .none
+            case .achievements(.presented(.close)):
+                state.achievements = nil
+                return .none
+            case .achievements:
+                return .none
             }
+        }
+        .ifLet(\.$achievements, action: \.achievements) {
+            AchievementsFeature()
         }
     }
 }
