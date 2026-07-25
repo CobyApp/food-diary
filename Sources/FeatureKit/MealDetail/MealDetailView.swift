@@ -6,31 +6,51 @@ public struct MealDetailView: View {
     @State private var confirmingDelete = false
     public init(store: StoreOf<MealDetailFeature>) { self.store = store }
 
-    let columns = [GridItem(.adaptive(minimum: 100), spacing: 12)]
+    private let columns = [GridItem(.adaptive(minimum: 100), spacing: 12)]
 
     public var body: some View {
-        ScrollView {
-            if let meal = store.meal {
-                VStack(alignment: .leading, spacing: 16) {
-                    if let place = meal.place { Text(place.name).font(.title2.bold()) }
-                    Text(meal.eatenAt, style: .date).foregroundStyle(.secondary)
-                    if let rating = meal.rating { Text(String(repeating: "⭐️", count: rating)) }
-                    if !meal.memo.isEmpty { Text(meal.memo) }
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(meal.cutouts) { cutout in
-                            CutoutImage(fileName: cutout.fileName).frame(height: 100)
+        ZStack {
+            Color.appMilk.ignoresSafeArea()
+            ScrollView {
+                if let meal = store.meal {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(meal.place?.name ?? "한 끼 기록")
+                            .font(.appDisplay).foregroundStyle(.appInk)
+
+                        HStack(spacing: 8) {
+                            PastelChip(meal.eatenAt.formatted(.dateTime.month().day().weekday()),
+                                       glyph: "📅", tone: .pink)
+                            if meal.rating != nil { StarRating(rating: meal.rating) }
+                        }
+
+                        if !meal.memo.isEmpty {
+                            SoftCard {
+                                Text(meal.memo).font(.appBody).foregroundStyle(.appInk)
+                            }
+                        }
+
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(Array(meal.cutouts.enumerated()), id: \.element.id) { index, cutout in
+                                StickerTile(tint: .rotating(index)) {
+                                    CutoutImage(fileName: cutout.fileName)
+                                }
+                            }
                         }
                     }
+                    .padding(18)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ProgressView().tint(.appBlue).padding(.top, 80)
                 }
-                .padding()
-            } else {
-                ProgressView()
             }
         }
         .navigationTitle("한 끼 기록")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color.appMilk, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .destructiveAction) {
-                Button("삭제", role: .destructive) { confirmingDelete = true }
+                Button("삭제") { confirmingDelete = true }
+                    .foregroundStyle(Color.appPinkInk)
             }
         }
         .confirmationDialog("이 기록을 삭제할까요?", isPresented: $confirmingDelete, titleVisibility: .visible) {
