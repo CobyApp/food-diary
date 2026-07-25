@@ -22,6 +22,7 @@ struct FoodDiaryApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(store: store)
+                .preferredColorScheme(.light)
         }
     }
 }
