@@ -5,13 +5,14 @@ import ClientKit
 
 @Reducer
 public struct RootFeature {
-    public enum Tab: Equatable { case collection, capture }
+    public enum Tab: Equatable { case collection, capture, game }
 
     @ObservableState
     public struct State: Equatable {
         public var tab: Tab = .collection
         public var collection = CollectionFeature.State()
         public var capture = CaptureFeature.State()
+        public var gameHub = GameHubFeature.State()
         public var path = StackState<MealDetailFeature.State>()
         public init() {}
     }
@@ -20,6 +21,7 @@ public struct RootFeature {
         case tabChanged(Tab)
         case collection(CollectionFeature.Action)
         case capture(CaptureFeature.Action)
+        case gameHub(GameHubFeature.Action)
         case pushDetail(UUID)
         case path(StackAction<MealDetailFeature.State, MealDetailFeature.Action>)
     }
@@ -31,6 +33,7 @@ public struct RootFeature {
     public var body: some ReducerOf<Self> {
         Scope(state: \.collection, action: \.collection) { CollectionFeature() }
         Scope(state: \.capture, action: \.capture) { CaptureFeature() }
+        Scope(state: \.gameHub, action: \.gameHub) { GameHubFeature() }
 
         Reduce { state, action in
             switch action {
@@ -59,7 +62,7 @@ public struct RootFeature {
                 state.path.pop(from: id)
                 return .send(.collection(.onAppear))
 
-            case .collection, .capture, .path:
+            case .collection, .capture, .gameHub, .path:
                 return .none
             }
         }

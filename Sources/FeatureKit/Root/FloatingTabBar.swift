@@ -13,6 +13,7 @@ public struct FloatingTabBar: View {
         HStack(spacing: 4) {
             item(.collection, systemImage: "square.grid.2x2.fill", title: "컬렉션")
             item(.capture, systemImage: "plus.circle.fill", title: "담기")
+            item(.game, systemImage: "die.face.5.fill", title: "뭐먹지")
         }
         .padding(6)
         .background(Color.appCard)
