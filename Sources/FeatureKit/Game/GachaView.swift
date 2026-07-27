@@ -6,8 +6,10 @@ public struct GachaView: View {
     @Bindable var store: StoreOf<GachaFeature>
     @State private var revealResult = false
     @State private var drumTurns = 0.0
+    @State private var drumShake: CGFloat = 0        // quick lateral jitter on lever pull
     @State private var capsuleDrop: CGFloat = -140   // y offset of the dispensed capsule
     @State private var capsuleOpen = false
+    @State private var capsuleSquash: CGFloat = 1    // landing squash-and-stretch factor
     public init(store: StoreOf<GachaFeature>) { self.store = store }
 
     public var body: some View {
@@ -18,6 +20,7 @@ public struct GachaView: View {
                            onAgain: {
                                capsuleDrop = -140
                                capsuleOpen = false
+                               capsuleSquash = 1
                                store.send(.playAgain)
                            },
                            onClose: { store.send(.close) })
@@ -30,6 +33,11 @@ public struct GachaView: View {
                     PillButton(store.isSpinning ? "캡슐 섞는 중" : "레버 당기기") {
                         guard !store.isSpinning else { return }
                         withAnimation(.easeInOut(duration: 1.05)) { drumTurns += 4 }
+                        // Quick shake on the drum as the lever is pulled.
+                        withAnimation(.easeInOut(duration: 0.09).repeatCount(4, autoreverses: true)) {
+                            drumShake = 5
+                        }
+                        withAnimation(.easeOut(duration: 0.5).delay(0.36)) { drumShake = 0 }
                         store.send(.pullLever)
                     }
                     .disabled(store.isSpinning)
@@ -45,11 +53,16 @@ public struct GachaView: View {
                 revealResult = false
                 capsuleDrop = -140
                 capsuleOpen = false
+                capsuleSquash = 1
                 return
             }
             // 1) capsule falls into the tray
             withAnimation(.interpolatingSpring(stiffness: 170, damping: 12)) { capsuleDrop = 26 }
             try? await Task.sleep(for: .milliseconds(520))
+            // squash-and-stretch bounce as the capsule lands
+            withAnimation(.easeOut(duration: 0.09)) { capsuleSquash = 0.86 }
+            try? await Task.sleep(for: .milliseconds(90))
+            withAnimation(.interpolatingSpring(stiffness: 320, damping: 12)) { capsuleSquash = 1 }
             // 2) it splits open, revealing the cutout
             withAnimation(.spring(response: 0.42, dampingFraction: 0.6)) { capsuleOpen = true }
             try? await Task.sleep(for: .milliseconds(700))
@@ -72,6 +85,19 @@ public struct GachaView: View {
                 .frame(width: 240, height: 240)
                 .rotationEffect(.degrees(drumTurns * 360))
                 .clipped()
+                .offset(x: drumShake)
+                .overlay {
+                    // Glass shine on the drum's dome.
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.55), Color.white.opacity(0.02)],
+                                startPoint: .topLeading, endPoint: .center
+                            )
+                        )
+                        .blendMode(.plusLighter)
+                        .allowsHitTesting(false)
+                }
 
                 RoundedRectangle(cornerRadius: 26)
                     .fill(Color.appPink)
@@ -93,6 +119,7 @@ public struct GachaView: View {
                 }
                 .offset(x: 22, y: 64)
                 .rotationEffect(.degrees(store.isSpinning ? 26 : 0), anchor: .bottom)
+                .animation(.interpolatingSpring(stiffness: 220, damping: 9), value: store.isSpinning)
         }
         .overlay(alignment: .top) { WashiTape(.appLavender).offset(y: -8) }
         .overlay(alignment: .bottom) {
@@ -121,8 +148,22 @@ public struct GachaView: View {
                 .opacity(capsuleOpen ? 1 : 0)
         }
         .offset(y: capsuleDrop)
+        .scaleEffect(x: 1 / capsuleSquash, y: capsuleSquash, anchor: .bottom)
         .overlay(alignment: .center) {
-            if capsuleOpen { KitschSparkle().fill(Color.appButter).frame(width: 26, height: 26).offset(y: -46) }
+            // Sparkle burst radiating outward when the capsule opens.
+            ForEach(0..<5, id: \.self) { index in
+                let angle = Double(index) / 5 * 2 * .pi
+                KitschSparkle()
+                    .fill(Color.appButter)
+                    .frame(width: 22, height: 22)
+                    .offset(x: cos(angle) * 44, y: sin(angle) * 44)
+                    .opacity(capsuleOpen ? 1 : 0)
+                    .scaleEffect(capsuleOpen ? 1 : 0.2)
+                    .animation(
+                        .spring(response: 0.35, dampingFraction: 0.6).delay(Double(index) * 0.04),
+                        value: capsuleOpen
+                    )
+            }
         }
     }
 
