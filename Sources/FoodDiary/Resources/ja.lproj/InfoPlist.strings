@@ -1,4 +1,4 @@
-"CFBundleDisplayName" = "Yumkie";
+"CFBundleDisplayName" = "ヤムキー";
 "NSCameraUsageDescription" = "食べた瞬間を撮影して切り抜きステッカーにするため、カメラを使用します。";
 "NSPhotoLibraryUsageDescription" = "料理の写真を選んで切り抜きステッカーにするため、写真ライブラリを使用します。";
 "NSLocationWhenInUseUsageDescription" = "写真を撮った場所の近くにあるお店を提案するため、位置情報を使用します。";
