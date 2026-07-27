@@ -14,6 +14,8 @@ public struct RouletteView: View {
     @State private var revealResult = false
     @State private var reelOffset: CGFloat = 0
     @State private var glow = false
+    @State private var reelBlur: CGFloat = 0
+    @State private var winnerPulse = false
 
     public init(store: StoreOf<RouletteFeature>) { self.store = store }
 
@@ -27,6 +29,7 @@ public struct RouletteView: View {
                     onAgain: {
                         revealResult = false
                         reelOffset = 0
+                        winnerPulse = false
                         store.send(.playAgain)
                     },
                     onClose: { store.send(.close) }
@@ -54,9 +57,18 @@ public struct RouletteView: View {
                                 }
                                 .frame(width: 142, height: slotHeight - 8)
                                 .padding(.vertical, 4)
+                                .overlay(alignment: .bottom) {
+                                    // Divider drawn as an overlay so it never adds to the
+                                    // row's height — slotHeight stays exact for the landing math.
+                                    Rectangle()
+                                        .fill(Color.appCard.opacity(0.55))
+                                        .frame(height: 1.5)
+                                        .padding(.horizontal, 26)
+                                }
                             }
                         }
                         .offset(y: reelOffset)
+                        .blur(radius: reelBlur)
                     }
                     .frame(width: 250, height: windowHeight)
                     .clipped()
@@ -78,6 +90,9 @@ public struct RouletteView: View {
                                     .foregroundStyle(Color.appCherry).offset(x: 14)
                             }
                             .allowsHitTesting(false)
+                            // Winner glow pulse once the reel settles on the landing slot.
+                            .shadow(color: Color.appButter.opacity(winnerPulse ? 0.9 : 0), radius: winnerPulse ? 14 : 0)
+                            .scaleEffect(winnerPulse ? 1.02 : 1)
                     }
                     .overlay(alignment: .leading) {
                         KitschSparkle().fill(Color.appButter)
@@ -105,9 +120,22 @@ public struct RouletteView: View {
         }
         .task(id: store.landingIndex) {
             guard let index = store.landingIndex else { return }
-            withAnimation(.timingCurve(0.12, 0.8, 0.2, 1, duration: spinDuration)) {
-                // Center the winning slot in the reel window.
-                reelOffset = -CGFloat(index) * slotHeight + (windowHeight - slotHeight) / 2
+            // Center the winning slot in the reel window — this target must stay exact
+            // so the pointer lines up with the actual winner.
+            let target = -CGFloat(index) * slotHeight + (windowHeight - slotHeight) / 2
+
+            withAnimation(.easeOut(duration: 0.18)) { reelBlur = 3.5 }
+            withAnimation(.easeIn(duration: spinDuration * 0.75).delay(spinDuration * 0.25)) { reelBlur = 0 }
+
+            withAnimation(.timingCurve(0.12, 0.8, 0.2, 1, duration: spinDuration * 0.86)) {
+                reelOffset = target - slotHeight * 0.22 // slightly past the slot
+            }
+            try? await Task.sleep(for: .seconds(spinDuration * 0.86))
+            withAnimation(.interpolatingSpring(stiffness: 210, damping: 15)) {
+                reelOffset = target // settle onto it
+            }
+            withAnimation(.easeInOut(duration: 0.32).repeatCount(3, autoreverses: true)) {
+                winnerPulse = true
             }
         }
         .task(id: store.result?.id) {
