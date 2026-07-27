@@ -7,6 +7,8 @@ struct ResultCard: View {
     let onAgain: () -> Void
     let onClose: () -> Void
 
+    @State private var stamped = false
+
     var body: some View {
         ZStack {
             ConfettiBurst()
@@ -45,6 +47,12 @@ struct ResultCard: View {
                 }
             }
             .padding(24)
+            .scaleEffect(stamped ? 1 : 1.15)
+            .rotationEffect(.degrees(stamped ? 0 : -4))
+            .opacity(stamped ? 1 : 0)
+            .task {
+                withAnimation(.interpolatingSpring(stiffness: 210, damping: 14)) { stamped = true }
+            }
         }
         .sensoryFeedback(.success, trigger: cutout.id)
     }
