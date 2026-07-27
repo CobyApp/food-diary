@@ -66,8 +66,7 @@ public struct CardFlipView: View {
                         .font(.appCaption).foregroundStyle(.appMuted)
                         .contentTransition(.numericText())
 
-                    Button("게임 나가기") { store.send(.close) }
-                        .font(.appCaption).foregroundStyle(.appMuted)
+                    OutlineButton("게임 나가기") { store.send(.close) }
                 }
                 .padding(24)
                 .task { if store.cards.isEmpty { store.send(.start) } }

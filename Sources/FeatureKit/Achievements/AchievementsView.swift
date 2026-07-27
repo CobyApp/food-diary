@@ -16,9 +16,19 @@ public struct AchievementsView: View {
                         Text("음식 도감").font(.appDisplay).foregroundStyle(.appInk)
                         Spacer()
                         Button { store.send(.close) } label: {
-                            Image(systemName: "xmark.circle.fill").font(.title2).foregroundStyle(.appMuted)
+                            Image(systemName: "xmark")
+                                .font(.caption.bold())
+                                .foregroundStyle(.appInk)
+                                .frame(width: 34, height: 34)
+                                .background(Color.appCard, in: Circle())
+                                .overlay {
+                                    Circle().stroke(
+                                        Color.appChocolate.opacity(0.25),
+                                        lineWidth: 1.5
+                                    )
+                                }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(KitschPressStyle())
                     }
                     Text(L10n.format(
                         "achievements.progress",
@@ -51,7 +61,7 @@ public struct AchievementsView: View {
                 Text(a.title).font(.appSection)
                     .foregroundStyle(a.unlocked ? Color.appInk : Color.appMuted)
                 if a.unlocked {
-                    Text("COLLECTED").font(.appCaption).foregroundStyle(.appPinkInk)
+                    Text("achievement.collected").font(.appCaption).foregroundStyle(.appPinkInk)
                 } else {
                     ProgressView(value: a.progress).tint(.appBlue)
                     Text("\(a.current)/\(a.target)").font(.appCaption).foregroundStyle(.appMuted)

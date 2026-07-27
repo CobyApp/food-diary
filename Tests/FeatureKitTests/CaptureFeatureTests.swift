@@ -16,11 +16,16 @@ final class CaptureFeatureTests: XCTestCase {
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.photoPicked(Data([9]))) {
-            $0.photoData = Data([9])
             $0.isProcessing = true
+            $0.processingTotal = 1
+        }
+        await store.receive(\.photoProcessingProgress) {
+            $0.processingCompleted = 1
         }
         await store.receive(\.processingFinished) {
             $0.isProcessing = false
+            $0.processingCompleted = 0
+            $0.processingTotal = 0
             $0.coordinate = Coordinate(latitude: 1, longitude: 2)
             $0.candidates = [
                 .init(id: $0.candidates[0].id, pngData: Data([1]), isSelected: true),
@@ -41,13 +46,69 @@ final class CaptureFeatureTests: XCTestCase {
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.photoPicked(Data([9]))) {
-            $0.photoData = Data([9])
             $0.isProcessing = true
+            $0.processingTotal = 1
+        }
+        await store.receive(\.photoProcessingProgress) {
+            $0.processingCompleted = 1
         }
         await store.receive(\.processingFinished) {
             $0.isProcessing = false
+            $0.processingCompleted = 0
+            $0.processingTotal = 0
             $0.coordinate = nil
             $0.candidates = []
+        }
+    }
+
+    @MainActor
+    func test_photosPicked_processesBatchAndAppendsAllCutouts() async {
+        let existing = CaptureFeature.CutoutCandidate(
+            id: UUID(),
+            pngData: Data([7])
+        )
+        let store = TestStore(
+            initialState: CaptureFeature.State(candidates: [existing])
+        ) {
+            CaptureFeature()
+        } withDependencies: {
+            $0.foodCutout.extract = { data in
+                [Cutout(pngData: Data([(data.first ?? 0) + 10]))]
+            }
+            $0.photoLocation.coordinate = { data in
+                data.first == 1 ? Coordinate(latitude: 1, longitude: 2) : nil
+            }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.photosPicked([Data([1]), Data([2])])) {
+            $0.isProcessing = true
+            $0.processingTotal = 2
+        }
+        await store.receive(\.photoProcessingProgress) {
+            $0.processingCompleted = 1
+        }
+        await store.receive(\.photoProcessingProgress) {
+            $0.processingCompleted = 2
+        }
+        await store.receive(\.processingFinished) {
+            $0.isProcessing = false
+            $0.processingCompleted = 0
+            $0.processingTotal = 0
+            $0.coordinate = Coordinate(latitude: 1, longitude: 2)
+            $0.candidates = [
+                existing,
+                .init(
+                    id: $0.candidates[1].id,
+                    pngData: Data([11]),
+                    isSelected: true
+                ),
+                .init(
+                    id: $0.candidates[2].id,
+                    pngData: Data([12]),
+                    isSelected: true
+                ),
+            ]
         }
     }
 

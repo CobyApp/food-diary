@@ -4,26 +4,50 @@ import ComposableArchitecture
 
 public struct CaptureView: View {
     @Bindable var store: StoreOf<CaptureFeature>
-    @State private var pickerItem: PhotosPickerItem?
-    @State private var showingSourcePicker = false
+    @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showingPhotoLibrary = false
     @State private var showingCamera = false
+    @State private var isLoadingPhotoData = false
     public init(store: StoreOf<CaptureFeature>) { self.store = store }
 
-    private let candidateColumns = [GridItem(.adaptive(minimum: 90), spacing: 10)]
+    private let candidateColumns = [GridItem(.adaptive(minimum: 140), spacing: 12)]
 
     public var body: some View {
         NavigationStack {
             ScreenScaffold(title: "한 끼 담기", doodle: nil) {
                 VStack(alignment: .leading, spacing: 16) {
-                    Button { showingSourcePicker = true } label: {
-                        DropZoneCard { Label("음식 사진 고르기", systemImage: "camera") }
-                    }
-                    .buttonStyle(KitschPressStyle())
+                    Text("음식 사진 가져오기")
+                        .font(.appSection)
+                        .foregroundStyle(.appInk)
 
-                    if store.isProcessing {
+                    HStack(spacing: 12) {
+                        sourceButton(
+                            title: "카메라",
+                            subtitle: "바로 찍기",
+                            systemImage: "camera.fill",
+                            color: .appPink,
+                            enabled: UIImagePickerController.isSourceTypeAvailable(.camera)
+                                && !store.isProcessing
+                                && !isLoadingPhotoData
+                        ) {
+                            showingCamera = true
+                        }
+                        sourceButton(
+                            title: "사진 보관함",
+                            subtitle: "최대 10장 선택",
+                            systemImage: "photo.on.rectangle.angled",
+                            color: .appBlue,
+                            enabled: !store.isProcessing && !isLoadingPhotoData
+                        ) {
+                            showingPhotoLibrary = true
+                        }
+                    }
+
+                    if store.isProcessing || isLoadingPhotoData {
                         KitschLoadingView(
-                            "음식 누끼를 만드는 중",
+                            isLoadingPhotoData
+                                ? "선택한 사진을 불러오는 중"
+                                : processingTitle,
                             messages: [
                                 "음식만 조심조심 오리는 중",
                                 "스티커 테두리를 예쁘게 다듬는 중",
@@ -36,7 +60,7 @@ public struct CaptureView: View {
 
                     if !store.candidates.isEmpty {
                         Text("담을 누끼 고르기").font(.appSection).foregroundStyle(.appInk)
-                        LazyVGrid(columns: candidateColumns, spacing: 10) {
+                        LazyVGrid(columns: candidateColumns, spacing: 12) {
                             ForEach(Array(store.candidates.enumerated()), id: \.element.id) { index, candidate in
                                 Button { store.send(.toggleCandidate(candidate.id)) } label: {
                                     StickerTile(tint: .rotating(index)) {
@@ -110,7 +134,7 @@ public struct CaptureView: View {
                                 .buttonStyle(.plain)
                                 Divider()
                                 HStack {
-                                    Text("메모").font(.appSection).foregroundStyle(.appInk)
+                                    Text("한 줄 평").font(.appSection).foregroundStyle(.appInk)
                                     Spacer()
                                     TextField("한 줄 남기기", text: Binding(
                                         get: { store.memo },
@@ -145,17 +169,13 @@ public struct CaptureView: View {
             .sheet(item: $store.scope(state: \.placePicker, action: \.placePicker)) { pickerStore in
                 NavigationStack { PlacePickerView(store: pickerStore) }
             }
-            .confirmationDialog("사진 가져오기", isPresented: $showingSourcePicker) {
-                if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                    Button("카메라로 찍기") { showingCamera = true }
-                }
-                Button("사진 보관함에서 고르기") { showingPhotoLibrary = true }
-                Button("취소", role: .cancel) {}
-            }
             .photosPicker(
                 isPresented: $showingPhotoLibrary,
-                selection: $pickerItem,
-                matching: .images
+                selection: $pickerItems,
+                maxSelectionCount: 10,
+                selectionBehavior: .ordered,
+                matching: .images,
+                preferredItemEncoding: .automatic
             )
             .fullScreenCover(isPresented: $showingCamera) {
                 CameraPicker(
@@ -167,16 +187,75 @@ public struct CaptureView: View {
                 )
                 .ignoresSafeArea()
             }
-            .onChange(of: pickerItem) { _, item in
-                guard let item else { return }
+            .onChange(of: pickerItems) { _, items in
+                guard !items.isEmpty else { return }
                 Task {
-                    if let data = try? await item.loadTransferable(type: Data.self) {
-                        store.send(.photoPicked(data))
+                    isLoadingPhotoData = true
+                    var photos: [Data] = []
+                    photos.reserveCapacity(items.count)
+                    for item in items {
+                        if let data = try? await item.loadTransferable(type: Data.self) {
+                            photos.append(data)
+                        }
                     }
+                    pickerItems = []
+                    store.send(.photosPicked(photos))
+                    isLoadingPhotoData = false
                 }
             }
         }
         .animation(.spring(response: 0.48, dampingFraction: 0.78), value: store.candidates)
         .sensoryFeedback(.selection, trigger: store.candidates.map(\.isSelected))
+    }
+
+    private var processingTitle: String {
+        guard store.processingTotal > 1 else {
+            return L10n.text("음식 누끼를 만드는 중")
+        }
+        return L10n.format(
+            "capture.processing.progress",
+            min(store.processingCompleted + 1, store.processingTotal),
+            store.processingTotal
+        )
+    }
+
+    private func sourceButton(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        color: Color,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 9) {
+                KitschIcon(
+                    systemImage,
+                    tint: .appChocolate,
+                    background: color,
+                    size: 52
+                )
+                Text(LocalizedStringKey(title))
+                    .font(.appSection)
+                    .foregroundStyle(.appInk)
+                Text(LocalizedStringKey(subtitle))
+                    .font(.appCaption)
+                    .foregroundStyle(.appMuted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(Color.appCard)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(color.opacity(0.9), lineWidth: 2)
+            }
+            .softShadow()
+        }
+        .buttonStyle(KitschPressStyle())
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.42)
     }
 }

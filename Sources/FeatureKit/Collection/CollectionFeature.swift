@@ -25,9 +25,11 @@ public struct CollectionFeature {
         case cutoutsLoaded([CutoutSnapshot])
         case cutoutTapped(UUID)
         case editButtonTapped
+        case beginSelection(UUID)
         case selectionToggled(UUID)
         case selectAllTapped
         case deleteSelectedConfirmed
+        case deleteCutoutsConfirmed(Set<UUID>)
         case cutoutsDeleted(Set<UUID>)
         case cutoutDeletionFailed
         case dismissDeleteError
@@ -74,6 +76,11 @@ public struct CollectionFeature {
                 state.isEditing.toggle()
                 state.selectedCutoutIDs.removeAll()
                 return .none
+            case let .beginSelection(id):
+                guard state.cutouts.contains(where: { $0.id == id }) else { return .none }
+                state.isEditing = true
+                state.selectedCutoutIDs = [id]
+                return .none
             case let .selectionToggled(id):
                 guard state.isEditing, state.cutouts.contains(where: { $0.id == id }) else {
                     return .none
@@ -96,6 +103,16 @@ public struct CollectionFeature {
                 return .run { send in
                     try await persistence.deleteCutouts(ids)
                     await send(.cutoutsDeleted(ids))
+                } catch: { _, send in
+                    await send(.cutoutDeletionFailed)
+                }
+            case let .deleteCutoutsConfirmed(ids):
+                let validIDs = ids.intersection(Set(state.cutouts.map(\.id)))
+                guard !validIDs.isEmpty, !state.isDeleting else { return .none }
+                state.isDeleting = true
+                return .run { send in
+                    try await persistence.deleteCutouts(validIDs)
+                    await send(.cutoutsDeleted(validIDs))
                 } catch: { _, send in
                     await send(.cutoutDeletionFailed)
                 }

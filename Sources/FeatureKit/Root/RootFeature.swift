@@ -52,16 +52,19 @@ public struct RootFeature {
                     }
                 }
 
-            case .collection(.cutoutsDeleted):
-                return .run { _ in
-                    let meals = (try? await persistence.allMeals()) ?? []
-                    guard let latest = meals.first else {
-                        await widgetData.clear()
-                        return
+            case let .collection(.cutoutsDeleted(ids)):
+                return .merge(
+                    .send(.foodMap(.cutoutsDeleted(ids))),
+                    .run { _ in
+                        let meals = (try? await persistence.allMeals()) ?? []
+                        guard let latest = meals.first else {
+                            await widgetData.clear()
+                            return
+                        }
+                        let streak = MealStreak.calculate(meals: meals, now: Date()).current
+                        await widgetData.update(latest, streak)
                     }
-                    let streak = MealStreak.calculate(meals: meals, now: Date()).current
-                    await widgetData.update(latest, streak)
-                }
+                )
 
             case let .pushDetail(mealID):
                 state.path.append(MealDetailFeature.State(mealID: mealID))
@@ -86,6 +89,7 @@ public struct RootFeature {
                 return .merge(
                     .send(.collection(.onAppear)),
                     .send(.collection(.streakOnAppear)),
+                    .send(.foodMap(.onAppear)),
                     .run { _ in
                         let meals = (try? await persistence.allMeals()) ?? []
                         guard let latest = meals.first else {

@@ -49,8 +49,7 @@ public struct WorldCupView: View {
 
                     Text("더 먹고 싶은 쪽을 탭하세요")
                         .font(.appCaption).foregroundStyle(.appMuted)
-                    Button("게임 나가기") { store.send(.close) }
-                        .font(.appCaption).foregroundStyle(.appMuted)
+                    OutlineButton("게임 나가기") { store.send(.close) }
                 }
                 .padding(20)
                 .id(store.pairIndex)

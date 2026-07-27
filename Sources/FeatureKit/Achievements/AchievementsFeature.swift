@@ -39,39 +39,87 @@ public struct AchievementStats: Equatable, Sendable {
 
 private struct AchievementDef {
     let id: String
-    let title: String
+    let titleKey: String
     let symbol: String
     let metric: AchievementMetric
     let target: Int
 }
 
-private let achievementCatalog: [AchievementDef] = [
-    .init(id: "cut1", title: "첫 누끼", symbol: "fork.knife", metric: .cutouts, target: 1),
-    .init(id: "cut10", title: "누끼 10개", symbol: "seal.fill", metric: .cutouts, target: 10),
-    .init(id: "cut30", title: "누끼 30개", symbol: "sparkles.rectangle.stack.fill", metric: .cutouts, target: 30),
-    .init(id: "cut50", title: "누끼 50개", symbol: "star.circle.fill", metric: .cutouts, target: 50),
-    .init(id: "cut100", title: "누끼 100개", symbol: "crown.fill", metric: .cutouts, target: 100),
-    .init(id: "meal3", title: "기록 3개", symbol: "book.pages.fill", metric: .meals, target: 3),
-    .init(id: "meal10", title: "기록 10개", symbol: "books.vertical.fill", metric: .meals, target: 10),
-    .init(id: "meal30", title: "기록 30개", symbol: "book.closed.fill", metric: .meals, target: 30),
-    .init(id: "meal100", title: "기록 100개", symbol: "trophy.fill", metric: .meals, target: 100),
-    .init(id: "plc1", title: "첫 맛집", symbol: "mappin", metric: .places, target: 1),
-    .init(id: "plc5", title: "맛집 5곳", symbol: "map.fill", metric: .places, target: 5),
-    .init(id: "plc10", title: "맛집 10곳", symbol: "globe.asia.australia.fill", metric: .places, target: 10),
-    .init(id: "plc25", title: "맛집 25곳", symbol: "signpost.right.and.left.fill", metric: .places, target: 25),
-    .init(id: "streak3", title: "3일 연속 기록", symbol: "flame.fill", metric: .bestStreak, target: 3),
-    .init(id: "streak7", title: "7일 연속 기록", symbol: "flame.circle.fill", metric: .bestStreak, target: 7),
-    .init(id: "streak14", title: "14일 연속 기록", symbol: "bolt.heart.fill", metric: .bestStreak, target: 14),
-    .init(id: "streak30", title: "30일 연속 기록", symbol: "medal.fill", metric: .bestStreak, target: 30),
-    .init(id: "rating1", title: "첫 별점", symbol: "star.leadinghalf.filled", metric: .ratedMeals, target: 1),
-    .init(id: "rating10", title: "별점 10번", symbol: "star.square.fill", metric: .ratedMeals, target: 10),
-    .init(id: "five1", title: "첫 만점", symbol: "star.fill", metric: .fiveStarMeals, target: 1),
-    .init(id: "five10", title: "만점 10번", symbol: "stars", metric: .fiveStarMeals, target: 10),
-    .init(id: "memo1", title: "첫 메모", symbol: "text.quote", metric: .memoMeals, target: 1),
-    .init(id: "memo10", title: "메모 10개", symbol: "note.text", metric: .memoMeals, target: 10),
-    .init(id: "decor1", title: "첫 꾸미기", symbol: "paintbrush.pointed.fill", metric: .decoratedCutouts, target: 1),
-    .init(id: "decor20", title: "꾸민 누끼 20개", symbol: "paintpalette.fill", metric: .decoratedCutouts, target: 20),
-]
+private func achievementSeries(
+    prefix: String,
+    titleKey: String,
+    metric: AchievementMetric,
+    targets: [Int],
+    symbols: [String]
+) -> [AchievementDef] {
+    targets.enumerated().map { index, target in
+        AchievementDef(
+            id: "\(prefix)\(target)",
+            titleKey: titleKey,
+            symbol: symbols[min(index * symbols.count / targets.count, symbols.count - 1)],
+            metric: metric,
+            target: target
+        )
+    }
+}
+
+private let achievementCatalog: [AchievementDef] =
+    achievementSeries(
+        prefix: "cut",
+        titleKey: "achievement.cutouts.title",
+        metric: .cutouts,
+        targets: [1, 3, 5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200, 300, 500],
+        symbols: ["fork.knife", "seal.fill", "sparkles.rectangle.stack.fill", "star.circle.fill", "crown.fill"]
+    )
+    + achievementSeries(
+        prefix: "meal",
+        titleKey: "achievement.meals.title",
+        metric: .meals,
+        targets: [1, 3, 5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200, 300, 500],
+        symbols: ["book.pages.fill", "books.vertical.fill", "book.closed.fill", "bookmark.fill", "trophy.fill"]
+    )
+    + achievementSeries(
+        prefix: "plc",
+        titleKey: "achievement.places.title",
+        metric: .places,
+        targets: [1, 3, 5, 10, 15, 20, 30, 40, 50, 75, 100, 150],
+        symbols: ["mappin", "map.fill", "signpost.right.and.left.fill", "globe.asia.australia.fill"]
+    )
+    + achievementSeries(
+        prefix: "streak",
+        titleKey: "achievement.streak.title",
+        metric: .bestStreak,
+        targets: [2, 3, 5, 7, 10, 14, 21, 30, 50, 75, 100, 365],
+        symbols: ["flame.fill", "flame.circle.fill", "bolt.heart.fill", "medal.fill"]
+    )
+    + achievementSeries(
+        prefix: "rating",
+        titleKey: "achievement.ratings.title",
+        metric: .ratedMeals,
+        targets: [1, 3, 5, 10, 15, 20, 30, 50, 75, 100, 200, 300],
+        symbols: ["star.leadinghalf.filled", "star.square.fill", "star.bubble.fill", "star.circle.fill"]
+    )
+    + achievementSeries(
+        prefix: "five",
+        titleKey: "achievement.fiveStars.title",
+        metric: .fiveStarMeals,
+        targets: [1, 3, 5, 10, 15, 20, 30, 50, 75, 100, 200, 300],
+        symbols: ["star.fill", "stars", "sparkles", "crown.fill"]
+    )
+    + achievementSeries(
+        prefix: "memo",
+        titleKey: "achievement.memos.title",
+        metric: .memoMeals,
+        targets: [1, 3, 5, 10, 20, 30, 50, 75, 100, 200, 300],
+        symbols: ["text.quote", "note.text", "note.text.badge.plus", "text.book.closed.fill"]
+    )
+    + achievementSeries(
+        prefix: "decor",
+        titleKey: "achievement.decorations.title",
+        metric: .decoratedCutouts,
+        targets: [1, 3, 5, 10, 20, 30, 50, 75, 100, 200, 300],
+        symbols: ["paintbrush.pointed.fill", "wand.and.stars", "paintpalette.fill", "camera.filters"]
+    )
 
 func makeAchievements(stats: AchievementStats) -> [Achievement] {
     achievementCatalog.map { def in
@@ -86,7 +134,7 @@ func makeAchievements(stats: AchievementStats) -> [Achievement] {
         case .memoMeals: current = stats.memoMeals
         case .decoratedCutouts: current = stats.decoratedCutouts
         }
-        return Achievement(id: def.id, title: L10n.text(def.title), symbol: def.symbol,
+        return Achievement(id: def.id, title: L10n.format(def.titleKey, def.target), symbol: def.symbol,
                            target: def.target, current: current)
     }
 }

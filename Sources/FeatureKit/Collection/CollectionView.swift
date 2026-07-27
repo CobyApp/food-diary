@@ -4,6 +4,7 @@ import ComposableArchitecture
 public struct CollectionView: View {
     @Bindable var store: StoreOf<CollectionFeature>
     @State private var confirmingDeletion = false
+    @State private var pendingSingleDeleteID: UUID?
     public init(store: StoreOf<CollectionFeature>) { self.store = store }
 
     private let columns = [GridItem(.adaptive(minimum: 100), spacing: 12)]
@@ -41,7 +42,7 @@ public struct CollectionView: View {
                 }
             }
 
-            if !store.cutouts.isEmpty {
+            if store.isEditing {
                 selectionToolbar
             }
 
@@ -100,6 +101,30 @@ public struct CollectionView: View {
                             )
                         }
                         .buttonStyle(KitschPressStyle())
+                        .contextMenu {
+                            Button {
+                                store.send(.cutoutTapped(cutout.id))
+                            } label: {
+                                Label("기록 보기", systemImage: "book.pages")
+                            }
+                            Button {
+                                store.send(.beginSelection(cutout.id))
+                            } label: {
+                                Label("여러 개 선택", systemImage: "checkmark.circle")
+                            }
+                            Divider()
+                            Button(role: .destructive) {
+                                pendingSingleDeleteID = cutout.id
+                                confirmingDeletion = true
+                            } label: {
+                                Label("이 음식 삭제", systemImage: "trash")
+                            }
+                        } preview: {
+                            CutoutImage(fileName: cutout.fileName, maxPixelDimension: 320)
+                                .frame(width: 190, height: 190)
+                                .padding(16)
+                                .background(Color.appMilk)
+                        }
                     }
                 }
 
@@ -113,6 +138,7 @@ public struct CollectionView: View {
                             ),
                         enabled: !store.selectedCutoutIDs.isEmpty && !store.isDeleting
                     ) {
+                        pendingSingleDeleteID = nil
                         confirmingDeletion = true
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -135,12 +161,25 @@ public struct CollectionView: View {
             ProfileView(store: profileStore)
         }
         .confirmationDialog(
-            L10n.format("collection.delete.confirm", store.selectedCutoutIDs.count),
+            L10n.format(
+                "collection.delete.confirm",
+                pendingSingleDeleteID == nil ? store.selectedCutoutIDs.count : 1
+            ),
             isPresented: $confirmingDeletion,
             titleVisibility: .visible
         ) {
-            Button(L10n.text("선택한 누끼 삭제"), role: .destructive) {
-                store.send(.deleteSelectedConfirmed)
+            Button(
+                L10n.text(
+                    pendingSingleDeleteID == nil ? "선택한 누끼 삭제" : "이 음식 삭제"
+                ),
+                role: .destructive
+            ) {
+                if let pendingSingleDeleteID {
+                    store.send(.deleteCutoutsConfirmed([pendingSingleDeleteID]))
+                    self.pendingSingleDeleteID = nil
+                } else {
+                    store.send(.deleteSelectedConfirmed)
+                }
             }
             Button("취소", role: .cancel) {}
         }
@@ -176,11 +215,6 @@ public struct CollectionView: View {
                 compactTextButton("완료") {
                     store.send(.editButtonTapped)
                 }
-            } else {
-                Spacer()
-                compactTextButton("여러 개 선택", systemImage: "checkmark.circle") {
-                    store.send(.editButtonTapped)
-                }
             }
         }
     }
@@ -201,7 +235,10 @@ public struct CollectionView: View {
             .foregroundStyle(.appBlueInk)
             .padding(.horizontal, 11)
             .padding(.vertical, 8)
-            .background(Color.appTileBlue, in: Capsule())
+            .background(Color.appBlue.opacity(0.5), in: Capsule())
+            .overlay {
+                Capsule().stroke(Color.appBlueInk.opacity(0.35), lineWidth: 1.5)
+            }
         }
         .buttonStyle(KitschPressStyle())
     }
@@ -216,7 +253,10 @@ public struct CollectionView: View {
                 .font(.title3)
                 .foregroundStyle(color)
                 .frame(width: 38, height: 38)
-                .background(Color.appCard, in: Circle())
+                .background(color.opacity(0.18), in: Circle())
+                .overlay {
+                    Circle().stroke(color.opacity(0.5), lineWidth: 1.5)
+                }
                 .softShadow()
         }
         .buttonStyle(KitschPressStyle())

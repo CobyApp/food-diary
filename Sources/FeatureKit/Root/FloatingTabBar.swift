@@ -38,15 +38,16 @@ public struct FloatingTabBar: View {
             .font(.appCaption)
             .minimumScaleFactor(0.78)
             .lineLimit(1)
-            .foregroundStyle(active ? Color.appChocolate : Color.appMuted)
+            .foregroundStyle(active ? Color.white : Color.appInk)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
-            .background(active ? Color.appPink.opacity(0.72) : Color.clear)
+            .background(active ? Color.appCherry : Color.appMilk.opacity(0.72))
             .clipShape(Capsule())
             .overlay {
-                if active {
-                    Capsule().stroke(Color.appCard, lineWidth: 2)
-                }
+                Capsule().stroke(
+                    active ? Color.appCard : Color.appChocolate.opacity(0.08),
+                    lineWidth: active ? 2 : 1
+                )
             }
             .offset(y: active ? -2 : 0)
         }

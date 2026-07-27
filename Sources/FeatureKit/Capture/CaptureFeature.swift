@@ -28,10 +28,11 @@ public struct CaptureFeature {
 
     @ObservableState
     public struct State: Equatable {
-        public var photoData: Data?
         public var coordinate: Coordinate?
         public var candidates: [CutoutCandidate]
         public var isProcessing = false
+        public var processingCompleted = 0
+        public var processingTotal = 0
         public var isSaving = false
         public var memo: String
         public var rating: Int?
@@ -40,14 +41,12 @@ public struct CaptureFeature {
         public var savedMeal: MealSnapshot?
 
         public init(
-            photoData: Data? = nil,
             coordinate: Coordinate? = nil,
             candidates: [CutoutCandidate] = [],
             memo: String = "",
             rating: Int? = nil,
             chosenPlace: PlaceInfo? = nil
         ) {
-            self.photoData = photoData
             self.coordinate = coordinate
             self.candidates = candidates
             self.memo = memo
@@ -58,6 +57,8 @@ public struct CaptureFeature {
 
     public enum Action: Equatable {
         case photoPicked(Data)
+        case photosPicked([Data])
+        case photoProcessingProgress(completed: Int, total: Int)
         case processingFinished(coordinate: Coordinate?, cutouts: [Data])
         case toggleCandidate(UUID)
         case cycleDecoration(UUID)
@@ -82,25 +83,28 @@ public struct CaptureFeature {
         Reduce { state, action in
             switch action {
             case let .photoPicked(data):
-                state.photoData = data
-                state.isProcessing = true
-                return .run { send in
-                    async let cutouts = foodCutout.extract(data)
-                    let coordinate = photoLocation.coordinate(data)
-                    let pngs = try await cutouts.map(\.pngData)
-                    await send(.processingFinished(coordinate: coordinate, cutouts: pngs))
-                } catch: { _, send in
-                    // Extraction can fail (e.g. Vision has no inference context in
-                    // the simulator); end processing with no candidates instead of
-                    // leaving the spinner stuck forever.
-                    await send(.processingFinished(coordinate: nil, cutouts: []))
-                }
+                return processPhotos([data], state: &state)
+
+            case let .photosPicked(data):
+                return processPhotos(data, state: &state)
+
+            case let .photoProcessingProgress(completed, total):
+                state.processingCompleted = completed
+                state.processingTotal = total
+                return .none
 
             case let .processingFinished(coordinate, cutouts):
                 state.isProcessing = false
-                state.photoData = nil
-                state.coordinate = coordinate
-                state.candidates = cutouts.map { CutoutCandidate(pngData: $0, isSelected: true) }
+                state.processingCompleted = 0
+                state.processingTotal = 0
+                if state.coordinate == nil {
+                    state.coordinate = coordinate
+                }
+                state.candidates.append(
+                    contentsOf: cutouts.map {
+                        CutoutCandidate(pngData: $0, isSelected: true)
+                    }
+                )
                 return .none
 
             case let .toggleCandidate(id):
@@ -185,6 +189,39 @@ public struct CaptureFeature {
         }
         .ifLet(\.$placePicker, action: \.placePicker) {
             PlacePickerFeature()
+        }
+    }
+
+    private func processPhotos(
+        _ data: [Data],
+        state: inout State
+    ) -> Effect<Action> {
+        guard !data.isEmpty, !state.isProcessing else { return .none }
+        state.isProcessing = true
+        state.processingCompleted = 0
+        state.processingTotal = data.count
+
+        return .run { send in
+            var allCutouts: [Data] = []
+            var firstCoordinate: Coordinate?
+
+            for (index, photoData) in data.enumerated() {
+                if firstCoordinate == nil {
+                    firstCoordinate = photoLocation.coordinate(photoData)
+                }
+                if let cutouts = try? await foodCutout.extract(photoData) {
+                    allCutouts.append(contentsOf: cutouts.map(\.pngData))
+                }
+                await send(.photoProcessingProgress(
+                    completed: index + 1,
+                    total: data.count
+                ))
+            }
+
+            await send(.processingFinished(
+                coordinate: firstCoordinate,
+                cutouts: allCutouts
+            ))
         }
     }
 }

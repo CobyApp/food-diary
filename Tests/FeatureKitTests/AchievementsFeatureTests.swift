@@ -32,6 +32,8 @@ final class AchievementsFeatureTests: XCTestCase {
             $0.stats.memoMeals = 1
         }
         let a = store.state.achievements
+        XCTAssertEqual(a.count, 100)
+        XCTAssertEqual(Set(a.map(\.id)).count, 100)
         XCTAssertTrue(a.first { $0.id == "cut1" }!.unlocked)
         XCTAssertTrue(a.first { $0.id == "cut10" }!.unlocked)
         XCTAssertFalse(a.first { $0.id == "cut50" }!.unlocked)

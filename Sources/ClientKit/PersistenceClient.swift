@@ -58,7 +58,14 @@ actor PersistenceActor {
         let descriptor = FetchDescriptor<Meal>(
             sortBy: [SortDescriptor(\.eatenAt, order: .reverse)]
         )
-        return try modelContext.fetch(descriptor).map { $0.snapshot() }
+        let meals = try modelContext.fetch(descriptor)
+        let emptyMeals = meals.filter(\.cutouts.isEmpty)
+        let snapshots = meals.filter { !$0.cutouts.isEmpty }.map { $0.snapshot() }
+        if !emptyMeals.isEmpty {
+            emptyMeals.forEach(modelContext.delete)
+            try modelContext.save()
+        }
+        return snapshots
     }
 
     func meal(id: UUID) throws -> MealSnapshot? {
@@ -75,10 +82,22 @@ actor PersistenceActor {
         guard !ids.isEmpty else { return }
         let cutouts = try modelContext.fetch(FetchDescriptor<FoodCutout>())
             .filter { ids.contains($0.id) }
+        let mealsToDelete = Dictionary(
+            cutouts.compactMap(\.meal)
+                .filter { meal in
+                    !meal.cutouts.isEmpty && meal.cutouts.allSatisfy { ids.contains($0.id) }
+                }
+                .map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         for cutout in cutouts {
             try? imageStore.delete(cutout.fileName)
+            if let mealID = cutout.meal?.id, mealsToDelete[mealID] != nil {
+                continue
+            }
             modelContext.delete(cutout)
         }
+        mealsToDelete.values.forEach(modelContext.delete)
         try modelContext.save()
     }
 

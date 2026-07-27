@@ -11,21 +11,13 @@ public struct StickerTile<Content: View>: View {
 
     public var body: some View {
         content
-            .padding(10)
+            .padding(14)
             .frame(maxWidth: .infinity)
             .aspectRatio(1, contentMode: .fit)
-            .background(tint.color)
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.tile, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: AppRadius.tile, style: .continuous)
-                    .stroke(Color.appCard, lineWidth: 4)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: AppRadius.tile, style: .continuous)
-                    .stroke(Color.appChocolate.opacity(0.16), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
-                    .padding(5)
-            }
-            .softShadow()
+            .contentShape(Rectangle())
+            .shadow(color: .white.opacity(0.9), radius: 2, x: 0, y: 1)
+            .shadow(color: tint.color.opacity(0.48), radius: 11, x: 0, y: 6)
+            .shadow(color: Color.appChocolate.opacity(0.2), radius: 4, x: 0, y: 4)
     }
 }
 

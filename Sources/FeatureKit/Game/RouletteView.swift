@@ -78,8 +78,7 @@ public struct RouletteView: View {
                     .disabled(store.isSpinning)
                     .padding(.horizontal, 48)
 
-                    Button("게임 나가기") { store.send(.close) }
-                        .font(.appCaption).foregroundStyle(.appMuted)
+                    OutlineButton("게임 나가기") { store.send(.close) }
                 }
                 .padding(24)
                 .task { store.send(.appear) }

@@ -113,4 +113,21 @@ final class PersistenceClientTests: XCTestCase {
         XCTAssertEqual(remaining.first?.id, meal.cutouts[1].id)
         XCTAssertEqual(remainingMeal?.memo, "keep meal")
     }
+
+    func test_deleteLastCutout_removesEmptyMealAndMapResidue() async throws {
+        let client = try makeClient()
+        let meal = try await client.saveMeal(
+            PlaceInfo(id: "p1", name: "remove me", address: ""),
+            "last cutout",
+            nil,
+            [NewCutout(pngData: Data([1]), label: nil)]
+        )
+
+        try await client.deleteCutouts([meal.cutouts[0].id])
+
+        let deletedMeal = try await client.meal(meal.id)
+        let remainingMeals = try await client.allMeals()
+        XCTAssertNil(deletedMeal)
+        XCTAssertTrue(remainingMeals.isEmpty)
+    }
 }

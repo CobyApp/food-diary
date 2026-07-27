@@ -25,15 +25,9 @@ public struct RootView: View {
                     FoodMapView(store: store.scope(state: \.foodMap, action: \.foodMap))
                 }
             }
-            .id(store.tab)
-            .transition(.asymmetric(
-                insertion: .move(edge: .trailing).combined(with: .opacity),
-                removal: .scale(scale: 0.97).combined(with: .opacity)
-            ))
 
             FloatingTabBar(selected: store.tab) { store.send(.tabChanged($0)) }
         }
-        .animation(.spring(response: 0.46, dampingFraction: 0.82), value: store.tab)
         .sensoryFeedback(.selection, trigger: store.tab)
     }
 }

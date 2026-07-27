@@ -1,4 +1,5 @@
 import ClientKit
+import CoreImage
 import ImageIO
 import SwiftUI
 import UIKit
@@ -7,11 +8,13 @@ public actor CutoutImageLoader {
     public static let shared = CutoutImageLoader()
 
     private let cache: NSCache<NSString, UIImage>
+    private let renderContext: CIContext
 
     public init() {
         cache = NSCache<NSString, UIImage>()
         cache.countLimit = 80
         cache.totalCostLimit = 48 * 1_024 * 1_024
+        renderContext = CIContext(options: [.cacheIntermediates: false])
     }
 
     public func image(
@@ -20,7 +23,7 @@ public actor CutoutImageLoader {
         cacheKey: String,
         maxPixelDimension: Int = 720
     ) -> UIImage? {
-        let key = "\(cacheKey)-\(maxPixelDimension)" as NSString
+        let key = "bold-outline-v3-\(cacheKey)-\(maxPixelDimension)" as NSString
         if let cached = cache.object(forKey: key) {
             return cached
         }
@@ -34,7 +37,14 @@ public actor CutoutImageLoader {
             data = nil
         }
 
-        guard let data, let image = Self.downsample(data, maxPixelDimension: maxPixelDimension) else {
+        guard
+            let data,
+            let image = Self.stickerImage(
+                data,
+                maxPixelDimension: maxPixelDimension,
+                context: renderContext
+            )
+        else {
             return nil
         }
         cache.setObject(image, forKey: key, cost: Self.estimatedCost(of: image))
@@ -54,7 +64,11 @@ public actor CutoutImageLoader {
         }
     }
 
-    private static func downsample(_ data: Data, maxPixelDimension: Int) -> UIImage? {
+    private static func stickerImage(
+        _ data: Data,
+        maxPixelDimension: Int,
+        context: CIContext
+    ) -> UIImage? {
         autoreleasepool {
             guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
                 return UIImage(data: data)
@@ -65,14 +79,55 @@ public actor CutoutImageLoader {
                 kCGImageSourceThumbnailMaxPixelSize: maxPixelDimension,
                 kCGImageSourceShouldCacheImmediately: true,
             ]
-            guard let cgImage = CGImageSourceCreateThumbnailAtIndex(
+            guard let sourceImage = CGImageSourceCreateThumbnailAtIndex(
                 source,
                 0,
                 options as CFDictionary
             ) else {
                 return UIImage(data: data)
             }
-            return UIImage(cgImage: cgImage)
+
+            let longestSide = CGFloat(max(sourceImage.width, sourceImage.height))
+            let outlineWidth = min(24, max(10, longestSide * 0.032))
+            let padding = ceil(outlineWidth + 5)
+            let canvas = CGRect(
+                x: 0,
+                y: 0,
+                width: CGFloat(sourceImage.width) + padding * 2,
+                height: CGFloat(sourceImage.height) + padding * 2
+            )
+            let transparentCanvas = CIImage(
+                color: CIColor(red: 0, green: 0, blue: 0, alpha: 0)
+            )
+            .cropped(to: canvas)
+            let cutout = CIImage(cgImage: sourceImage)
+                .transformed(by: CGAffineTransform(translationX: padding, y: padding))
+                .composited(over: transparentCanvas)
+
+            let whiteSilhouette = cutout.applyingFilter(
+                "CIColorMatrix",
+                parameters: [
+                    "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+                    "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+                    "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+                    "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+                    "inputBiasVector": CIVector(x: 1, y: 1, z: 1, w: 0),
+                ]
+            )
+            let outline = whiteSilhouette
+                .applyingFilter(
+                    "CIMorphologyMaximum",
+                    parameters: ["inputRadius": outlineWidth]
+                )
+                .cropped(to: canvas)
+            let sticker = cutout
+                .composited(over: outline)
+                .cropped(to: canvas)
+
+            guard let rendered = context.createCGImage(sticker, from: canvas) else {
+                return UIImage(cgImage: sourceImage)
+            }
+            return UIImage(cgImage: rendered)
         }
     }
 

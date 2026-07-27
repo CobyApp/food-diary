@@ -28,12 +28,7 @@ struct ResultCard: View {
                     .multilineTextAlignment(.center)
                 HStack(spacing: 12) {
                     PillButton("한 번 더") { onAgain() }
-                    Button { onClose() } label: {
-                        Text("닫기").font(.appSection).foregroundStyle(.appMuted)
-                            .padding(.vertical, 14).padding(.horizontal, 22)
-                            .background(Color.appCard).clipShape(Capsule()).softShadow()
-                    }
-                    .buttonStyle(KitschPressStyle())
+                    OutlineButton("닫기") { onClose() }
                 }
             }
             .padding(24)

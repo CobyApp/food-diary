@@ -79,6 +79,21 @@ final class CollectionFeatureTests: XCTestCase {
     }
 
     @MainActor
+    func test_longPressSelection_startsWithPressedCutoutSelected() async {
+        let cutout = CutoutSnapshot(
+            id: UUID(), fileName: "pressed.png", createdAt: Date(), label: nil
+        )
+        var initialState = CollectionFeature.State()
+        initialState.cutouts = [cutout]
+        let store = TestStore(initialState: initialState) { CollectionFeature() }
+
+        await store.send(.beginSelection(cutout.id)) {
+            $0.isEditing = true
+            $0.selectedCutoutIDs = [cutout.id]
+        }
+    }
+
+    @MainActor
     func test_onAppear_whenLoadFails_clearsLoadingAndShowsEmpty() async {
         struct LoadError: Error {}
         let store = TestStore(initialState: CollectionFeature.State()) {

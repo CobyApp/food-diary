@@ -16,6 +16,12 @@
 
 "한 끼 담기" = "Add a Meal";
 "음식 사진 고르기" = "Choose a Food Photo";
+"음식 사진 가져오기" = "Add Food Photos";
+"카메라" = "Camera";
+"바로 찍기" = "Take one now";
+"사진 보관함" = "Photo Library";
+"최대 10장 선택" = "Choose up to 10";
+"선택한 사진을 불러오는 중" = "Loading your selected photos";
 "사진 가져오기" = "Add a Photo";
 "카메라로 찍기" = "Take a Photo";
 "사진 보관함에서 고르기" = "Choose from Library";
@@ -73,6 +79,9 @@
 "꾸민 누끼 20개" = "20 Decorated";
 
 "여러 개 선택" = "Select Multiple";
+"기록 보기" = "View Entry";
+"이 음식 삭제" = "Delete This Food";
+"한 줄 평" = "Quick Note";
 "전체 선택" = "Select All";
 "선택 해제" = "Deselect All";
 "완료" = "Done";
@@ -138,6 +147,11 @@
 "TODAY'S PICK" = "TODAY'S PICK";
 
 "맛집 지도" = "Food Map";
+"map.records" = "%d tasty memories";
+"지도를 정리하는 중" = "Tidying up your map";
+"삭제한 기록도 깔끔하게 정리하고 있어요" = "Clearing away deleted memories";
+"지도 앱에서 가게 보기" = "Open Restaurant in Maps";
+"음식 스티커를 눌러 추억을 펼쳐보세요" = "Tap a food sticker to open the memory";
 "아직 지도에 찍힌 곳이 없어요" = "Nothing on your map yet";
 "위치가 있는 사진으로 한 끼를 담아보세요!" = "Add a meal from a photo with location data!";
 "한 끼" = "Meal";
@@ -152,7 +166,17 @@
 "streak.days" = "%d days";
 "streak.best" = "Best %d";
 "achievements.progress" = "%d / %d unlocked";
+"achievement.cutouts.title" = "Sticker Collector · %d";
+"achievement.meals.title" = "Meal Archivist · %d";
+"achievement.places.title" = "Food Explorer · %d";
+"achievement.streak.title" = "Daily Foodie · %d days";
+"achievement.ratings.title" = "Taste Critic · %d";
+"achievement.fiveStars.title" = "Perfect Bites · %d";
+"achievement.memos.title" = "Flavor Writer · %d";
+"achievement.decorations.title" = "Sticker Artist · %d";
+"achievement.collected" = "COLLECTED";
 "game.minimum" = "%d stickers needed";
 "card.moves" = "Checking the pair · %d moves";
 "round.count" = "Round of %d";
 "recap.meals" = "%d meals · %@";
+"capture.processing.progress" = "Making stickers · Photo %d/%d";
