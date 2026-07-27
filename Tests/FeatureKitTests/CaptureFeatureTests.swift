@@ -209,4 +209,29 @@ final class CaptureFeatureTests: XCTestCase {
             $0.savedMeal = savedMeal
         }
     }
+
+    @MainActor
+    func test_saveFailure_presentsErrorAndClearsSaving() async {
+        struct SaveFailure: Error {}
+        let store = TestStore(
+            initialState: CaptureFeature.State(
+                candidates: [.init(id: UUID(), pngData: Data([1]), isSelected: true)]
+            )
+        ) {
+            CaptureFeature()
+        } withDependencies: {
+            $0.persistence.saveMeal = { _, _, _, _ in throw SaveFailure() }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.saveTapped) { $0.isSaving = true }
+        await store.receive(\.saveFailed) {
+            $0.isSaving = false
+            $0.isSaveErrorPresented = true
+        }
+        // The picked candidate survives, so "다시 시도" is a real retry.
+        XCTAssertEqual(store.state.candidates.count, 1)
+
+        await store.send(.dismissSaveError) { $0.isSaveErrorPresented = false }
+    }
 }

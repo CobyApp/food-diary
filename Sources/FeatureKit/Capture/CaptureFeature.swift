@@ -34,6 +34,7 @@ public struct CaptureFeature {
         public var processingCompleted = 0
         public var processingTotal = 0
         public var isSaving = false
+        public var isSaveErrorPresented = false
         public var memo: String
         public var rating: Int?
         @Presents public var placePicker: PlacePickerFeature.State?
@@ -71,6 +72,7 @@ public struct CaptureFeature {
         case saveTapped
         case saved(MealSnapshot)
         case saveFailed
+        case dismissSaveError
     }
 
     @Dependency(\.foodCutout) var foodCutout
@@ -184,6 +186,11 @@ public struct CaptureFeature {
 
             case .saveFailed:
                 state.isSaving = false
+                state.isSaveErrorPresented = true
+                return .none
+
+            case .dismissSaveError:
+                state.isSaveErrorPresented = false
                 return .none
             }
         }

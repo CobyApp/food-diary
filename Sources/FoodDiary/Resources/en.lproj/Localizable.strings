@@ -91,6 +91,8 @@
 "collection.delete.count" = "Delete %d";
 "collection.delete.confirm" = "Delete %d selected stickers?";
 "삭제하지 못했어요" = "Couldn't delete";
+"저장하지 못했어요" = "Couldn't save";
+"다시 시도" = "Retry";
 "잠시 후 다시 시도해주세요." = "Please try again in a moment.";
 "확인" = "OK";
 

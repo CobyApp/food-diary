@@ -203,6 +203,18 @@ public struct CaptureView: View {
                     isLoadingPhotoData = false
                 }
             }
+            .alert(
+                "저장하지 못했어요",
+                isPresented: Binding(
+                    get: { store.isSaveErrorPresented },
+                    set: { if !$0 { store.send(.dismissSaveError) } }
+                )
+            ) {
+                Button("다시 시도") { store.send(.saveTapped) }
+                Button("확인", role: .cancel) { store.send(.dismissSaveError) }
+            } message: {
+                Text("잠시 후 다시 시도해주세요.")
+            }
         }
         .animation(.spring(response: 0.48, dampingFraction: 0.78), value: store.candidates)
         .sensoryFeedback(.selection, trigger: store.candidates.map(\.isSelected))
