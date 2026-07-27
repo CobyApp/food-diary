@@ -11,23 +11,33 @@ public struct PlacePickerView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("근처 식당").font(.appSection).foregroundStyle(.appMuted)
-                    VStack(spacing: 10) {
-                        ForEach(store.places) { place in
-                            Button { store.send(.placeSelected(place)) } label: {
-                                SoftCard {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(place.name).font(.appSection).foregroundStyle(.appInk)
-                                            Text(place.address).font(.appCaption).foregroundStyle(.appMuted)
-                                        }
-                                        Spacer()
-                                        if store.selected?.id == place.id {
-                                            Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.appBlue)
+                    if store.isSearchFailed {
+                        VStack(spacing: 10) {
+                            Text("근처 식당을 불러오지 못했어요")
+                                .font(.appBody).foregroundStyle(.appMuted)
+                            OutlineButton("다시 시도") { store.send(.task) }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                    } else {
+                        VStack(spacing: 10) {
+                            ForEach(store.places) { place in
+                                Button { store.send(.placeSelected(place)) } label: {
+                                    SoftCard {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(place.name).font(.appSection).foregroundStyle(.appInk)
+                                                Text(place.address).font(.appCaption).foregroundStyle(.appMuted)
+                                            }
+                                            Spacer()
+                                            if store.selected?.id == place.id {
+                                                Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.appBlue)
+                                            }
                                         }
                                     }
                                 }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
 
