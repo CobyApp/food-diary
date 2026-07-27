@@ -3,6 +3,11 @@ import Models
 import SwiftUI
 
 public struct RouletteView: View {
+    // Reel slot geometry: row height (112) + vertical padding (4 top + 4 bottom) = 120.
+    // These must match the `.frame`/`.padding` values on each reel row below.
+    private let slotHeight: CGFloat = 120
+    private let windowHeight: CGFloat = 270
+
     @Bindable var store: StoreOf<RouletteFeature>
     @State private var revealResult = false
     @State private var reelOffset: CGFloat = 0
@@ -45,17 +50,32 @@ public struct RouletteView: View {
                                 StickerTile(tint: .rotating(index)) {
                                     CutoutImage(fileName: cutout.fileName)
                                 }
-                                .frame(width: 142, height: 112)
+                                .frame(width: 142, height: slotHeight - 8)
                                 .padding(.vertical, 4)
                             }
                         }
                         .offset(y: reelOffset)
                     }
-                    .frame(width: 250, height: 270)
+                    .frame(width: 250, height: windowHeight)
                     .clipped()
                     .overlay {
                         RoundedRectangle(cornerRadius: 30)
                             .stroke(glow ? Color.appButter : Color.appChocolate, lineWidth: glow ? 8 : 3)
+                    }
+                    .overlay(alignment: .center) {
+                        // Center pointer marking the slot the reel will land on.
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.appCherry, lineWidth: 4)
+                            .frame(height: slotHeight)
+                            .overlay(alignment: .leading) {
+                                Image(systemName: "arrowtriangle.right.fill")
+                                    .foregroundStyle(Color.appCherry).offset(x: -14)
+                            }
+                            .overlay(alignment: .trailing) {
+                                Image(systemName: "arrowtriangle.left.fill")
+                                    .foregroundStyle(Color.appCherry).offset(x: 14)
+                            }
+                            .allowsHitTesting(false)
                     }
                     .overlay(alignment: .leading) {
                         KitschSparkle().fill(Color.appButter)
@@ -70,9 +90,6 @@ public struct RouletteView: View {
                     PillButton(store.isSpinning ? "돌아가는 중" : "룰렛 돌리기") {
                         guard !store.isSpinning else { return }
                         glow = true
-                        withAnimation(.timingCurve(0.12, 0.8, 0.2, 1, duration: 1.45)) {
-                            reelOffset = -CGFloat(max(store.reel.count - 2, 1)) * 120
-                        }
                         store.send(.spin)
                     }
                     .disabled(store.isSpinning)
@@ -82,6 +99,13 @@ public struct RouletteView: View {
                 }
                 .padding(24)
                 .task { store.send(.appear) }
+            }
+        }
+        .task(id: store.landingIndex) {
+            guard let index = store.landingIndex else { return }
+            withAnimation(.timingCurve(0.12, 0.8, 0.2, 1, duration: 1.6)) {
+                // Center the winning slot in the reel window.
+                reelOffset = -CGFloat(index) * slotHeight + (windowHeight - slotHeight) / 2
             }
         }
         .task(id: store.result?.id) {

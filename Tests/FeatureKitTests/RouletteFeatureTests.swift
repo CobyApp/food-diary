@@ -27,4 +27,23 @@ final class RouletteFeatureTests: XCTestCase {
             $0.lastResultID = picked.id
         }
     }
+
+    @MainActor
+    func test_spin_placesWinnerAtLandingIndex() async {
+        let items = [snap(1), snap(2), snap(3)]
+        let picked = items[2]
+        let store = TestStore(initialState: RouletteFeature.State(cutouts: items)) {
+            RouletteFeature()
+        } withDependencies: {
+            $0.random.shuffled = { $0 }
+            $0.random.pick = { _ in picked }
+            $0.persistence.mealByCutout = { _ in nil }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.spin)
+        XCTAssertEqual(store.state.result?.id, picked.id)
+        XCTAssertEqual(store.state.reel.last?.id, picked.id)
+        XCTAssertEqual(store.state.landingIndex, store.state.reel.count - 1)
+    }
 }

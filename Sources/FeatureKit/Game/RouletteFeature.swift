@@ -13,6 +13,7 @@ public struct RouletteFeature {
         public var resultInfo: GameResultInfo?
         public var isSpinning = false
         public var lastResultID: UUID?
+        public var landingIndex: Int?
         public init(cutouts: [CutoutSnapshot]) { self.cutouts = cutouts }
     }
 
@@ -46,6 +47,11 @@ public struct RouletteFeature {
                 state.result = pick
                 state.resultInfo = nil
                 state.lastResultID = pick.id
+                // Rebuild the reel so the picked cutout IS the slot the reel stops on.
+                var reel = (0..<3).flatMap { _ in random.shuffled(state.cutouts) }
+                reel.append(pick)
+                state.reel = reel
+                state.landingIndex = reel.count - 1
                 return .run { send in
                     let meal = try? await persistence.mealByCutout(pick.id)
                     await send(.infoLoaded(GameResultInfo.from(meal)))
@@ -59,6 +65,7 @@ public struct RouletteFeature {
                 state.result = nil
                 state.resultInfo = nil
                 state.isSpinning = false
+                state.landingIndex = nil
                 return .none
 
             case .close:
