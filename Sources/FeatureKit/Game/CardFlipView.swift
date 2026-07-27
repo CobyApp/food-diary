@@ -33,28 +33,45 @@ public struct CardFlipView: View {
                             .font(.appBody).foregroundStyle(.appMuted)
                     }
 
-                    LazyVGrid(columns: columns, spacing: 14) {
-                        ForEach(Array(store.cards.enumerated()), id: \.offset) { index, cutout in
-                            Button {
-                                lastFlippedIndex = index
-                                store.send(.flip(index))
-                            } label: {
-                                ZStack {
-                                    cardBack(index)
-                                        .opacity(store.revealedIndices.contains(index) ? 0 : 1)
-                                    StickerTile(tint: .rotating(index)) {
-                                        CutoutImage(fileName: cutout.fileName)
+                    ZStack {
+                        if store.result != nil {
+                            ConfettiBurst()
+                                .frame(width: 260, height: 260)
+                            Text("매치!")
+                                .font(.system(size: 15, weight: .black, design: .rounded))
+                                .tracking(1)
+                                .foregroundStyle(.appCard)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.appCherry, in: Capsule())
+                                .softShadow()
+                                .transition(.scale(scale: 0.5).combined(with: .opacity))
+                                .zIndex(1)
+                        }
+                        LazyVGrid(columns: columns, spacing: 14) {
+                            ForEach(Array(store.cards.enumerated()), id: \.offset) { index, cutout in
+                                Button {
+                                    lastFlippedIndex = index
+                                    store.send(.flip(index))
+                                } label: {
+                                    ZStack {
+                                        cardBack(index)
+                                            .opacity(store.revealedIndices.contains(index) ? 0 : 1)
+                                        StickerTile(tint: .rotating(index)) {
+                                            CutoutImage(fileName: cutout.fileName)
+                                        }
+                                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                                        .opacity(store.revealedIndices.contains(index) ? 1 : 0)
                                     }
-                                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-                                    .opacity(store.revealedIndices.contains(index) ? 1 : 0)
+                                    .rotation3DEffect(
+                                        .degrees(store.revealedIndices.contains(index) ? 180 : 0),
+                                        axis: (x: 0, y: 1, z: 0)
+                                    )
+                                    .aspectRatio(0.78, contentMode: .fit)
+                                    .scaleEffect(store.result != nil && store.revealedIndices.contains(index) ? 1.06 : 1)
                                 }
-                                .rotation3DEffect(
-                                    .degrees(store.revealedIndices.contains(index) ? 180 : 0),
-                                    axis: (x: 0, y: 1, z: 0)
-                                )
-                                .aspectRatio(0.78, contentMode: .fit)
+                                .buttonStyle(KitschPressStyle())
                             }
-                            .buttonStyle(KitschPressStyle())
                         }
                     }
 
@@ -85,6 +102,7 @@ public struct CardFlipView: View {
             }
         }
         .animation(.spring(response: 0.48, dampingFraction: 0.72), value: store.revealedIndices)
+        .animation(.spring(response: 0.5, dampingFraction: 0.6), value: store.result != nil)
         .sensoryFeedback(.impact(weight: .medium), trigger: lastFlippedIndex)
     }
 

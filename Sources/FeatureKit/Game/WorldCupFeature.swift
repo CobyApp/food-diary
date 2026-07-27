@@ -13,6 +13,7 @@ public struct WorldCupFeature {
         public var pairIndex = 0
         public var champion: CutoutSnapshot?
         public var championInfo: GameResultInfo?
+        public var info: [UUID: GameResultInfo] = [:]
         public init(cutouts: [CutoutSnapshot]) { self.cutouts = cutouts }
 
         public var currentPair: (CutoutSnapshot, CutoutSnapshot)? {
@@ -32,6 +33,7 @@ public struct WorldCupFeature {
         case start
         case pick(CutoutSnapshot)
         case infoLoaded(GameResultInfo?)
+        case infoTableLoaded([UUID: GameResultInfo])
         case playAgain
         case close
     }
@@ -60,7 +62,15 @@ public struct WorldCupFeature {
                 state.pairIndex = 0
                 state.champion = nil
                 state.championInfo = nil
-                return .none
+                return .run { send in
+                    let meals = (try? await persistence.allMeals()) ?? []
+                    var table: [UUID: GameResultInfo] = [:]
+                    for meal in meals {
+                        guard let info = GameResultInfo.from(meal) else { continue }
+                        for cutout in meal.cutouts { table[cutout.id] = info }
+                    }
+                    await send(.infoTableLoaded(table))
+                }
 
             case let .pick(winner):
                 state.nextRound.append(winner)
@@ -83,6 +93,10 @@ public struct WorldCupFeature {
 
             case let .infoLoaded(info):
                 state.championInfo = info
+                return .none
+
+            case let .infoTableLoaded(table):
+                state.info = table
                 return .none
 
             case .playAgain:
