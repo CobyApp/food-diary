@@ -6,8 +6,6 @@ public struct CardFlipView: View {
     @Bindable var store: StoreOf<CardFlipFeature>
     @State private var lastFlippedIndex: Int?
     @State private var revealResult = false
-    @State private var matchedGlow: Set<Int> = []
-    @State private var shake: CGFloat = 0
 
     public init(store: StoreOf<CardFlipFeature>) { self.store = store }
 
@@ -23,8 +21,6 @@ public struct CardFlipView: View {
                     onAgain: {
                         lastFlippedIndex = nil
                         revealResult = false
-                        matchedGlow = []
-                        shake = 0
                         store.send(.playAgain)
                     },
                     onClose: { store.send(.close) }
@@ -41,7 +37,7 @@ public struct CardFlipView: View {
                         if store.result != nil {
                             ConfettiBurst()
                                 .frame(width: 260, height: 260)
-                            Text("매치!")
+                            Text("선택 완료!")
                                 .font(.system(size: 15, weight: .black, design: .rounded))
                                 .tracking(1)
                                 .foregroundStyle(.appCard)
@@ -60,41 +56,27 @@ public struct CardFlipView: View {
                                 } label: {
                                     ZStack {
                                         cardBack(index)
-                                            .opacity(store.revealedIndices.contains(index) ? 0 : 1)
+                                            .opacity(store.revealedIndex == index ? 0 : 1)
                                         StickerTile(tint: .rotating(index)) {
                                             CutoutImage(fileName: cutout.fileName)
                                         }
                                         .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0), perspective: 0.6)
-                                        .opacity(store.revealedIndices.contains(index) ? 1 : 0)
+                                        .opacity(store.revealedIndex == index ? 1 : 0)
                                     }
                                     .rotation3DEffect(
-                                        .degrees(store.revealedIndices.contains(index) ? 180 : 0),
+                                        .degrees(store.revealedIndex == index ? 180 : 0),
                                         axis: (x: 0, y: 1, z: 0),
                                         perspective: 0.6
                                     )
                                     .aspectRatio(0.78, contentMode: .fit)
-                                    .overlay {
-                                        if matchedGlow.contains(index) {
-                                            RoundedRectangle(cornerRadius: 18)
-                                                .stroke(Color.appButter, lineWidth: 4)
-                                                .shadow(color: Color.appButter.opacity(0.8), radius: 8)
-                                        }
-                                    }
-                                    .scaleEffect(matchedGlow.contains(index) ? 1.05 : 1)
-                                    .offset(x: store.firstRevealedIndex == index || store.secondRevealedIndex == index ? shake : 0)
                                 }
                                 .buttonStyle(KitschPressStyle())
                             }
                         }
                     }
 
-                    Text(
-                        store.firstRevealedIndex == nil
-                            ? L10n.text("같은 누끼 두 장을 찾아봐")
-                            : L10n.format("card.moves", store.moves)
-                    )
+                    Text(L10n.text("끌리는 카드 한 장을 골라 뒤집어봐"))
                         .font(.appCaption).foregroundStyle(.appMuted)
-                        .contentTransition(.numericText())
 
                     OutlineButton("게임 나가기") { store.send(.close) }
                 }
@@ -107,27 +89,7 @@ public struct CardFlipView: View {
             try? await Task.sleep(for: .milliseconds(850))
             withAnimation(.spring(response: 0.5, dampingFraction: 0.65)) { revealResult = true }
         }
-        .task(id: store.secondRevealedIndex) {
-            guard let second = store.secondRevealedIndex else { return }
-            guard store.result == nil else {
-                // Matched pair: keep both indices glowing instead of hiding them.
-                if let first = store.firstRevealedIndex {
-                    matchedGlow.insert(first)
-                }
-                matchedGlow.insert(second)
-                return
-            }
-            try? await Task.sleep(for: .milliseconds(720))
-            withAnimation(.easeInOut(duration: 0.07).repeatCount(4, autoreverses: true)) {
-                shake = 6
-            }
-            try? await Task.sleep(for: .milliseconds(560))
-            shake = 0
-            withAnimation(.spring(response: 0.42, dampingFraction: 0.8)) {
-                _ = store.send(.hideMismatch)
-            }
-        }
-        .animation(.spring(response: 0.48, dampingFraction: 0.72), value: store.revealedIndices)
+        .animation(.spring(response: 0.48, dampingFraction: 0.72), value: store.revealedIndex)
         .animation(.spring(response: 0.5, dampingFraction: 0.6), value: store.result != nil)
         .sensoryFeedback(.impact(weight: .medium), trigger: lastFlippedIndex)
     }

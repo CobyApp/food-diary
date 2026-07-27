@@ -133,7 +133,7 @@
 "룰렛 돌리기" = "Spin the Roulette";
 "시크릿 카드" = "Secret Cards";
 "끌리는 패턴 한 장을 골라 뒤집어봐" = "Pick a pattern you like and flip it";
-"같은 누끼 두 장을 찾아봐" = "Find two matching stickers";
+"끌리는 카드 한 장을 골라 뒤집어봐" = "Pick the card that calls to you and flip it";
 "더 먹고 싶은 쪽을 탭하세요" = "Tap the one you want more";
 "한 번 더" = "Play Again";
 "오늘의 한 끼" = "Today's Meal";
@@ -178,7 +178,6 @@
 "game.minimum" = "%d stickers needed";
 "game.myCutouts" = "%d stickers";
 "game.needMore" = "%d more to unlock all";
-"card.moves" = "Checking the pair · %d moves";
 "round.count" = "Round of %d";
 "recap.meals" = "%d meals · %@";
 "capture.processing.progress" = "Making stickers · Photo %d/%d";
