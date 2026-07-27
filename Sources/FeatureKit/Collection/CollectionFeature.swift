@@ -3,6 +3,15 @@ import Foundation
 import Models
 import ClientKit
 
+public struct CutoutMealInfo: Equatable, Sendable {
+    public let placeName: String
+    public let dateText: String
+    public let memo: String
+    public init(placeName: String, dateText: String, memo: String) {
+        self.placeName = placeName; self.dateText = dateText; self.memo = memo
+    }
+}
+
 @Reducer
 public struct CollectionFeature {
     @ObservableState
@@ -13,6 +22,8 @@ public struct CollectionFeature {
         public var isDeleting = false
         public var isDeleteErrorPresented = false
         public var selectedCutoutIDs: Set<UUID> = []
+        public var flippedCutoutID: UUID?
+        public var cutoutMealInfo: [UUID: CutoutMealInfo] = [:]
         public var streak = MealStreak()
         @Presents public var achievements: AchievementsFeature.State?
         @Presents public var recap: RecapFeature.State?
@@ -23,6 +34,7 @@ public struct CollectionFeature {
     public enum Action: Equatable {
         case onAppear
         case cutoutsLoaded([CutoutSnapshot])
+        case mealInfoLoaded([UUID: CutoutMealInfo])
         case cutoutTapped(UUID)
         case editButtonTapped
         case beginSelection(UUID)
@@ -58,6 +70,19 @@ public struct CollectionFeature {
                 return .run { send in
                     let cutouts = try await persistence.allCutouts()
                     await send(.cutoutsLoaded(cutouts))
+                    let meals = (try? await persistence.allMeals()) ?? []
+                    var info: [UUID: CutoutMealInfo] = [:]
+                    for meal in meals {
+                        let dateText = meal.eatenAt.formatted(.dateTime.month().day())
+                        for c in meal.cutouts {
+                            info[c.id] = CutoutMealInfo(
+                                placeName: meal.place?.name ?? "",
+                                dateText: dateText,
+                                memo: meal.memo
+                            )
+                        }
+                    }
+                    await send(.mealInfoLoaded(info))
                 } catch: { _, send in
                     await send(.cutoutsLoaded([]))
                 }
@@ -69,8 +94,11 @@ public struct CollectionFeature {
                     state.isEditing = false
                 }
                 return .none
-            case .cutoutTapped:
-                // Navigation handled by the parent (RootFeature).
+            case let .mealInfoLoaded(info):
+                state.cutoutMealInfo = info
+                return .none
+            case let .cutoutTapped(id):
+                state.flippedCutoutID = (state.flippedCutoutID == id) ? nil : id
                 return .none
             case .editButtonTapped:
                 state.isEditing.toggle()

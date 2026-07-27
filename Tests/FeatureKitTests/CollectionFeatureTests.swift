@@ -13,12 +13,43 @@ final class CollectionFeatureTests: XCTestCase {
             CollectionFeature()
         } withDependencies: {
             $0.persistence.allCutouts = { sample }
+            $0.persistence.allMeals = { [] }
         }
 
         await store.send(.onAppear) { $0.isLoading = true }
         await store.receive(\.cutoutsLoaded) {
             $0.isLoading = false
             $0.cutouts = sample
+        }
+        await store.receive(\.mealInfoLoaded)
+    }
+
+    @MainActor
+    func test_onAppear_loadsMealInfoForCutouts() async {
+        let cutoutID = UUID()
+        let eatenAt = Date()
+        let cutout = CutoutSnapshot(id: cutoutID, fileName: "a.png", createdAt: eatenAt, label: nil)
+        let place = PlaceInfo(id: "place-1", name: "스시야", address: "서울")
+        let meal = MealSnapshot(
+            id: UUID(), eatenAt: eatenAt, place: place, memo: "맛있었다", rating: nil, cutouts: [cutout]
+        )
+        let store = TestStore(initialState: CollectionFeature.State()) {
+            CollectionFeature()
+        } withDependencies: {
+            $0.persistence.allCutouts = { [cutout] }
+            $0.persistence.allMeals = { [meal] }
+        }
+        let expectedDateText = eatenAt.formatted(.dateTime.month().day())
+
+        await store.send(.onAppear) { $0.isLoading = true }
+        await store.receive(\.cutoutsLoaded) {
+            $0.isLoading = false
+            $0.cutouts = [cutout]
+        }
+        await store.receive(\.mealInfoLoaded) {
+            $0.cutoutMealInfo = [
+                cutoutID: CutoutMealInfo(placeName: "스시야", dateText: expectedDateText, memo: "맛있었다"),
+            ]
         }
     }
 
@@ -166,5 +197,16 @@ final class CollectionFeatureTests: XCTestCase {
         await store.receive(\.profileEditorLoaded) {
             $0.profile = ProfileFeature.State(profile: profile)
         }
+    }
+
+    @MainActor
+    func test_cutoutTapped_togglesFlip() async {
+        let id = UUID()
+        let store = TestStore(initialState: CollectionFeature.State()) {
+            CollectionFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+        await store.send(.cutoutTapped(id)) { $0.flippedCutoutID = id }
+        await store.send(.cutoutTapped(id)) { $0.flippedCutoutID = nil }
     }
 }

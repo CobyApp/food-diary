@@ -45,13 +45,6 @@ public struct RootFeature {
                 state.tab = tab
                 return .none
 
-            case let .collection(.cutoutTapped(cutoutID)):
-                return .run { send in
-                    if let meal = try await persistence.mealByCutout(cutoutID) {
-                        await send(.pushDetail(meal.id))
-                    }
-                }
-
             case let .collection(.cutoutsDeleted(ids)):
                 return .merge(
                     .send(.foodMap(.cutoutsDeleted(ids))),
