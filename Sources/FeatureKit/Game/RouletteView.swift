@@ -7,6 +7,8 @@ public struct RouletteView: View {
     // These must match the `.frame`/`.padding` values on each reel row below.
     private let slotHeight: CGFloat = 120
     private let windowHeight: CGFloat = 270
+    /// Shared by the reel animation and the reveal delay so they can never drift apart.
+    private let spinDuration: TimeInterval = 1.6
 
     @Bindable var store: StoreOf<RouletteFeature>
     @State private var revealResult = false
@@ -103,14 +105,15 @@ public struct RouletteView: View {
         }
         .task(id: store.landingIndex) {
             guard let index = store.landingIndex else { return }
-            withAnimation(.timingCurve(0.12, 0.8, 0.2, 1, duration: 1.6)) {
+            withAnimation(.timingCurve(0.12, 0.8, 0.2, 1, duration: spinDuration)) {
                 // Center the winning slot in the reel window.
                 reelOffset = -CGFloat(index) * slotHeight + (windowHeight - slotHeight) / 2
             }
         }
         .task(id: store.result?.id) {
             guard store.result != nil else { return }
-            try? await Task.sleep(for: .milliseconds(1500))
+            // Let the reel visibly settle on the winning slot before the card covers it.
+            try? await Task.sleep(for: .seconds(spinDuration + 0.25))
             withAnimation(.spring(response: 0.52, dampingFraction: 0.62)) {
                 revealResult = true
                 glow = false
