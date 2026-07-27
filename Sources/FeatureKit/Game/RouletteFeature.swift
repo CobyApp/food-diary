@@ -10,7 +10,7 @@ public struct RouletteFeature {
         public var cutouts: [CutoutSnapshot]
         public var reel: [CutoutSnapshot] = []
         public var result: CutoutSnapshot?
-        public var resultPlace: String?
+        public var resultInfo: GameResultInfo?
         public var isSpinning = false
         public var lastResultID: UUID?
         public init(cutouts: [CutoutSnapshot]) { self.cutouts = cutouts }
@@ -19,7 +19,7 @@ public struct RouletteFeature {
     public enum Action: Equatable {
         case appear
         case spin
-        case placeLoaded(String?)
+        case infoLoaded(GameResultInfo?)
         case playAgain
         case close
     }
@@ -44,20 +44,20 @@ public struct RouletteFeature {
                 guard let pick = random.pick(fresh.isEmpty ? state.cutouts : fresh) else { return .none }
                 state.isSpinning = true
                 state.result = pick
-                state.resultPlace = nil
+                state.resultInfo = nil
                 state.lastResultID = pick.id
                 return .run { send in
-                    let place = try? await persistence.mealByCutout(pick.id)?.place?.name
-                    await send(.placeLoaded(place ?? nil))
+                    let meal = try? await persistence.mealByCutout(pick.id)
+                    await send(.infoLoaded(GameResultInfo.from(meal)))
                 }
 
-            case let .placeLoaded(place):
-                state.resultPlace = place
+            case let .infoLoaded(info):
+                state.resultInfo = info
                 return .none
 
             case .playAgain:
                 state.result = nil
-                state.resultPlace = nil
+                state.resultInfo = nil
                 state.isSpinning = false
                 return .none
 

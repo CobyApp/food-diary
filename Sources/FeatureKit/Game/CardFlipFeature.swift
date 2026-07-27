@@ -13,7 +13,7 @@ public struct CardFlipFeature {
         public var secondRevealedIndex: Int?
         public var moves = 0
         public var result: CutoutSnapshot?
-        public var resultPlace: String?
+        public var resultInfo: GameResultInfo?
         public init(cutouts: [CutoutSnapshot]) { self.cutouts = cutouts }
 
         public var revealedIndices: Set<Int> {
@@ -25,7 +25,7 @@ public struct CardFlipFeature {
         case start
         case flip(Int)
         case hideMismatch
-        case placeLoaded(String?)
+        case infoLoaded(GameResultInfo?)
         case playAgain
         case close
     }
@@ -45,7 +45,7 @@ public struct CardFlipFeature {
                 state.secondRevealedIndex = nil
                 state.moves = 0
                 state.result = nil
-                state.resultPlace = nil
+                state.resultInfo = nil
                 return .none
 
             case let .flip(index):
@@ -68,8 +68,8 @@ public struct CardFlipFeature {
                 guard first.id == second.id else { return .none }
                 state.result = second
                 return .run { send in
-                    let place = try? await persistence.mealByCutout(second.id)?.place?.name
-                    await send(.placeLoaded(place ?? nil))
+                    let meal = try? await persistence.mealByCutout(second.id)
+                    await send(.infoLoaded(GameResultInfo.from(meal)))
                 }
 
             case .hideMismatch:
@@ -78,8 +78,8 @@ public struct CardFlipFeature {
                 state.secondRevealedIndex = nil
                 return .none
 
-            case let .placeLoaded(place):
-                state.resultPlace = place
+            case let .infoLoaded(info):
+                state.resultInfo = info
                 return .none
 
             case .playAgain:

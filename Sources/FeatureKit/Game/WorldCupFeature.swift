@@ -12,7 +12,7 @@ public struct WorldCupFeature {
         public var nextRound: [CutoutSnapshot] = []
         public var pairIndex = 0
         public var champion: CutoutSnapshot?
-        public var championPlace: String?
+        public var championInfo: GameResultInfo?
         public init(cutouts: [CutoutSnapshot]) { self.cutouts = cutouts }
 
         public var currentPair: (CutoutSnapshot, CutoutSnapshot)? {
@@ -31,7 +31,7 @@ public struct WorldCupFeature {
     public enum Action: Equatable {
         case start
         case pick(CutoutSnapshot)
-        case placeLoaded(String?)
+        case infoLoaded(GameResultInfo?)
         case playAgain
         case close
     }
@@ -59,7 +59,7 @@ public struct WorldCupFeature {
                 state.nextRound = []
                 state.pairIndex = 0
                 state.champion = nil
-                state.championPlace = nil
+                state.championInfo = nil
                 return .none
 
             case let .pick(winner):
@@ -71,8 +71,8 @@ public struct WorldCupFeature {
                         let champ = state.nextRound[0]
                         state.champion = champ
                         return .run { send in
-                            let place = try? await persistence.mealByCutout(champ.id)?.place?.name
-                            await send(.placeLoaded(place ?? nil))
+                            let meal = try? await persistence.mealByCutout(champ.id)
+                            await send(.infoLoaded(GameResultInfo.from(meal)))
                         }
                     }
                     state.currentRound = state.nextRound
@@ -81,8 +81,8 @@ public struct WorldCupFeature {
                 }
                 return .none
 
-            case let .placeLoaded(place):
-                state.championPlace = place
+            case let .infoLoaded(info):
+                state.championInfo = info
                 return .none
 
             case .playAgain:
@@ -90,7 +90,7 @@ public struct WorldCupFeature {
                 state.nextRound = []
                 state.pairIndex = 0
                 state.champion = nil
-                state.championPlace = nil
+                state.championInfo = nil
                 return .send(.start)
 
             case .close:

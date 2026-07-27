@@ -12,7 +12,7 @@ public struct GachaView: View {
         ZStack {
             PaperBackground()
             if let result = store.result, revealResult {
-                ResultCard(cutout: result, place: store.resultPlace,
+                ResultCard(cutout: result, info: store.resultInfo,
                            onAgain: { store.send(.playAgain) },
                            onClose: { store.send(.close) })
             } else {

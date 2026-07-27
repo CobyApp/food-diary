@@ -14,7 +14,7 @@ public struct WorldCupView: View {
             if let champion = store.champion {
                 ResultCard(
                     cutout: champion,
-                    place: store.championPlace,
+                    info: store.championInfo,
                     onAgain: {
                         selectedID = nil
                         store.send(.playAgain)

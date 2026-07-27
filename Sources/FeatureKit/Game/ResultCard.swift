@@ -3,7 +3,7 @@ import Models
 
 struct ResultCard: View {
     let cutout: CutoutSnapshot
-    let place: String?
+    let info: GameResultInfo?
     let onAgain: () -> Void
     let onClose: () -> Void
 
@@ -23,9 +23,22 @@ struct ResultCard: View {
                     .rotationEffect(.degrees(-2))
                     .overlay(alignment: .top) { WashiTape(.appButter).offset(y: -7) }
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
-                Text(place ?? L10n.text("오늘의 한 끼"))
+                Text(info?.placeName.isEmpty == false ? info!.placeName : L10n.text("오늘의 한 끼"))
                     .font(.appDisplay).foregroundStyle(.appChocolate)
                     .multilineTextAlignment(.center)
+                if let info {
+                    if !info.dateText.isEmpty {
+                        PastelChip(info.dateText, symbol: "calendar", tone: .pink)
+                    }
+                    if !info.memo.isEmpty {
+                        Text("\u{201C}\(info.memo)\u{201D}")
+                            .font(.appBody).foregroundStyle(.appInk)
+                            .multilineTextAlignment(.center)
+                    }
+                    if let rating = info.rating {
+                        StarRating(rating: rating)
+                    }
+                }
                 HStack(spacing: 12) {
                     PillButton("한 번 더") { onAgain() }
                     OutlineButton("닫기") { onClose() }

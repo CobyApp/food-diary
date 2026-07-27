@@ -17,7 +17,7 @@ public struct CardFlipView: View {
             if let result = store.result, revealResult {
                 ResultCard(
                     cutout: result,
-                    place: store.resultPlace,
+                    info: store.resultInfo,
                     onAgain: {
                         lastFlippedIndex = nil
                         revealResult = false

@@ -9,7 +9,7 @@ public struct GachaFeature {
     public struct State: Equatable {
         public var cutouts: [CutoutSnapshot]
         public var result: CutoutSnapshot?
-        public var resultPlace: String?
+        public var resultInfo: GameResultInfo?
         public var isSpinning = false
         public var drawnIDs: Set<UUID> = []
         public init(cutouts: [CutoutSnapshot]) { self.cutouts = cutouts }
@@ -18,7 +18,7 @@ public struct GachaFeature {
     public enum Action: Equatable {
         case pullLever
         case revealed(CutoutSnapshot)
-        case placeLoaded(String?)
+        case infoLoaded(GameResultInfo?)
         case playAgain
         case close
     }
@@ -40,24 +40,24 @@ public struct GachaFeature {
                 guard let pick = random.pick(pool) else { return .none }
                 state.isSpinning = true
                 state.result = pick
-                state.resultPlace = nil
+                state.resultInfo = nil
                 state.drawnIDs.insert(pick.id)
                 return .run { send in
-                    let place = try? await persistence.mealByCutout(pick.id)?.place?.name
-                    await send(.placeLoaded(place ?? nil))
+                    let meal = try? await persistence.mealByCutout(pick.id)
+                    await send(.infoLoaded(GameResultInfo.from(meal)))
                 }
 
             case let .revealed(cutout):
                 state.result = cutout
                 return .none
 
-            case let .placeLoaded(place):
-                state.resultPlace = place
+            case let .infoLoaded(info):
+                state.resultInfo = info
                 return .none
 
             case .playAgain:
                 state.result = nil
-                state.resultPlace = nil
+                state.resultInfo = nil
                 state.isSpinning = false
                 return .none
 

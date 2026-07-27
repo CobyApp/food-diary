@@ -29,7 +29,8 @@ final class GachaFeatureTests: XCTestCase {
             $0.result = picked
             $0.drawnIDs = [picked.id]
         }
-        await store.receive(\.placeLoaded) { $0.resultPlace = "라멘집" }
+        await store.receive(\.infoLoaded)
+        XCTAssertEqual(store.state.resultInfo?.placeName, "라멘집")
     }
 
     @MainActor
@@ -44,11 +45,11 @@ final class GachaFeatureTests: XCTestCase {
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.pullLever)
-        await store.receive(\.placeLoaded)
+        await store.receive(\.infoLoaded)
         let firstID = store.state.result?.id
         await store.send(.playAgain)
         await store.send(.pullLever)
-        await store.receive(\.placeLoaded)
+        await store.receive(\.infoLoaded)
 
         XCTAssertNotEqual(store.state.result?.id, firstID)
     }

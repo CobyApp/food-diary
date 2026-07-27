@@ -16,7 +16,7 @@ public struct RouletteView: View {
             if let result = store.result, revealResult {
                 ResultCard(
                     cutout: result,
-                    place: store.resultPlace,
+                    info: store.resultInfo,
                     onAgain: {
                         revealResult = false
                         reelOffset = 0
