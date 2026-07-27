@@ -40,7 +40,7 @@ private actor WidgetDataStore {
             title: meal.place?.name ?? NSLocalizedString(
                 "오늘의 한 끼", bundle: .main, comment: ""
             ),
-            subtitle: meal.memo.isEmpty ? "Foodie Diary" : meal.memo,
+            subtitle: meal.memo.isEmpty ? "Yumkie" : meal.memo,
             decoration: latest?.label,
             streak: streak,
             imageFileName: sharedImageName

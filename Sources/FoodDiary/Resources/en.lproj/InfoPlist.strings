@@ -1,4 +1,4 @@
-"CFBundleDisplayName" = "Foodie Diary";
+"CFBundleDisplayName" = "Yumkie";
 "NSCameraUsageDescription" = "Camera access lets you photograph a meal and turn it into a cutout sticker.";
 "NSPhotoLibraryUsageDescription" = "Photo library access lets you choose food photos for your cutout sticker collection.";
 "NSLocationWhenInUseUsageDescription" = "Location helps suggest restaurants near where your food photo was taken.";
