@@ -36,14 +36,23 @@ actor PersistenceActor {
     ) throws -> MealSnapshot {
         let meal = Meal(memo: memo, rating: rating)
         meal.place = place
-        for new in cutouts {
-            let name = try imageStore.save(new.pngData)
-            let cutout = FoodCutout(fileName: name, label: new.label)
-            cutout.meal = meal
-            meal.cutouts.append(cutout)
+        // Track what we wrote so a later failure doesn't leave orphaned PNGs.
+        var written: [String] = []
+        do {
+            for new in cutouts {
+                let name = try imageStore.save(new.pngData)
+                written.append(name)
+                let cutout = FoodCutout(fileName: name, label: new.label)
+                cutout.meal = meal
+                meal.cutouts.append(cutout)
+            }
+            modelContext.insert(meal)
+            try modelContext.save()
+        } catch {
+            for name in written { try? imageStore.delete(name) }
+            modelContext.rollback()
+            throw error
         }
-        modelContext.insert(meal)
-        try modelContext.save()
         return meal.snapshot()
     }
 

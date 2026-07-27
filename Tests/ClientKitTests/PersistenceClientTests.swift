@@ -130,4 +130,69 @@ final class PersistenceClientTests: XCTestCase {
         XCTAssertNil(deletedMeal)
         XCTAssertTrue(remainingMeals.isEmpty)
     }
+
+    func test_saveMeal_whenAnImageWriteFails_rollsBackWrittenImages() async throws {
+        struct WriteFailure: Error {}
+        let container = try ModelContainer(
+            for: Meal.self, FoodCutout.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        // Fails on the SECOND write; records every delete so we can assert rollback.
+        let writes = CounterBox()
+        let deleted = StringListBox()
+        let store = ImageStore(
+            save: { _ in
+                let index = writes.increment()
+                if index == 2 { throw WriteFailure() }
+                return "written-\(index).png"
+            },
+            load: { _ in nil },
+            delete: { name in deleted.append(name) }
+        )
+        let client = PersistenceClient.live(container: container, imageStore: store)
+
+        do {
+            _ = try await client.saveMeal(
+                nil, "rollback", nil,
+                [NewCutout(pngData: Data([1]), label: nil),
+                 NewCutout(pngData: Data([2]), label: nil)]
+            )
+            XCTFail("save should have thrown")
+        } catch {
+            // expected
+        }
+
+        XCTAssertEqual(deleted.currentValues, ["written-1.png"], "the first written PNG must be cleaned up")
+        let meals = try await client.allMeals()
+        XCTAssertTrue(meals.isEmpty, "no meal should be persisted when the save fails")
+    }
+}
+
+// `LockIsolated` (ConcurrencyExtras) isn't linked into this test target, so
+// these tiny lock-backed boxes stand in for it to safely share mutable state
+// across the `@Sendable` ImageStore closures used above.
+private final class CounterBox: @unchecked Sendable {
+    private var value = 0
+    private let lock = NSLock()
+    func increment() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        value += 1
+        return value
+    }
+}
+
+private final class StringListBox: @unchecked Sendable {
+    private var values: [String] = []
+    private let lock = NSLock()
+    func append(_ value: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        values.append(value)
+    }
+    var currentValues: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return values
+    }
 }
