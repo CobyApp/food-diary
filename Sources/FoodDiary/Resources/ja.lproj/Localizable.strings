@@ -176,6 +176,8 @@
 "achievement.decorations.title" = "ステッカーアーティスト · %d";
 "achievement.collected" = "コレクション済み";
 "game.minimum" = "ステッカーが%d枚必要";
+"game.myCutouts" = "ヌッキ %d個";
+"game.needMore" = "あと%d個で全部開きます";
 "card.moves" = "ペアを確認中 · %d回";
 "round.count" = "ベスト%d";
 "recap.meals" = "%d食 · %@";

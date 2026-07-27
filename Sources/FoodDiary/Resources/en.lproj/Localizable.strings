@@ -176,6 +176,8 @@
 "achievement.decorations.title" = "Sticker Artist · %d";
 "achievement.collected" = "COLLECTED";
 "game.minimum" = "%d stickers needed";
+"game.myCutouts" = "%d stickers";
+"game.needMore" = "%d more to unlock all";
 "card.moves" = "Checking the pair · %d moves";
 "round.count" = "Round of %d";
 "recap.meals" = "%d meals · %@";

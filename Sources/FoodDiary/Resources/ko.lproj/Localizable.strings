@@ -176,6 +176,8 @@
 "achievement.decorations.title" = "스티커 아티스트 · %d";
 "achievement.collected" = "수집 완료";
 "game.minimum" = "누끼 %d개 필요";
+"game.myCutouts" = "내 누끼 %d개";
+"game.needMore" = "%d개만 더 모으면 다 열려요";
 "card.moves" = "짝이 맞는지 확인 중 · %d번";
 "round.count" = "%d강";
 "recap.meals" = "%d끼 · %@";
