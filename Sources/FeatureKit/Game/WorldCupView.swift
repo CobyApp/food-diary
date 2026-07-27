@@ -6,6 +6,7 @@ public struct WorldCupView: View {
     @Bindable var store: StoreOf<WorldCupFeature>
     @State private var selectedID: UUID?
     @State private var roundBanner: String?
+    @State private var vsPop = false
 
     public init(store: StoreOf<WorldCupFeature>) { self.store = store }
 
@@ -28,12 +29,14 @@ public struct WorldCupView: View {
                         Text("FOOD TASTE MATCH")
                             .font(.appCaption).tracking(1.6).foregroundStyle(.appPinkInk)
                         Text(store.roundName).font(.appDisplay).foregroundStyle(.appInk)
-                        ProgressView(
-                            value: Double(store.pairIndex + 2),
-                            total: Double(max(store.currentRound.count, 2))
-                        )
-                        .tint(.appCherry)
-                        .frame(maxWidth: 220)
+                        HStack(spacing: 6) {
+                            let matches = max(store.currentRound.count / 2, 1)
+                            ForEach(0..<matches, id: \.self) { i in
+                                Circle()
+                                    .fill(i < store.pairIndex / 2 ? Color.appCherry : Color.appCherry.opacity(0.25))
+                                    .frame(width: 7, height: 7)
+                            }
+                        }
                     }
 
                     HStack(spacing: 10) {
@@ -45,6 +48,8 @@ public struct WorldCupView: View {
                             .background(Color.appCherry, in: Circle())
                             .overlay { Circle().stroke(Color.appCard, lineWidth: 3) }
                             .zIndex(2)
+                            .scaleEffect(vsPop ? 1.12 : 1)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.5), value: vsPop)
                         contender(pair.1, index: 1)
                     }
 
@@ -53,11 +58,6 @@ public struct WorldCupView: View {
                     OutlineButton("게임 나가기") { store.send(.close) }
                 }
                 .padding(20)
-                .id(store.pairIndex)
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
-                ))
             } else {
                 KitschLoadingView(
                     "대진표를 섞는 중",
@@ -90,6 +90,12 @@ public struct WorldCupView: View {
             try? await Task.sleep(for: .milliseconds(900))
             roundBanner = nil
         }
+        .task(id: store.pairIndex) {
+            selectedID = nil
+            vsPop = true
+            try? await Task.sleep(for: .milliseconds(180))
+            vsPop = false
+        }
     }
 
     private func contender(_ cutout: CutoutSnapshot, index: Int) -> some View {
@@ -119,9 +125,12 @@ public struct WorldCupView: View {
                 RoundedRectangle(cornerRadius: 24)
                     .stroke(Color.appChocolate.opacity(0.14), lineWidth: 1.5)
             }
-            .scaleEffect(selectedID == cutout.id ? 1.06 : 1)
+            .scaleEffect(selectedID == cutout.id ? 1.1 : (selectedID == nil ? 1 : 0.9))
+            .opacity(selectedID == nil || selectedID == cutout.id ? 1 : 0.25)
+            .offset(x: selectedID == nil || selectedID == cutout.id ? 0 : (index == 0 ? -40 : 40))
             .rotationEffect(.degrees(index == 0 ? -1.5 : 1.5))
             .softShadow()
+            .animation(.spring(response: 0.42, dampingFraction: 0.8), value: selectedID)
         }
         .buttonStyle(KitschPressStyle())
     }

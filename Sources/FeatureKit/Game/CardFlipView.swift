@@ -6,6 +6,8 @@ public struct CardFlipView: View {
     @Bindable var store: StoreOf<CardFlipFeature>
     @State private var lastFlippedIndex: Int?
     @State private var revealResult = false
+    @State private var matchedGlow: Set<Int> = []
+    @State private var shake: CGFloat = 0
 
     public init(store: StoreOf<CardFlipFeature>) { self.store = store }
 
@@ -21,6 +23,8 @@ public struct CardFlipView: View {
                     onAgain: {
                         lastFlippedIndex = nil
                         revealResult = false
+                        matchedGlow = []
+                        shake = 0
                         store.send(.playAgain)
                     },
                     onClose: { store.send(.close) }
@@ -60,15 +64,24 @@ public struct CardFlipView: View {
                                         StickerTile(tint: .rotating(index)) {
                                             CutoutImage(fileName: cutout.fileName)
                                         }
-                                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0), perspective: 0.6)
                                         .opacity(store.revealedIndices.contains(index) ? 1 : 0)
                                     }
                                     .rotation3DEffect(
                                         .degrees(store.revealedIndices.contains(index) ? 180 : 0),
-                                        axis: (x: 0, y: 1, z: 0)
+                                        axis: (x: 0, y: 1, z: 0),
+                                        perspective: 0.6
                                     )
                                     .aspectRatio(0.78, contentMode: .fit)
-                                    .scaleEffect(store.result != nil && store.revealedIndices.contains(index) ? 1.06 : 1)
+                                    .overlay {
+                                        if matchedGlow.contains(index) {
+                                            RoundedRectangle(cornerRadius: 18)
+                                                .stroke(Color.appButter, lineWidth: 4)
+                                                .shadow(color: Color.appButter.opacity(0.8), radius: 8)
+                                        }
+                                    }
+                                    .scaleEffect(matchedGlow.contains(index) ? 1.05 : 1)
+                                    .offset(x: store.firstRevealedIndex == index || store.secondRevealedIndex == index ? shake : 0)
                                 }
                                 .buttonStyle(KitschPressStyle())
                             }
@@ -95,8 +108,21 @@ public struct CardFlipView: View {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.65)) { revealResult = true }
         }
         .task(id: store.secondRevealedIndex) {
-            guard store.secondRevealedIndex != nil, store.result == nil else { return }
+            guard let second = store.secondRevealedIndex else { return }
+            guard store.result == nil else {
+                // Matched pair: keep both indices glowing instead of hiding them.
+                if let first = store.firstRevealedIndex {
+                    matchedGlow.insert(first)
+                }
+                matchedGlow.insert(second)
+                return
+            }
             try? await Task.sleep(for: .milliseconds(720))
+            withAnimation(.easeInOut(duration: 0.07).repeatCount(4, autoreverses: true)) {
+                shake = 6
+            }
+            try? await Task.sleep(for: .milliseconds(560))
+            shake = 0
             withAnimation(.spring(response: 0.42, dampingFraction: 0.8)) {
                 _ = store.send(.hideMismatch)
             }
