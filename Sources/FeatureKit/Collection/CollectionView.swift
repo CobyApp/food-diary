@@ -1,10 +1,12 @@
 import SwiftUI
 import ComposableArchitecture
+import Models
 
 public struct CollectionView: View {
     @Bindable var store: StoreOf<CollectionFeature>
     @State private var confirmingDeletion = false
     @State private var pendingSingleDeleteID: UUID?
+    @State private var motion = ParallaxMotion()
     public init(store: StoreOf<CollectionFeature>) { self.store = store }
 
     private let columns = [GridItem(.adaptive(minimum: 100), spacing: 12)]
@@ -67,38 +69,50 @@ public struct CollectionView: View {
                                     : .cutoutTapped(cutout.id)
                             )
                         } label: {
-                            StickerTile(tint: .rotating(index)) {
-                                CutoutImage(fileName: cutout.fileName)
-                            }
-                            .overlay(alignment: .topTrailing) {
-                                if store.isEditing {
-                                    Image(systemName:
-                                        store.selectedCutoutIDs.contains(cutout.id)
-                                            ? "checkmark.circle.fill"
-                                            : "circle"
-                                    )
-                                    .font(.title2.bold())
-                                    .foregroundStyle(
-                                        store.selectedCutoutIDs.contains(cutout.id)
-                                            ? Color.appCherry
-                                            : Color.appMuted
-                                    )
-                                    .padding(7)
-                                    .transition(.scale.combined(with: .opacity))
+                            let isFlipped = store.flippedCutoutID == cutout.id
+                            ZStack {
+                                // FRONT
+                                StickerTile(tint: .rotating(index)) {
+                                    CutoutImage(fileName: cutout.fileName)
                                 }
-                            }
-                            .overlay(alignment: .bottomTrailing) {
-                                if let symbol = CutoutDecoration(label: cutout.label).symbol {
-                                    KitschIcon(symbol, tint: .appPinkInk, background: .appPink, size: 34)
-                                        .padding(5)
+                                .overlay(alignment: .topTrailing) {
+                                    if store.isEditing {
+                                        Image(systemName:
+                                            store.selectedCutoutIDs.contains(cutout.id)
+                                                ? "checkmark.circle.fill"
+                                                : "circle"
+                                        )
+                                        .font(.title2.bold())
+                                        .foregroundStyle(
+                                            store.selectedCutoutIDs.contains(cutout.id)
+                                                ? Color.appCherry
+                                                : Color.appMuted
+                                        )
+                                        .padding(7)
+                                        .transition(.scale.combined(with: .opacity))
+                                    }
                                 }
+                                .overlay(alignment: .bottomTrailing) {
+                                    if let symbol = CutoutDecoration(label: cutout.label).symbol {
+                                        KitschIcon(symbol, tint: .appPinkInk, background: .appPink, size: 34)
+                                            .padding(5)
+                                    }
+                                }
+                                .opacity(isFlipped ? 0 : 1)
+
+                                // BACK
+                                cutoutBack(cutout)
+                                    .opacity(isFlipped ? 1 : 0)
+                                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
                             }
+                            .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
                             .rotationEffect(.degrees(index.isMultiple(of: 3) ? -1.2 : index.isMultiple(of: 2) ? 1 : 0))
                             .opacity(
                                 store.isEditing && !store.selectedCutoutIDs.contains(cutout.id)
                                     ? 0.62
                                     : 1
                             )
+                            .parallax(8, motion: motion)
                         }
                         .buttonStyle(KitschPressStyle())
                         .contextMenu {
@@ -150,6 +164,7 @@ public struct CollectionView: View {
             store.send(.onAppear)
             store.send(.streakOnAppear)
             store.send(.profileCheck)
+            motion.start()
         }
         .sheet(item: $store.scope(state: \.achievements, action: \.achievements)) { achStore in
             AchievementsView(store: achStore)
@@ -241,6 +256,35 @@ public struct CollectionView: View {
             }
         }
         .buttonStyle(KitschPressStyle())
+    }
+
+    @ViewBuilder
+    private func cutoutBack(_ cutout: CutoutSnapshot) -> some View {
+        let info = store.cutoutMealInfo[cutout.id]
+        VStack(alignment: .leading, spacing: 6) {
+            Text(info?.placeName.isEmpty == false ? info!.placeName : "기록")
+                .font(.appSection).foregroundStyle(.appInk).lineLimit(1)
+            if let date = info?.dateText, !date.isEmpty {
+                Text(date).font(.appCaption).foregroundStyle(.appMuted)
+            }
+            if let memo = info?.memo, !memo.isEmpty {
+                Text("\u{201C}\(memo)\u{201D}").font(.appCaption).foregroundStyle(.appInk).lineLimit(3)
+            }
+            Spacer(minLength: 0)
+            Button {
+                store.send(.deleteCutoutsConfirmed([cutout.id]))
+            } label: {
+                Label("삭제", systemImage: "trash")
+                    .font(.appCaption).foregroundStyle(.appPinkInk)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .aspectRatio(1, contentMode: .fit)
+        .background(Color.appCard)
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.tile, style: .continuous))
+        .softShadow()
     }
 
     private func headerButton(
