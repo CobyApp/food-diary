@@ -10,6 +10,7 @@ public struct GachaView: View {
     @State private var capsuleDrop: CGFloat = -140   // y offset of the dispensed capsule
     @State private var capsuleOpen = false
     @State private var capsuleSquash: CGFloat = 1    // landing squash-and-stretch factor
+    @State private var dialTurn: Double = 0          // gachapon dial rotation on pull
     public init(store: StoreOf<GachaFeature>) { self.store = store }
 
     public var body: some View {
@@ -21,6 +22,7 @@ public struct GachaView: View {
                                capsuleDrop = -140
                                capsuleOpen = false
                                capsuleSquash = 1
+                               dialTurn = 0
                                store.send(.playAgain)
                            },
                            onClose: { store.send(.close) })
@@ -38,6 +40,7 @@ public struct GachaView: View {
                             drumShake = 5
                         }
                         withAnimation(.easeOut(duration: 0.5).delay(0.36)) { drumShake = 0 }
+                        dialTurn += 180
                         store.send(.pullLever)
                     }
                     .disabled(store.isSpinning)
@@ -54,6 +57,7 @@ public struct GachaView: View {
                 capsuleDrop = -140
                 capsuleOpen = false
                 capsuleSquash = 1
+                dialTurn = 0
                 return
             }
             // 1) capsule falls into the tray
@@ -103,29 +107,41 @@ public struct GachaView: View {
                     .fill(Color.appPink)
                     .frame(width: 220, height: 135)
                     .overlay {
-                        VStack(spacing: 10) {
+                        VStack(spacing: 6) {
                             KitschIcon("arrow.down.circle.fill", background: .appButter, size: 52)
                             RoundedRectangle(cornerRadius: 12)
                                 .fill(Color.appChocolate)
                                 .frame(width: 90, height: 18)
+                            // Coin slot.
+                            Capsule()
+                                .fill(Color.appChocolate.opacity(0.85))
+                                .frame(width: 46, height: 10)
+                            dial
                         }
                     }
             }
-            Capsule()
-                .fill(Color.appCherry)
-                .frame(width: 28, height: 118)
-                .overlay(alignment: .top) {
-                    Circle().fill(Color.appButter).frame(width: 48, height: 48).offset(y: -12)
-                }
-                .offset(x: 22, y: 64)
-                .rotationEffect(.degrees(store.isSpinning ? 26 : 0), anchor: .bottom)
-                .animation(.interpolatingSpring(stiffness: 220, damping: 9), value: store.isSpinning)
         }
         .overlay(alignment: .top) { WashiTape(.appLavender).offset(y: -8) }
         .overlay(alignment: .bottom) {
             if let result = store.result, !revealResult { dispensedCapsule(result) }
         }
         .softShadow()
+    }
+
+    // Turnable gachapon dial mounted on the machine face; springs back after each pull.
+    private var dial: some View {
+        ZStack {
+            Circle().fill(Color.appCard).frame(width: 62, height: 62).softShadow()
+            Circle().stroke(Color.appChocolate, lineWidth: 4).frame(width: 62, height: 62)
+            // Turn groove.
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.appChocolate)
+                .frame(width: 44, height: 9)
+            // Marker dot so the turn is readable.
+            Circle().fill(Color.appCherry).frame(width: 8, height: 8).offset(y: -20)
+        }
+        .rotationEffect(.degrees(dialTurn))
+        .animation(.interpolatingSpring(stiffness: 150, damping: 11), value: dialTurn)
     }
 
     @ViewBuilder
