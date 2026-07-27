@@ -55,6 +55,7 @@ public struct GameHubFeature {
     public struct State: Equatable {
         public var cutouts: [CutoutSnapshot]
         @Presents public var game: GameDestination.State?
+        @Presents public var groupDecider: GroupDeciderFeature.State?
         public init(cutouts: [CutoutSnapshot] = [], game: GameDestination.State? = nil) {
             self.cutouts = cutouts
             self.game = game
@@ -66,6 +67,8 @@ public struct GameHubFeature {
         case cutoutsLoaded([CutoutSnapshot])
         case gameTapped(GameKind)
         case game(PresentationAction<GameDestination.Action>)
+        case groupTapped
+        case groupDecider(PresentationAction<GroupDeciderFeature.Action>)
     }
 
     @Dependency(\.persistence) var persistence
@@ -104,8 +107,22 @@ public struct GameHubFeature {
 
             case .game:
                 return .none
+
+            case .groupTapped:
+                state.groupDecider = GroupDeciderFeature.State()
+                return .none
+
+            case .groupDecider(.presented(.leave)):
+                state.groupDecider = nil
+                return .none
+
+            case .groupDecider:
+                return .none
             }
         }
         .ifLet(\.$game, action: \.game)
+        .ifLet(\.$groupDecider, action: \.groupDecider) {
+            GroupDeciderFeature()
+        }
     }
 }

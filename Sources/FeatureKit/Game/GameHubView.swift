@@ -53,6 +53,18 @@ public struct GameHubView: View {
                     .buttonStyle(KitschPressStyle())
                     .disabled(!enabled)
                 }
+
+                Button { store.send(.groupTapped) } label: {
+                    SoftCard {
+                        VStack(spacing: 8) {
+                            Text("🎉").font(.system(size: 44))
+                            Text("함께 정하기").font(.appSection).foregroundStyle(.appInk)
+                            Text("게임센터").font(.appCaption).foregroundStyle(.appMuted)
+                        }
+                        .frame(maxWidth: .infinity).padding(.vertical, 10)
+                    }
+                }
+                .buttonStyle(.plain)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
@@ -64,6 +76,9 @@ public struct GameHubView: View {
             case let .cardFlip(s): CardFlipView(store: s)
             case let .roulette(s): RouletteView(store: s)
             }
+        }
+        .fullScreenCover(item: $store.scope(state: \.groupDecider, action: \.groupDecider)) { groupStore in
+            GroupDeciderView(store: groupStore)
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: store.game != nil)
     }

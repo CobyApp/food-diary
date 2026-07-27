@@ -44,4 +44,15 @@ final class GameHubFeatureTests: XCTestCase {
             $0.game = nil
         }
     }
+
+    @MainActor
+    func test_groupTapped_presentsGroupDecider() async {
+        let store = TestStore(initialState: GameHubFeature.State()) {
+            GameHubFeature()
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+        await store.send(.groupTapped) {
+            $0.groupDecider = GroupDeciderFeature.State()
+        }
+    }
 }
