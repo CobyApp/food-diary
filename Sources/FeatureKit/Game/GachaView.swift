@@ -6,6 +6,8 @@ public struct GachaView: View {
     @Bindable var store: StoreOf<GachaFeature>
     @State private var revealResult = false
     @State private var drumTurns = 0.0
+    @State private var capsuleDrop: CGFloat = -140   // y offset of the dispensed capsule
+    @State private var capsuleOpen = false
     public init(store: StoreOf<GachaFeature>) { self.store = store }
 
     public var body: some View {
@@ -13,7 +15,11 @@ public struct GachaView: View {
             PaperBackground()
             if let result = store.result, revealResult {
                 ResultCard(cutout: result, info: store.resultInfo,
-                           onAgain: { store.send(.playAgain) },
+                           onAgain: {
+                               capsuleDrop = -140
+                               capsuleOpen = false
+                               store.send(.playAgain)
+                           },
                            onClose: { store.send(.close) })
             } else {
                 VStack(spacing: 18) {
@@ -37,9 +43,17 @@ public struct GachaView: View {
         .task(id: store.result?.id) {
             guard store.result != nil else {
                 revealResult = false
+                capsuleDrop = -140
+                capsuleOpen = false
                 return
             }
-            try? await Task.sleep(for: .milliseconds(1100))
+            // 1) capsule falls into the tray
+            withAnimation(.interpolatingSpring(stiffness: 170, damping: 12)) { capsuleDrop = 26 }
+            try? await Task.sleep(for: .milliseconds(520))
+            // 2) it splits open, revealing the cutout
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.6)) { capsuleOpen = true }
+            try? await Task.sleep(for: .milliseconds(700))
+            // 3) hand off to the result card
             withAnimation(.spring(response: 0.55, dampingFraction: 0.62)) { revealResult = true }
         }
         .sensoryFeedback(.impact(weight: .heavy), trigger: store.isSpinning)
@@ -81,7 +95,35 @@ public struct GachaView: View {
                 .rotationEffect(.degrees(store.isSpinning ? 26 : 0), anchor: .bottom)
         }
         .overlay(alignment: .top) { WashiTape(.appLavender).offset(y: -8) }
+        .overlay(alignment: .bottom) {
+            if let result = store.result, !revealResult { dispensedCapsule(result) }
+        }
         .softShadow()
+    }
+
+    @ViewBuilder
+    private func dispensedCapsule(_ cutout: CutoutSnapshot) -> some View {
+        ZStack {
+            // Two halves that part when the capsule opens.
+            Circle()
+                .fill(Color.appPink)
+                .frame(width: 96, height: 96)
+                .mask(Rectangle().frame(height: 48).offset(y: -24))
+                .offset(y: capsuleOpen ? -30 : 0)
+            Circle()
+                .fill(Color.appButter)
+                .frame(width: 96, height: 96)
+                .mask(Rectangle().frame(height: 48).offset(y: 24))
+                .offset(y: capsuleOpen ? 30 : 0)
+            CutoutImage(fileName: cutout.fileName)
+                .frame(width: 74, height: 74)
+                .scaleEffect(capsuleOpen ? 1.15 : 0.6)
+                .opacity(capsuleOpen ? 1 : 0)
+        }
+        .offset(y: capsuleDrop)
+        .overlay(alignment: .center) {
+            if capsuleOpen { KitschSparkle().fill(Color.appButter).frame(width: 26, height: 26).offset(y: -46) }
+        }
     }
 
     private func gameHeader(_ title: String, subtitle: String) -> some View {
