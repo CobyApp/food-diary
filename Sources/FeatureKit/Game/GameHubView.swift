@@ -21,6 +21,8 @@ public struct GameHubView: View {
                 }
             }
 
+            sectionHeader("혼자 결정", caption: "내 누끼로 바로 정하기")
+
             LazyVGrid(columns: columns, spacing: 14) {
                 ForEach(Array(GameKind.allCases.enumerated()), id: \.element) { index, kind in
                     let enabled = store.cutouts.count >= kind.minimum
@@ -53,19 +55,26 @@ public struct GameHubView: View {
                     .buttonStyle(KitschPressStyle())
                     .disabled(!enabled)
                 }
-
-                Button { store.send(.groupTapped) } label: {
-                    SoftCard {
-                        VStack(spacing: 8) {
-                            Text("🎉").font(.system(size: 44))
-                            Text("함께 정하기").font(.appSection).foregroundStyle(.appInk)
-                            Text("게임센터").font(.appCaption).foregroundStyle(.appMuted)
-                        }
-                        .frame(maxWidth: .infinity).padding(.vertical, 10)
-                    }
-                }
-                .buttonStyle(.plain)
             }
+
+            sectionHeader("같이 결정", caption: "친구들과 같은 결과를 함께")
+
+            Button { store.send(.groupTapped) } label: {
+                SoftCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        KitschIcon("person.2.fill", tint: .appChocolate, background: .appLavender, size: 56)
+                        Text(L10n.text("함께 정하기")).font(.appTitle).foregroundStyle(.appInk)
+                        Text(L10n.text("친구를 초대해 다 같이 결정"))
+                            .font(.appCaption).foregroundStyle(.appMuted)
+                            .multilineTextAlignment(.leading)
+                        Label(L10n.text("게임센터"), systemImage: "gamecontroller.fill")
+                            .font(.appCaption).foregroundStyle(.appBlueInk)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 170, alignment: .leading)
+                }
+                .rotationEffect(.degrees(1))
+            }
+            .buttonStyle(KitschPressStyle())
         }
         .toolbar(.hidden, for: .navigationBar)
         .task { store.send(.onAppear) }
@@ -81,5 +90,13 @@ public struct GameHubView: View {
             GroupDeciderView(store: groupStore)
         }
         .sensoryFeedback(.impact(weight: .medium), trigger: store.game != nil)
+    }
+
+    private func sectionHeader(_ title: String, caption: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(L10n.text(title)).font(.appSection).foregroundStyle(.appInk)
+            Text(L10n.text(caption)).font(.appCaption).foregroundStyle(.appMuted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
