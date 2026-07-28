@@ -10,8 +10,10 @@ public struct CollectionView: View {
     @State private var activeStickerID: UUID?
     @State private var stickerPlacements: [String: StickerBoardPlacement] = [:]
     @State private var showingRecapDatePicker = false
+    @State private var showingBoardStylePicker = false
     @State private var draftRecapStartDate = Date()
     @State private var draftRecapEndDate = Date()
+    @State private var transformPreview: StickerTransformPreview?
     @AppStorage("collection.freeStickerBoard.v1") private var savedStickerPlacements = ""
     @AppStorage("collection.stickerBoardTheme.v1")
     private var selectedThemeRaw = StickerBoardTheme.strawberryCheck.rawValue
@@ -49,13 +51,17 @@ public struct CollectionView: View {
 
                 Spacer()
 
+                headerButton(systemImage: "paintpalette.fill", color: .appPinkInk) {
+                    showingBoardStylePicker = true
+                }
+                .accessibilityLabel(Text("보드 꾸미기"))
+
                 headerButton(systemImage: "rosette", color: .appButterInk) {
                     store.send(.achievementsButtonTapped)
                 }
             }
 
             recapPeriodCard
-            boardStylePicker
 
             if store.isEditing {
                 selectionToolbar
@@ -126,6 +132,28 @@ public struct CollectionView: View {
             )
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingBoardStylePicker) {
+            NavigationStack {
+                ScrollView {
+                    boardStylePicker
+                        .padding(20)
+                }
+                .scrollIndicators(.hidden)
+                .background(PaperBackground())
+                .navigationTitle("보드 꾸미기")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("닫기") {
+                            showingBoardStylePicker = false
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Color.appMilk)
         }
         .sheet(
             isPresented: Binding(
@@ -342,6 +370,18 @@ public struct CollectionView: View {
                             isActive: activeStickerID == cutout.id,
                             onActiveChange: { active in
                                 activeStickerID = active ? cutout.id : nil
+                                if !active, transformPreview?.id == cutout.id {
+                                    transformPreview = nil
+                                }
+                            },
+                            onPreview: { scale, rotation, isScaling, isRotating in
+                                transformPreview = StickerTransformPreview(
+                                    id: cutout.id,
+                                    scale: scale,
+                                    rotation: rotation,
+                                    isScaling: isScaling,
+                                    isRotating: isRotating
+                                )
                             },
                             onMove: { destination in
                                 let current = stickerPlacements[cutout.id.uuidString]
@@ -418,8 +458,19 @@ public struct CollectionView: View {
                             .background(Color.appMilk)
                     }
                 }
+
+                if let transformPreview {
+                    StickerTransformHUD(preview: transformPreview)
+                        .position(x: width / 2, y: 28)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .zIndex(1_000)
+                }
             }
             .frame(width: width, height: height)
+            .animation(
+                .spring(response: 0.25, dampingFraction: 0.82),
+                value: transformPreview != nil
+            )
         }
         .frame(height: boardHeightForCurrentWidth)
     }
@@ -935,6 +986,14 @@ private extension Optional where Wrapped == String {
     var orEmpty: String { self ?? "" }
 }
 
+private struct StickerTransformPreview: Equatable {
+    let id: UUID
+    let scale: CGFloat
+    let rotation: Double
+    let isScaling: Bool
+    let isRotating: Bool
+}
+
 private struct FreeStickerDrag: ViewModifier {
     let position: CGPoint
     let baseScale: CGFloat
@@ -942,6 +1001,7 @@ private struct FreeStickerDrag: ViewModifier {
     let enabled: Bool
     let isActive: Bool
     let onActiveChange: (Bool) -> Void
+    let onPreview: (CGFloat, Double, Bool, Bool) -> Void
     let onMove: (CGPoint) -> Void
     let onTransform: (Double?, Double?) -> Void
 
@@ -974,15 +1034,8 @@ private struct FreeStickerDrag: ViewModifier {
         content
             .overlay {
                 if isInteracting || isActive {
-                    StickerTransformGuide(
-                        scale: liveScale,
-                        rotation: liveRotation
-                    )
-                    // Keep the readout upright and the same visual size while
-                    // the selected sticker itself rotates and scales.
-                    .scaleEffect(1 / max(liveScale, 0.01))
-                    .rotationEffect(.degrees(-liveRotation))
-                    .transition(.scale(scale: 0.84).combined(with: .opacity))
+                    StickerSelectionBoundary()
+                        .transition(.opacity)
                 }
             }
             .scaleEffect(
@@ -1034,6 +1087,18 @@ private struct FreeStickerDrag: ViewModifier {
             .updating($isMagnifying) { _, state, _ in
                 state = true
             }
+            .onChanged { value in
+                onPreview(
+                    CGFloat(
+                        FreeStickerBoardLayout.clampedScale(
+                            Double(baseScale * value)
+                        )
+                    ),
+                    liveRotation,
+                    true,
+                    isRotating
+                )
+            }
             .onEnded { value in
                 let rawScale = Double(baseScale * value)
                 let snappedScale = FreeStickerBoardLayout.snappedScale(rawScale)
@@ -1052,6 +1117,16 @@ private struct FreeStickerDrag: ViewModifier {
             .updating($isRotating) { _, state, _ in
                 state = true
             }
+            .onChanged { value in
+                onPreview(
+                    liveScale,
+                    FreeStickerBoardLayout.normalizedRotation(
+                        baseRotation + value.degrees
+                    ),
+                    isMagnifying,
+                    true
+                )
+            }
             .onEnded { value in
                 let rawRotation = baseRotation + value.degrees
                 let snappedRotation = FreeStickerBoardLayout.snappedRotation(rawRotation)
@@ -1063,55 +1138,71 @@ private struct FreeStickerDrag: ViewModifier {
     }
 }
 
-private struct StickerTransformGuide: View {
-    let scale: CGFloat
-    let rotation: Double
+private struct StickerSelectionBoundary: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .stroke(Color.appCard, lineWidth: 5)
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(Color.appCherry.opacity(0.92), lineWidth: 1.5)
+            }
+            .padding(3)
+            .shadow(color: Color.appChocolate.opacity(0.14), radius: 3, y: 2)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
+private struct StickerTransformHUD: View {
+    let preview: StickerTransformPreview
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(
-                    Color.appCherry,
-                    style: StrokeStyle(lineWidth: 2, dash: [6, 4])
-                )
-                .padding(2)
+        HStack(spacing: 4) {
+            metric(
+                systemImage: "arrow.up.left.and.arrow.down.right",
+                value: "\(Int((preview.scale * 100).rounded()))%",
+                active: preview.isScaling
+            )
 
-            guideHandle(alignment: .topLeading)
-            guideHandle(alignment: .bottomTrailing)
+            Rectangle()
+                .fill(Color.appChocolate.opacity(0.12))
+                .frame(width: 1, height: 22)
+                .padding(.horizontal, 3)
+
+            metric(
+                systemImage: "rotate.right",
+                value: "\(Int(preview.rotation.rounded()))°",
+                active: preview.isRotating
+            )
         }
-        .overlay(alignment: .top) {
-            HStack(spacing: 7) {
-                Label(
-                    "\(Int((scale * 100).rounded()))%",
-                    systemImage: "arrow.up.left.and.arrow.down.right"
-                )
-                Divider()
-                    .frame(height: 12)
-                    .overlay(Color.appPink.opacity(0.7))
-                Label(
-                    "\(Int(rotation.rounded()))°",
-                    systemImage: "rotate.right"
-                )
-            }
-            .font(.system(size: 11, weight: .black, design: .rounded))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(Color.appPinkInk, in: Capsule())
-            .overlay(Capsule().stroke(Color.appCard, lineWidth: 2))
-            .shadow(color: Color.appChocolate.opacity(0.18), radius: 4, y: 2)
-            .offset(y: -29)
-        }
+        .padding(5)
+        .background(.ultraThinMaterial, in: Capsule())
+        .background(Color.appCard.opacity(0.90), in: Capsule())
+        .overlay(Capsule().stroke(Color.appCard, lineWidth: 2))
+        .overlay(Capsule().stroke(Color.appCherry.opacity(0.24), lineWidth: 1))
+        .shadow(color: Color.appChocolate.opacity(0.17), radius: 8, y: 4)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
-    private func guideHandle(alignment: Alignment) -> some View {
-        Circle()
-            .fill(Color.appCard)
-            .frame(width: 13, height: 13)
-            .overlay(Circle().stroke(Color.appCherry, lineWidth: 2))
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
-            .padding(1)
+    private func metric(
+        systemImage: String,
+        value: String,
+        active: Bool
+    ) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: systemImage)
+            Text(verbatim: value)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+        }
+        .font(.system(size: 12, weight: .black, design: .rounded))
+        .foregroundStyle(active ? Color.white : Color.appInk)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 7)
+        .background(
+            active ? Color.appPinkInk : Color.clear,
+            in: Capsule()
+        )
     }
 }
