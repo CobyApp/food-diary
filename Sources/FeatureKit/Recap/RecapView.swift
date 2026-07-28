@@ -78,12 +78,11 @@ public struct RecapView: View {
     @State private var images: [UIImage] = []
     @State private var imageCutoutIDs: [UUID] = []
     @State private var export: RecapExport?
-    @State private var showingDatePicker = false
-    @State private var draftStartDate = Date()
-    @State private var draftEndDate = Date()
     @AppStorage("collection.freeStickerBoard.v1") private var savedStickerPlacements = ""
     @AppStorage("collection.stickerBoardTheme.v1")
     private var selectedThemeRaw = StickerBoardTheme.strawberryCheck.rawValue
+    @AppStorage("collection.stickerBoardFrame.v1")
+    private var selectedFrameRaw = StickerBoardFrame.softPaper.rawValue
 
     public init(store: StoreOf<RecapFeature>) {
         self.store = store
@@ -94,13 +93,6 @@ public struct RecapView: View {
             ZStack {
                 PaperBackground()
                 VStack(spacing: 0) {
-                    if store.startDate != nil {
-                        dateRangeButton
-                            .padding(.horizontal, 20)
-                            .padding(.top, 10)
-                            .padding(.bottom, 8)
-                    }
-
                     if store.isLoading {
                         Spacer()
                         KitschLoadingView(
@@ -113,7 +105,7 @@ public struct RecapView: View {
                         EmptyState(
                             systemImage: "film.stack",
                             title: "선택한 기간에 기록이 없어요",
-                            subtitle: "다른 날짜를 골라 맛있는 기록을 찾아보세요!"
+                            subtitle: "메인에서 다른 기간을 골라보세요!"
                         )
                         .padding(.horizontal, 22)
                         Spacer()
@@ -144,27 +136,12 @@ public struct RecapView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingDatePicker) {
-            RecapDateRangePicker(
-                startDate: $draftStartDate,
-                endDate: $draftEndDate,
-                onApply: {
-                    store.send(.dateRangeChanged(
-                        start: draftStartDate,
-                        end: draftEndDate
-                    ))
-                    showingDatePicker = false
-                }
-            )
-            .presentationDetents([.medium])
-            .presentationDragIndicator(.visible)
-        }
         .task { store.send(.onAppear) }
         .task(id: store.caption) {
             guard !images.isEmpty else { return }
             await renderExport()
         }
-        .task(id: "\(selectedThemeRaw)|\(savedStickerPlacements)") {
+        .task(id: "\(selectedThemeRaw)|\(selectedFrameRaw)|\(savedStickerPlacements)") {
             guard !images.isEmpty else { return }
             await renderExport()
         }
@@ -187,48 +164,12 @@ public struct RecapView: View {
         }
     }
 
-    private var dateRangeButton: some View {
-        Button {
-            draftStartDate = store.startDate ?? Date()
-            draftEndDate = store.endDate ?? Date()
-            showingDatePicker = true
-        } label: {
-            HStack(spacing: 10) {
-                KitschIcon(
-                    "calendar",
-                    tint: .appPinkInk,
-                    background: .appPink,
-                    size: 38
-                )
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("공유 기간")
-                        .font(.appCaption)
-                        .foregroundStyle(.appMuted)
-                    Text(store.rangeText)
-                        .font(.appSection)
-                        .foregroundStyle(.appInk)
-                }
-                Spacer()
-                Text("기간 설정")
-                    .font(.appCaption)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.appCherry, in: Capsule())
-            }
-            .padding(11)
-            .background(Color.appCard, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color.appPinkInk.opacity(0.28), lineWidth: 1.5)
-            }
-            .softShadow()
-        }
-        .buttonStyle(KitschPressStyle())
-    }
-
     private var selectedTheme: StickerBoardTheme {
         StickerBoardTheme(rawValue: selectedThemeRaw) ?? .strawberryCheck
+    }
+
+    private var selectedFrame: StickerBoardFrame {
+        StickerBoardFrame(rawValue: selectedFrameRaw) ?? .softPaper
     }
 
     private var storyBoardPlacements: [StickerBoardPlacement?] {
@@ -251,6 +192,7 @@ public struct RecapView: View {
             rangeText: store.rangeText,
             caption: store.caption,
             theme: selectedTheme,
+            boardFrame: selectedFrame,
             boardPlacements: storyBoardPlacements
         )
         .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
@@ -326,106 +268,13 @@ public struct RecapView: View {
                 rangeText: store.rangeText,
                 caption: store.caption,
                 theme: selectedTheme,
+                boardFrame: selectedFrame,
                 boardPlacements: storyBoardPlacements
             )
             .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
         )
         renderer.scale = 3
         export = renderer.uiImage?.pngData().map(RecapExport.init(data:))
-    }
-}
-
-private struct RecapDateRangePicker: View {
-    @Binding var startDate: Date
-    @Binding var endDate: Date
-    let onApply: () -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    private let calendar = Calendar.current
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(spacing: 8) {
-                    presetButton("오늘") {
-                        let today = calendar.startOfDay(for: Date())
-                        startDate = today
-                        endDate = today
-                    }
-                    presetButton("최근 7일") {
-                        let today = calendar.startOfDay(for: Date())
-                        startDate = calendar.date(byAdding: .day, value: -6, to: today) ?? today
-                        endDate = today
-                    }
-                    presetButton("이번 달") {
-                        let today = calendar.startOfDay(for: Date())
-                        startDate = calendar.dateInterval(of: .month, for: today)?.start ?? today
-                        endDate = today
-                    }
-                }
-
-                VStack(spacing: 12) {
-                    dateRow(
-                        "시작일",
-                        selection: $startDate,
-                        range: Date.distantPast...endDate
-                    )
-                    dateRow("종료일", selection: $endDate, range: startDate...Date())
-                }
-                .padding(16)
-                .background(Color.appCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(Color.appPinkInk.opacity(0.22), lineWidth: 1.5)
-                }
-
-                PillButton("이 기간으로 만들기", action: onApply)
-                Spacer(minLength: 0)
-            }
-            .padding(20)
-            .background(PaperBackground())
-            .navigationTitle("기간 설정")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") { dismiss() }
-                }
-            }
-        }
-    }
-
-    private func presetButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(LocalizedStringKey(title))
-        }
-        .buttonStyle(
-            KitschOutlineButtonStyle(
-                color: .appPinkInk,
-                fullWidth: true,
-                verticalPadding: 9
-            )
-        )
-    }
-
-    private func dateRow(
-        _ title: String,
-        selection: Binding<Date>,
-        range: ClosedRange<Date>
-    ) -> some View {
-        HStack {
-            Text(LocalizedStringKey(title))
-                .font(.appSection)
-                .foregroundStyle(.appInk)
-            Spacer()
-            DatePicker(
-                LocalizedStringKey(title),
-                selection: selection,
-                in: range,
-                displayedComponents: .date
-            )
-            .labelsHidden()
-            .tint(.appCherry)
-        }
     }
 }
 

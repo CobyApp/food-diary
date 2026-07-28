@@ -180,6 +180,13 @@
 "theme.lavender" = "Lavender Pop";
 "theme.soda" = "Soda Blue";
 "선택한 테마는 인스타 카드에도 적용돼요" = "Also applies to your Story card";
+"선택한 꾸미기는 인스타 카드에도 적용돼요" = "Your picks also style your Story card";
+"배경 무늬" = "Background pattern";
+"보드 모양" = "Board shape";
+"board.shape.soft" = "Soft Paper";
+"board.shape.cloud" = "Cloud";
+"board.shape.scallop" = "Scallop";
+"board.shape.ticket" = "Ticket";
 "푸드 리캡" = "Food Recap";
 "리캡 카드를 만드는 중" = "Making your recap card";
 "선택한 기간의 맛있는 순간을 모으고 있어요" = "Gathering tasty moments from your dates";
@@ -200,4 +207,5 @@
 "아직 별점이 없어요" = "No rating yet";
 "나의 한 줄평" = "My One-Line Review";
 "아직 한 줄평이 없어요" = "No review yet";
-"드래그로 옮기고 두 손가락으로 크기와 각도를 바꿔보세요" = "Drag to move, pinch and twist to style";
+"리캡 만들기" = "Make Recap";
+"메인에서 다른 기간을 골라보세요!" = "Choose another date range on the main screen!";

@@ -46,6 +46,55 @@ enum StickerBoardTheme: String, CaseIterable, Codable, Identifiable {
     }
 }
 
+enum StickerBoardFrame: String, CaseIterable, Codable, Identifiable {
+    case softPaper
+    case cloud
+    case scallop
+    case ticket
+
+    var id: String { rawValue }
+
+    var titleKey: String {
+        switch self {
+        case .softPaper: return "board.shape.soft"
+        case .cloud: return "board.shape.cloud"
+        case .scallop: return "board.shape.scallop"
+        case .ticket: return "board.shape.ticket"
+        }
+    }
+
+    var shape: AnyShape {
+        switch self {
+        case .softPaper:
+            return AnyShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        case .cloud:
+            return AnyShape(CloudBoardShape())
+        case .scallop:
+            return AnyShape(ScallopedBoardShape())
+        case .ticket:
+            return AnyShape(TicketBoardShape())
+        }
+    }
+}
+
+struct StickerBoardSurface: View {
+    let theme: StickerBoardTheme
+    let frame: StickerBoardFrame
+    var borderOpacity: Double = 0.30
+
+    var body: some View {
+        StickerBoardThemeBackground(theme: theme)
+            .clipShape(frame.shape)
+            .overlay {
+                frame.shape
+                    .stroke(
+                        theme.accent.opacity(borderOpacity),
+                        style: StrokeStyle(lineWidth: 1.7, dash: [7, 7])
+                    )
+            }
+    }
+}
+
 struct StickerBoardThemeBackground: View {
     let theme: StickerBoardTheme
 
@@ -84,6 +133,149 @@ struct StickerBoardThemeBackground: View {
         case .sodaBlue:
             BoardPatternCanvas(kind: .wave, color: theme.accent.opacity(0.14))
         }
+    }
+}
+
+private struct CloudBoardShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+        var path = Path()
+        path.move(to: CGPoint(x: w * 0.07, y: h * 0.12))
+        path.addCurve(
+            to: CGPoint(x: w * 0.31, y: h * 0.055),
+            control1: CGPoint(x: w * 0.08, y: h * 0.045),
+            control2: CGPoint(x: w * 0.20, y: h * 0.035)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.58, y: h * 0.045),
+            control1: CGPoint(x: w * 0.38, y: -h * 0.01),
+            control2: CGPoint(x: w * 0.51, y: -h * 0.005)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.84, y: h * 0.10),
+            control1: CGPoint(x: w * 0.68, y: h * 0.005),
+            control2: CGPoint(x: w * 0.80, y: h * 0.035)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.96, y: h * 0.20),
+            control1: CGPoint(x: w * 0.94, y: h * 0.07),
+            control2: CGPoint(x: w * 0.98, y: h * 0.13)
+        )
+        path.addLine(to: CGPoint(x: w * 0.98, y: h * 0.84))
+        path.addCurve(
+            to: CGPoint(x: w * 0.79, y: h * 0.95),
+            control1: CGPoint(x: w, y: h * 0.93),
+            control2: CGPoint(x: w * 0.91, y: h * 0.98)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.48, y: h * 0.96),
+            control1: CGPoint(x: w * 0.71, y: h * 1.01),
+            control2: CGPoint(x: w * 0.57, y: h * 1.01)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.17, y: h * 0.94),
+            control1: CGPoint(x: w * 0.38, y: h * 1.01),
+            control2: CGPoint(x: w * 0.24, y: h)
+        )
+        path.addCurve(
+            to: CGPoint(x: w * 0.03, y: h * 0.82),
+            control1: CGPoint(x: w * 0.06, y: h * 0.97),
+            control2: CGPoint(x: w, y: h * 0.91)
+        )
+        path.addLine(to: CGPoint(x: w * 0.025, y: h * 0.22))
+        path.addCurve(
+            to: CGPoint(x: w * 0.07, y: h * 0.12),
+            control1: CGPoint(x: -w * 0.005, y: h * 0.17),
+            control2: CGPoint(x: w * 0.015, y: h * 0.12)
+        )
+        path.closeSubpath()
+        return path
+    }
+}
+
+private struct ScallopedBoardShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let steps = max(Int(rect.width / 7), 36)
+        let inset: CGFloat = 5
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + inset, y: rect.minY + inset))
+
+        for index in 0...steps {
+            let progress = CGFloat(index) / CGFloat(steps)
+            let wave = (1 + cos(progress * .pi * CGFloat(steps / 2))) * inset / 2
+            path.addLine(to: CGPoint(
+                x: rect.minX + progress * rect.width,
+                y: rect.minY + wave
+            ))
+        }
+        for index in 0...steps {
+            let progress = CGFloat(index) / CGFloat(steps)
+            let wave = (1 + cos(progress * .pi * CGFloat(steps / 2))) * inset / 2
+            path.addLine(to: CGPoint(
+                x: rect.maxX - wave,
+                y: rect.minY + progress * rect.height
+            ))
+        }
+        for index in 0...steps {
+            let progress = CGFloat(index) / CGFloat(steps)
+            let wave = (1 + cos(progress * .pi * CGFloat(steps / 2))) * inset / 2
+            path.addLine(to: CGPoint(
+                x: rect.maxX - progress * rect.width,
+                y: rect.maxY - wave
+            ))
+        }
+        for index in 0...steps {
+            let progress = CGFloat(index) / CGFloat(steps)
+            let wave = (1 + cos(progress * .pi * CGFloat(steps / 2))) * inset / 2
+            path.addLine(to: CGPoint(
+                x: rect.minX + wave,
+                y: rect.maxY - progress * rect.height
+            ))
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
+private struct TicketBoardShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let r: CGFloat = 24
+        let notch: CGFloat = 14
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + r, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - r, y: rect.minY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.minY + r),
+            control: CGPoint(x: rect.maxX, y: rect.minY)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY - notch))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.midY + notch),
+            control: CGPoint(x: rect.maxX - notch * 1.35, y: rect.midY)
+        )
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX - r, y: rect.maxY),
+            control: CGPoint(x: rect.maxX, y: rect.maxY)
+        )
+        path.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX, y: rect.maxY - r),
+            control: CGPoint(x: rect.minX, y: rect.maxY)
+        )
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.midY + notch))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX, y: rect.midY - notch),
+            control: CGPoint(x: rect.minX + notch * 1.35, y: rect.midY)
+        )
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + r))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.minX + r, y: rect.minY),
+            control: CGPoint(x: rect.minX, y: rect.minY)
+        )
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -276,10 +468,21 @@ enum FreeStickerBoardLayout {
         min(max(value, scaleRange.lowerBound), scaleRange.upperBound)
     }
 
+    static func snappedScale(_ value: Double) -> Double {
+        let value = clampedScale(value)
+        return abs(value - 1) <= 0.045 ? 1 : value
+    }
+
     static func normalizedRotation(_ degrees: Double) -> Double {
         var value = degrees.truncatingRemainder(dividingBy: 360)
         if value > 180 { value -= 360 }
         if value < -180 { value += 360 }
         return value
+    }
+
+    static func snappedRotation(_ degrees: Double) -> Double {
+        let value = normalizedRotation(degrees)
+        let nearestStep = (value / 15).rounded() * 15
+        return abs(value - nearestStep) <= 2.2 ? nearestStep : value
     }
 }

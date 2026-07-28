@@ -9,6 +9,7 @@ struct RecapStoryCard: View {
     let rangeText: String
     var caption: String?
     var theme: StickerBoardTheme = .strawberryCheck
+    var boardFrame: StickerBoardFrame = .softPaper
     var boardPlacements: [StickerBoardPlacement?] = []
 
     static let size = CGSize(width: 360, height: 640)
@@ -89,19 +90,12 @@ struct RecapStoryCard: View {
         GeometryReader { proxy in
             let count = min(images.count, 9)
             ZStack {
-                StoryCheckerPattern(color: theme.accent.opacity(0.18), cellSize: 18)
-                    .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
-                    .padding(5)
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .fill(Color.appCard.opacity(0.58))
+                StickerBoardSurface(
+                    theme: theme,
+                    frame: boardFrame,
+                    borderOpacity: 0.42
+                )
                     .frame(width: proxy.size.width - 10, height: proxy.size.height - 18)
-                    .rotationEffect(.degrees(-1.1))
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .stroke(
-                        Color.appChocolate.opacity(0.12),
-                        style: StrokeStyle(lineWidth: 1.2, dash: [6, 6])
-                    )
-                    .frame(width: proxy.size.width - 14, height: proxy.size.height - 22)
                     .rotationEffect(.degrees(-1.1))
 
                 ForEach(Array(images.prefix(9).enumerated()), id: \.offset) { index, image in

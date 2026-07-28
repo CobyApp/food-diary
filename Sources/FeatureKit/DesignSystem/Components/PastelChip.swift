@@ -32,6 +32,9 @@ public struct PastelChip: View {
         HStack(spacing: 4) {
             if let symbol { Image(systemName: symbol).fontWeight(.black) }
             Text(text)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .minimumScaleFactor(0.78)
         }
         .font(.appCaption)
         .foregroundStyle(foreground)

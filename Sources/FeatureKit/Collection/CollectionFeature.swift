@@ -29,9 +29,30 @@ public struct CollectionFeature {
         public var selectedCutoutID: UUID?
         public var cutoutMealInfo: [UUID: CutoutMealInfo] = [:]
         public var streak = MealStreak()
+        public var recapStartDate: Date
+        public var recapEndDate: Date
         @Presents public var achievements: AchievementsFeature.State?
         @Presents public var recap: RecapFeature.State?
-        public init() {}
+        public init(
+            recapStartDate: Date = Calendar.current.startOfDay(for: Date()),
+            recapEndDate: Date = Calendar.current.startOfDay(for: Date())
+        ) {
+            self.recapStartDate = recapStartDate
+            self.recapEndDate = recapEndDate
+        }
+
+        public var recapRangeText: String {
+            let start = recapStartDate.formatted(
+                .dateTime.year().month(.abbreviated).day()
+            )
+            if Calendar.current.isDate(recapStartDate, inSameDayAs: recapEndDate) {
+                return start
+            }
+            let end = recapEndDate.formatted(
+                .dateTime.year().month(.abbreviated).day()
+            )
+            return "\(start) – \(end)"
+        }
     }
 
     public enum Action: Equatable {
@@ -53,6 +74,7 @@ public struct CollectionFeature {
         case streakLoaded(MealStreak)
         case achievementsButtonTapped
         case achievements(PresentationAction<AchievementsFeature.Action>)
+        case recapDateRangeChanged(start: Date, end: Date)
         case recapButtonTapped
         case recap(PresentationAction<RecapFeature.Action>)
     }
@@ -186,8 +208,19 @@ public struct CollectionFeature {
                 return .none
             case .achievements:
                 return .none
+            case let .recapDateRangeChanged(rawStart, rawEnd):
+                state.recapStartDate = Calendar.current.startOfDay(
+                    for: min(rawStart, rawEnd)
+                )
+                state.recapEndDate = Calendar.current.startOfDay(
+                    for: max(rawStart, rawEnd)
+                )
+                return .none
             case .recapButtonTapped:
-                state.recap = RecapFeature.State()
+                state.recap = RecapFeature.State(
+                    startDate: state.recapStartDate,
+                    endDate: state.recapEndDate
+                )
                 return .none
             case .recap(.presented(.close)):
                 state.recap = nil

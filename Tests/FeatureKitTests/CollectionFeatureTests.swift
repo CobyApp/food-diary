@@ -160,13 +160,26 @@ final class CollectionFeatureTests: XCTestCase {
     }
 
     @MainActor
-    func test_recapButton_presentsAndDismisses() async {
-        let store = TestStore(initialState: CollectionFeature.State()) {
+    func test_recapDateRange_isPassedWhenPresentingRecap() async {
+        let today = Calendar.current.startOfDay(
+            for: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+        let start = Calendar.current.date(byAdding: .day, value: -6, to: today) ?? today
+        let store = TestStore(
+            initialState: CollectionFeature.State(
+                recapStartDate: today,
+                recapEndDate: today
+            )
+        ) {
             CollectionFeature()
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
+        await store.send(.recapDateRangeChanged(start: start, end: today)) {
+            $0.recapStartDate = start
+            $0.recapEndDate = today
+        }
         await store.send(.recapButtonTapped) {
-            $0.recap = RecapFeature.State()
+            $0.recap = RecapFeature.State(startDate: start, endDate: today)
         }
         await store.send(.recap(.presented(.close))) {
             $0.recap = nil

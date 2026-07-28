@@ -66,6 +66,18 @@ final class FreeStickerBoardLayoutTests: XCTestCase {
         )
     }
 
+    func test_boardFramesHaveStableUniqueStorageValues() {
+        XCTAssertEqual(StickerBoardFrame.allCases.count, 4)
+        XCTAssertEqual(
+            Set(StickerBoardFrame.allCases.map(\.rawValue)).count,
+            StickerBoardFrame.allCases.count
+        )
+        XCTAssertEqual(
+            StickerBoardFrame(rawValue: StickerBoardFrame.ticket.rawValue),
+            .ticket
+        )
+    }
+
     func test_oldSavedPlacementDecodesWithoutTransformValues() throws {
         let data = Data(#"{"xFraction":0.4,"y":180}"#.utf8)
         let placement = try JSONDecoder().decode(StickerBoardPlacement.self, from: data)
@@ -79,6 +91,14 @@ final class FreeStickerBoardLayoutTests: XCTestCase {
         XCTAssertEqual(FreeStickerBoardLayout.clampedScale(4), 1.5)
         XCTAssertEqual(FreeStickerBoardLayout.normalizedRotation(450), 90)
         XCTAssertEqual(FreeStickerBoardLayout.normalizedRotation(-450), -90)
+    }
+
+    func test_scaleAndRotationSnapNearUsefulValues() {
+        XCTAssertEqual(FreeStickerBoardLayout.snappedScale(1.04), 1)
+        XCTAssertEqual(FreeStickerBoardLayout.snappedScale(1.08), 1.08)
+        XCTAssertEqual(FreeStickerBoardLayout.snappedRotation(1.8), 0)
+        XCTAssertEqual(FreeStickerBoardLayout.snappedRotation(13.2), 15)
+        XCTAssertEqual(FreeStickerBoardLayout.snappedRotation(11), 11)
     }
 
     func test_largeStickerCenterIsClampedFurtherFromTheEdge() {

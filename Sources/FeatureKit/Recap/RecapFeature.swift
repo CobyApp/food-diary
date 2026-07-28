@@ -18,7 +18,10 @@ public struct RecapFeature {
         /// Keeps a late AI response from replacing the line the user already wrote.
         public var hasEditedCaption = false
 
-        public init() {}
+        public init(startDate: Date? = nil, endDate: Date? = nil) {
+            self.startDate = startDate
+            self.endDate = endDate
+        }
     }
 
     public enum Action: Equatable {

@@ -9,13 +9,22 @@ public struct CollectionView: View {
     @State private var isSpilling = false
     @State private var activeStickerID: UUID?
     @State private var stickerPlacements: [String: StickerBoardPlacement] = [:]
+    @State private var showingRecapDatePicker = false
+    @State private var draftRecapStartDate = Date()
+    @State private var draftRecapEndDate = Date()
     @AppStorage("collection.freeStickerBoard.v1") private var savedStickerPlacements = ""
     @AppStorage("collection.stickerBoardTheme.v1")
     private var selectedThemeRaw = StickerBoardTheme.strawberryCheck.rawValue
+    @AppStorage("collection.stickerBoardFrame.v1")
+    private var selectedFrameRaw = StickerBoardFrame.softPaper.rawValue
     public init(store: StoreOf<CollectionFeature>) { self.store = store }
 
     private var selectedTheme: StickerBoardTheme {
         StickerBoardTheme(rawValue: selectedThemeRaw) ?? .strawberryCheck
+    }
+
+    private var selectedFrame: StickerBoardFrame {
+        StickerBoardFrame(rawValue: selectedFrameRaw) ?? .softPaper
     }
 
     public var body: some View {
@@ -40,13 +49,13 @@ public struct CollectionView: View {
 
                 Spacer()
 
-                headerButton(systemImage: "rectangle.stack.fill", color: .appBlueInk) {
-                    store.send(.recapButtonTapped)
-                }
                 headerButton(systemImage: "rosette", color: .appButterInk) {
                     store.send(.achievementsButtonTapped)
                 }
             }
+
+            recapPeriodCard
+            boardStylePicker
 
             if store.isEditing {
                 selectionToolbar
@@ -64,20 +73,7 @@ public struct CollectionView: View {
                                subtitle: "음식 사진을 찍어 첫 누끼를 담아보세요!")
                 }
             } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    themePicker
-
-                    HStack(spacing: 6) {
-                        KitschSparkle()
-                            .fill(Color.appCherry)
-                            .frame(width: 12, height: 12)
-                        Text("드래그로 옮기고 두 손가락으로 크기와 각도를 바꿔보세요")
-                            .font(.appCaption)
-                            .foregroundStyle(.appPinkInk)
-                    }
-
-                    freeStickerBoard
-                }
+                freeStickerBoard
 
                 if store.isEditing {
                     PillButton(
@@ -116,6 +112,21 @@ public struct CollectionView: View {
         .sheet(item: $store.scope(state: \.recap, action: \.recap)) { recapStore in
             RecapView(store: recapStore)
         }
+        .sheet(isPresented: $showingRecapDatePicker) {
+            RecapDateRangePicker(
+                startDate: $draftRecapStartDate,
+                endDate: $draftRecapEndDate,
+                onApply: {
+                    store.send(.recapDateRangeChanged(
+                        start: draftRecapStartDate,
+                        end: draftRecapEndDate
+                    ))
+                    showingRecapDatePicker = false
+                }
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
         .sheet(
             isPresented: Binding(
                 get: { store.selectedCutoutID != nil },
@@ -133,6 +144,8 @@ public struct CollectionView: View {
                 .presentationDetents([.fraction(0.68), .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(30)
+                .presentationBackground(Color.appMilk)
+                .presentationContentInteraction(.scrolls)
             }
         }
         .confirmationDialog(
@@ -173,6 +186,58 @@ public struct CollectionView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: store.selectedCutoutIDs)
     }
 
+    private var recapPeriodCard: some View {
+        HStack(spacing: 10) {
+            Button {
+                draftRecapStartDate = store.recapStartDate
+                draftRecapEndDate = store.recapEndDate
+                showingRecapDatePicker = true
+            } label: {
+                HStack(spacing: 9) {
+                    KitschIcon(
+                        "calendar",
+                        tint: .appPinkInk,
+                        background: .appPink,
+                        size: 40
+                    )
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("공유 기간")
+                            .font(.appCaption)
+                            .foregroundStyle(.appMuted)
+                        Text(store.recapRangeText)
+                            .font(.appSection)
+                            .foregroundStyle(.appInk)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                    }
+                }
+            }
+            .buttonStyle(KitschPressStyle())
+
+            Spacer(minLength: 4)
+
+            Button {
+                store.send(.recapButtonTapped)
+            } label: {
+                Label("리캡 만들기", systemImage: "square.and.arrow.up")
+                    .labelStyle(.titleAndIcon)
+            }
+            .buttonStyle(
+                KitschFilledButtonStyle(
+                    fullWidth: false,
+                    verticalPadding: 10
+                )
+            )
+        }
+        .padding(12)
+        .background(Color.appCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.appPinkInk.opacity(0.25), lineWidth: 1.5)
+        }
+        .softShadow()
+    }
+
     private var freeStickerBoard: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
@@ -187,19 +252,10 @@ public struct CollectionView: View {
             let side = FreeStickerBoardLayout.itemSide(width: width)
 
             ZStack {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(.clear)
-                    .background {
-                        StickerBoardThemeBackground(theme: selectedTheme)
-                            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .stroke(
-                                selectedTheme.accent.opacity(0.30),
-                                style: StrokeStyle(lineWidth: 1.5, dash: [7, 7])
-                            )
-                    }
+                StickerBoardSurface(
+                    theme: selectedTheme,
+                    frame: selectedFrame
+                )
 
                 ForEach(Array(store.cutouts.enumerated()), id: \.element.id) { index, cutout in
                     let savedPlacement = stickerPlacements[cutout.id.uuidString]
@@ -368,19 +424,23 @@ public struct CollectionView: View {
         .frame(height: boardHeightForCurrentWidth)
     }
 
-    private var themePicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var boardStylePicker: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("보드 꾸미기")
                     .font(.appSection)
                     .foregroundStyle(.appInk)
                 Spacer()
-                Text("선택한 테마는 인스타 카드에도 적용돼요")
+                Text("선택한 꾸미기는 인스타 카드에도 적용돼요")
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(.appMuted)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
+
+            Text("배경 무늬")
+                .font(.appCaption)
+                .foregroundStyle(.appPinkInk)
 
             ScrollView(.horizontal) {
                 HStack(spacing: 10) {
@@ -439,6 +499,73 @@ public struct CollectionView: View {
                 .padding(.bottom, 5)
             }
             .scrollIndicators(.hidden)
+
+            Text("보드 모양")
+                .font(.appCaption)
+                .foregroundStyle(.appPinkInk)
+                .padding(.top, 2)
+
+            ScrollView(.horizontal) {
+                HStack(spacing: 10) {
+                    ForEach(StickerBoardFrame.allCases) { frame in
+                        let selected = selectedFrame == frame
+                        Button {
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                                selectedFrameRaw = frame.rawValue
+                            }
+                        } label: {
+                            VStack(spacing: 6) {
+                                StickerBoardSurface(
+                                    theme: selectedTheme,
+                                    frame: frame,
+                                    borderOpacity: selected ? 0.72 : 0.30
+                                )
+                                .frame(width: 74, height: 52)
+                                .overlay(alignment: .bottomTrailing) {
+                                    if selected {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 9, weight: .black))
+                                            .foregroundStyle(.white)
+                                            .frame(width: 20, height: 20)
+                                            .background(selectedTheme.accent, in: Circle())
+                                            .overlay(Circle().stroke(Color.appCard, lineWidth: 2))
+                                            .offset(x: 4, y: 4)
+                                    }
+                                }
+
+                                Text(L10n.text(frame.titleKey))
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .foregroundStyle(
+                                        selected ? selectedTheme.accent : Color.appInk
+                                    )
+                                    .lineLimit(1)
+                            }
+                            .padding(7)
+                            .background(Color.appCard, in: RoundedRectangle(cornerRadius: 18))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 18)
+                                    .stroke(
+                                        selected
+                                            ? selectedTheme.accent.opacity(0.65)
+                                            : Color.appChocolate.opacity(0.10),
+                                        lineWidth: selected ? 2 : 1
+                                    )
+                            }
+                        }
+                        .buttonStyle(KitschPressStyle())
+                        .accessibilityAddTraits(selected ? .isSelected : [])
+                    }
+                }
+                .padding(.horizontal, 2)
+                .padding(.bottom, 5)
+            }
+            .scrollIndicators(.hidden)
+        }
+        .padding(14)
+        .background(Color.appCard.opacity(0.72), in: RoundedRectangle(cornerRadius: 24))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(Color.appChocolate.opacity(0.08), lineWidth: 1)
         }
     }
 
@@ -540,6 +667,100 @@ public struct CollectionView: View {
     }
 }
 
+private struct RecapDateRangePicker: View {
+    @Binding var startDate: Date
+    @Binding var endDate: Date
+    let onApply: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    private let calendar = Calendar.current
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 8) {
+                    presetButton("오늘") {
+                        let today = calendar.startOfDay(for: Date())
+                        startDate = today
+                        endDate = today
+                    }
+                    presetButton("최근 7일") {
+                        let today = calendar.startOfDay(for: Date())
+                        startDate = calendar.date(byAdding: .day, value: -6, to: today) ?? today
+                        endDate = today
+                    }
+                    presetButton("이번 달") {
+                        let today = calendar.startOfDay(for: Date())
+                        startDate = calendar.dateInterval(of: .month, for: today)?.start ?? today
+                        endDate = today
+                    }
+                }
+
+                VStack(spacing: 12) {
+                    dateRow(
+                        "시작일",
+                        selection: $startDate,
+                        range: Date.distantPast...endDate
+                    )
+                    dateRow("종료일", selection: $endDate, range: startDate...Date())
+                }
+                .padding(16)
+                .background(Color.appCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(Color.appPinkInk.opacity(0.22), lineWidth: 1.5)
+                }
+
+                PillButton("이 기간으로 만들기", action: onApply)
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .background(PaperBackground())
+            .navigationTitle("기간 설정")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("닫기") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func presetButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(LocalizedStringKey(title))
+        }
+        .buttonStyle(
+            KitschOutlineButtonStyle(
+                color: .appPinkInk,
+                fullWidth: true,
+                verticalPadding: 9
+            )
+        )
+    }
+
+    private func dateRow(
+        _ title: String,
+        selection: Binding<Date>,
+        range: ClosedRange<Date>
+    ) -> some View {
+        HStack {
+            Text(LocalizedStringKey(title))
+                .font(.appSection)
+                .foregroundStyle(.appInk)
+            Spacer()
+            DatePicker(
+                LocalizedStringKey(title),
+                selection: selection,
+                in: range,
+                displayedComponents: .date
+            )
+            .labelsHidden()
+            .tint(.appCherry)
+        }
+    }
+}
+
 private struct StickerRatingBadge: View {
     let rating: Int
 
@@ -570,8 +791,24 @@ private struct StickerDetailSheet: View {
 
     var body: some View {
         ZStack {
-            StickerBoardThemeBackground(theme: theme)
-                .ignoresSafeArea()
+            PaperBackground()
+
+            VStack {
+                ZStack {
+                    Circle()
+                        .fill(theme.secondary.opacity(0.34))
+                        .frame(width: 210, height: 210)
+                        .offset(x: 145, y: -92)
+                    Circle()
+                        .fill(theme.accent.opacity(0.08))
+                        .frame(width: 150, height: 150)
+                        .offset(x: -145, y: -38)
+                }
+                .frame(height: 130)
+                Spacer()
+            }
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
 
             ScrollView {
                 VStack(spacing: 16) {
@@ -597,23 +834,36 @@ private struct StickerDetailSheet: View {
                     }
 
                     ZStack {
+                        RoundedRectangle(cornerRadius: 36, style: .continuous)
+                            .fill(Color.appCard.opacity(0.90))
                         Circle()
-                            .fill(theme.secondary.opacity(0.38))
-                            .frame(width: 238, height: 238)
+                            .fill(theme.secondary.opacity(0.34))
+                            .frame(width: 210, height: 210)
                         StickerTile(tint: .plain) {
                             CutoutImage(fileName: cutout.fileName, maxPixelDimension: 520)
                         }
-                        .frame(width: 230, height: 230)
+                        .frame(width: 218, height: 218)
                     }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 244)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 36, style: .continuous)
+                            .stroke(
+                                theme.accent.opacity(0.30),
+                                style: StrokeStyle(lineWidth: 1.5, dash: [7, 6])
+                            )
+                    }
+                    .softShadow()
 
-                    HStack(spacing: 8) {
-                        if let placeName = info?.placeName, !placeName.isEmpty {
-                            PastelChip(placeName, symbol: "mappin", tone: .pink)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) {
+                            detailChips
                         }
-                        if !cutout.label.orEmpty.isEmpty {
-                            PastelChip(cutout.label.orEmpty, tone: .blue)
+                        VStack(alignment: .leading, spacing: 8) {
+                            detailChips
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     VStack(alignment: .leading, spacing: 9) {
                         HStack {
@@ -669,6 +919,16 @@ private struct StickerDetailSheet: View {
             .scrollIndicators(.hidden)
         }
     }
+
+    @ViewBuilder
+    private var detailChips: some View {
+        if let placeName = info?.placeName, !placeName.isEmpty {
+            PastelChip(placeName, symbol: "mappin", tone: .pink)
+        }
+        if !cutout.label.orEmpty.isEmpty {
+            PastelChip(cutout.label.orEmpty, tone: .blue)
+        }
+    }
 }
 
 private extension Optional where Wrapped == String {
@@ -688,23 +948,66 @@ private struct FreeStickerDrag: ViewModifier {
     @GestureState private var translation: CGSize = .zero
     @GestureState private var magnification: CGFloat = 1
     @GestureState private var gestureRotation: Angle = .zero
+    @GestureState private var isDragging = false
+    @GestureState private var isMagnifying = false
+    @GestureState private var isRotating = false
+
+    private var isInteracting: Bool {
+        isDragging || isMagnifying || isRotating
+    }
+
+    private var liveScale: CGFloat {
+        CGFloat(
+            FreeStickerBoardLayout.clampedScale(
+                Double(baseScale * magnification)
+            )
+        )
+    }
+
+    private var liveRotation: Double {
+        FreeStickerBoardLayout.normalizedRotation(
+            baseRotation + gestureRotation.degrees
+        )
+    }
 
     func body(content: Content) -> some View {
         content
-            .offset(translation)
+            .overlay {
+                if isInteracting || isActive {
+                    StickerTransformGuide(
+                        scale: liveScale,
+                        rotation: liveRotation
+                    )
+                    // Keep the readout upright and the same visual size while
+                    // the selected sticker itself rotates and scales.
+                    .scaleEffect(1 / max(liveScale, 0.01))
+                    .rotationEffect(.degrees(-liveRotation))
+                    .transition(.scale(scale: 0.84).combined(with: .opacity))
+                }
+            }
             .scaleEffect(
-                baseScale * magnification * (isActive ? 1.04 : 1)
+                liveScale * ((isInteracting || isActive) ? 1.025 : 1)
             )
-            .rotationEffect(.degrees(baseRotation) + gestureRotation)
+            .rotationEffect(.degrees(liveRotation))
             .shadow(
-                color: Color.appPinkInk.opacity(isActive ? 0.24 : 0),
-                radius: isActive ? 16 : 0,
-                y: isActive ? 10 : 0
+                color: Color.appPinkInk.opacity((isInteracting || isActive) ? 0.24 : 0),
+                radius: (isInteracting || isActive) ? 16 : 0,
+                y: (isInteracting || isActive) ? 10 : 0
             )
+            // Translation comes last so a scaled sticker still follows the
+            // finger one-for-one instead of multiplying the drag distance.
+            .offset(translation)
             .animation(.spring(response: 0.24, dampingFraction: 0.72), value: isActive)
+            .animation(.spring(response: 0.22, dampingFraction: 0.78), value: isInteracting)
             .highPriorityGesture(dragGesture, including: enabled ? .all : .none)
             .simultaneousGesture(magnifyGesture, including: enabled ? .all : .none)
             .simultaneousGesture(rotationGesture, including: enabled ? .all : .none)
+            .onChange(of: isInteracting) { _, active in
+                onActiveChange(active)
+                if active {
+                    UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                }
+            }
     }
 
     private var dragGesture: some Gesture {
@@ -712,17 +1015,14 @@ private struct FreeStickerDrag: ViewModifier {
             .updating($translation) { value, state, _ in
                 state = value.translation
             }
-            .onChanged { _ in
-                if !isActive {
-                    onActiveChange(true)
-                }
+            .updating($isDragging) { _, state, _ in
+                state = true
             }
             .onEnded { value in
                 onMove(CGPoint(
                     x: position.x + value.translation.width,
                     y: position.y + value.translation.height
                 ))
-                onActiveChange(false)
             }
     }
 
@@ -731,14 +1031,16 @@ private struct FreeStickerDrag: ViewModifier {
             .updating($magnification) { value, state, _ in
                 state = value
             }
-            .onChanged { _ in
-                if !isActive {
-                    onActiveChange(true)
-                }
+            .updating($isMagnifying) { _, state, _ in
+                state = true
             }
             .onEnded { value in
-                onTransform(Double(baseScale * value), nil)
-                onActiveChange(false)
+                let rawScale = Double(baseScale * value)
+                let snappedScale = FreeStickerBoardLayout.snappedScale(rawScale)
+                onTransform(snappedScale, nil)
+                if abs(snappedScale - rawScale) > 0.001 {
+                    UISelectionFeedbackGenerator().selectionChanged()
+                }
             }
     }
 
@@ -747,14 +1049,69 @@ private struct FreeStickerDrag: ViewModifier {
             .updating($gestureRotation) { value, state, _ in
                 state = value
             }
-            .onChanged { _ in
-                if !isActive {
-                    onActiveChange(true)
-                }
+            .updating($isRotating) { _, state, _ in
+                state = true
             }
             .onEnded { value in
-                onTransform(nil, baseRotation + value.degrees)
-                onActiveChange(false)
+                let rawRotation = baseRotation + value.degrees
+                let snappedRotation = FreeStickerBoardLayout.snappedRotation(rawRotation)
+                onTransform(nil, snappedRotation)
+                if abs(snappedRotation - rawRotation) > 0.001 {
+                    UISelectionFeedbackGenerator().selectionChanged()
+                }
             }
+    }
+}
+
+private struct StickerTransformGuide: View {
+    let scale: CGFloat
+    let rotation: Double
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(
+                    Color.appCherry,
+                    style: StrokeStyle(lineWidth: 2, dash: [6, 4])
+                )
+                .padding(2)
+
+            guideHandle(alignment: .topLeading)
+            guideHandle(alignment: .bottomTrailing)
+        }
+        .overlay(alignment: .top) {
+            HStack(spacing: 7) {
+                Label(
+                    "\(Int((scale * 100).rounded()))%",
+                    systemImage: "arrow.up.left.and.arrow.down.right"
+                )
+                Divider()
+                    .frame(height: 12)
+                    .overlay(Color.appPink.opacity(0.7))
+                Label(
+                    "\(Int(rotation.rounded()))°",
+                    systemImage: "rotate.right"
+                )
+            }
+            .font(.system(size: 11, weight: .black, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color.appPinkInk, in: Capsule())
+            .overlay(Capsule().stroke(Color.appCard, lineWidth: 2))
+            .shadow(color: Color.appChocolate.opacity(0.18), radius: 4, y: 2)
+            .offset(y: -29)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func guideHandle(alignment: Alignment) -> some View {
+        Circle()
+            .fill(Color.appCard)
+            .frame(width: 13, height: 13)
+            .overlay(Circle().stroke(Color.appCherry, lineWidth: 2))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment)
+            .padding(1)
     }
 }
