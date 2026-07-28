@@ -21,26 +21,26 @@ final class GameHubFeatureTests: XCTestCase {
     }
 
     @MainActor
-    func test_gameTapped_presentsGachaWithPool() async {
-        let items = [snap(1), snap(2), snap(3)]
+    func test_gameTapped_presentsWorldCup() async {
+        let items = [snap(1), snap(2)]
         let store = TestStore(initialState: GameHubFeature.State(cutouts: items)) {
             GameHubFeature()
         }
-        await store.send(.gameTapped(.gacha)) {
-            $0.game = .gacha(GachaFeature.State(cutouts: items))
+        await store.send(.gameTapped(.worldCup)) {
+            $0.game = .worldCup(WorldCupFeature.State(cutouts: items))
         }
     }
 
     @MainActor
     func test_gameClose_dismisses() async {
-        let items = [snap(1)]
+        let items = [snap(1), snap(2)]
         let store = TestStore(
             initialState: GameHubFeature.State(cutouts: items,
-                                               game: .gacha(GachaFeature.State(cutouts: items)))
+                                               game: .worldCup(WorldCupFeature.State(cutouts: items)))
         ) {
             GameHubFeature()
         }
-        await store.send(.game(.presented(.gacha(.close)))) {
+        await store.send(.game(.presented(.worldCup(.close)))) {
             $0.game = nil
         }
     }
