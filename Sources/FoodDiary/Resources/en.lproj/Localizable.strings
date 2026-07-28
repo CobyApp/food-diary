@@ -183,3 +183,13 @@
 "round.count" = "Round of %d";
 "recap.meals" = "%d meals · %@";
 "capture.processing.progress" = "Making stickers · Photo %d/%d";
+
+"group.start.title" = "Food World Cup 🏆";
+"group.start.subtitle" = "Vote with friends in 5 seconds to decide";
+"게임센터로 시작" = "Start with Game Center";
+"메뉴 고르기" = "Pick a Menu";
+"group.lobby.progress" = "%d joined · %d submitted";
+"내 누끼에서 먹고 싶은 메뉴를 골라요" = "Pick a menu from your stickers";
+"제출 완료! 다른 사람들을 기다리는 중… ⏳" = "Submitted! Waiting for others… ⏳";
+"group.voting.progress" = "%d / %d voted";
+"group.champion.title" = "Today it's %@'s %@!";

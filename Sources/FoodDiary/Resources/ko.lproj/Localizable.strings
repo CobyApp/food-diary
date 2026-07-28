@@ -183,3 +183,13 @@
 "round.count" = "%d강";
 "recap.meals" = "%d끼 · %@";
 "capture.processing.progress" = "사진 %d/%d 누끼 만드는 중";
+
+"group.start.title" = "함께 월드컵 🏆";
+"group.start.subtitle" = "친구들과 5초 안에 투표해서 정해요";
+"게임센터로 시작" = "게임센터로 시작";
+"메뉴 고르기" = "메뉴 고르기";
+"group.lobby.progress" = "참가자 %d명 · 제출 %d명";
+"내 누끼에서 먹고 싶은 메뉴를 골라요" = "내 누끼에서 먹고 싶은 메뉴를 골라요";
+"제출 완료! 다른 사람들을 기다리는 중… ⏳" = "제출 완료! 다른 사람들을 기다리는 중… ⏳";
+"group.voting.progress" = "%d / %d명 투표";
+"group.champion.title" = "오늘은 %@님의 %@!";

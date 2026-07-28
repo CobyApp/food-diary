@@ -183,3 +183,13 @@
 "round.count" = "ベスト%d";
 "recap.meals" = "%d食 · %@";
 "capture.processing.progress" = "写真%d/%dのステッカーを作成中";
+
+"group.start.title" = "みんなでワールドカップ 🏆";
+"group.start.subtitle" = "友達と5秒以内に投票して決めよう";
+"게임센터로 시작" = "ゲームセンターで開始";
+"메뉴 고르기" = "メニューを選ぶ";
+"group.lobby.progress" = "参加者%d人 · 提出%d人";
+"내 누끼에서 먹고 싶은 메뉴를 골라요" = "自分のヌッキから食べたいメニューを選ぼう";
+"제출 완료! 다른 사람들을 기다리는 중… ⏳" = "提出完了！他のメンバーを待っています… ⏳";
+"group.voting.progress" = "%d / %d人投票";
+"group.champion.title" = "今日は%@さんの%@!";

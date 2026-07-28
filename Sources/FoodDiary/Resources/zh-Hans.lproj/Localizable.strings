@@ -183,3 +183,13 @@
 "round.count" = "%d强";
 "recap.meals" = "%d餐 · %@";
 "capture.processing.progress" = "正在制作第%d/%d张照片的贴纸";
+
+"group.start.title" = "一起决定世界杯 🏆";
+"group.start.subtitle" = "和朋友们5秒内投票决定";
+"게임센터로 시작" = "用游戏中心开始";
+"메뉴 고르기" = "选择菜品";
+"group.lobby.progress" = "%d位参加者 · %d人已提交";
+"내 누끼에서 먹고 싶은 메뉴를 골라요" = "从我的贴纸中选择想吃的菜";
+"제출 완료! 다른 사람들을 기다리는 중… ⏳" = "提交完成！正在等待其他人… ⏳";
+"group.voting.progress" = "%d / %d人投票";
+"group.champion.title" = "今天是%@的%@!";
