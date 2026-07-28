@@ -1,6 +1,7 @@
 import SwiftUI
 import ComposableArchitecture
 import Models
+import ClientKit
 
 public struct GroupDeciderView: View {
     @Bindable var store: StoreOf<GroupDeciderFeature>
@@ -16,7 +17,11 @@ public struct GroupDeciderView: View {
                 startScreen
             case .lobby:
                 lobby
-            case .result:
+            case .voting, .reveal:
+                // NOTE: placeholder voting UI only, kept just compiling for Task 2
+                // (protocol + reducer). The real timed-voting bracket UI is Task 3.
+                votingPlaceholder
+            case .champion:
                 resultScreen
             }
             closeButton
@@ -65,10 +70,42 @@ public struct GroupDeciderView: View {
         .padding(24)
     }
 
+    // NOTE: placeholder voting UI only — kept just enough to compile for Task 2
+    // (protocol + reducer rewrite). The real timed-voting bracket UI is Task 3.
+    private var votingPlaceholder: some View {
+        VStack(spacing: 16) {
+            Text("투표 중… (\(store.secondsLeft)초)").font(.appTitle).foregroundStyle(.appInk)
+            if let pair = store.currentPair {
+                HStack(spacing: 16) {
+                    votingCandidate(pair.0)
+                    votingCandidate(pair.1)
+                }
+            }
+            if let tally = store.lastTally {
+                Text("결과: \(tally.winner) (\(tally.left) : \(tally.right))")
+                    .font(.appBody).foregroundStyle(.appMuted)
+            }
+        }
+        .padding(24)
+    }
+
+    private func votingCandidate(_ candidate: MenuPick) -> some View {
+        Button { store.send(.voteTapped(candidate.playerID)) } label: {
+            VStack(spacing: 8) {
+                StickerTile(tint: .pink) { CutoutImage(data: candidate.thumbnail) }
+                    .frame(width: 140, height: 140)
+                Text(candidate.placeName.isEmpty ? candidate.playerName : candidate.placeName)
+                    .font(.appCaption).foregroundStyle(.appInk)
+            }
+        }
+        .buttonStyle(.plain)
+        .opacity(store.myVote == nil || store.myVote == candidate.playerID ? 1 : 0.4)
+    }
+
     private var resultScreen: some View {
         VStack(spacing: 16) {
             Text("오늘의 선택 🎉").font(.appTitle).foregroundStyle(.appInk)
-            if let w = store.winner {
+            if let w = store.championPick {
                 StickerTile(tint: .pink) { CutoutImage(data: w.thumbnail) }
                     .frame(width: 200, height: 200)
                 Text("\(w.playerName)님의 \(w.placeName.isEmpty ? "메뉴" : w.placeName)")

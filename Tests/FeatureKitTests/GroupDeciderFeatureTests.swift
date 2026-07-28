@@ -10,73 +10,130 @@ final class GroupDeciderFeatureTests: XCTestCase {
                  memo: "m\(id)", placeName: "p\(id)", address: "a\(id)")
     }
 
+    /// Host with two submitted menus: bracket + first pair are broadcast.
     @MainActor
-    func test_start_authenticatesAndEntersLobby() async {
-        let store = TestStore(initialState: GroupDeciderFeature.State()) {
-            GroupDeciderFeature()
-        } withDependencies: {
-            $0.multiplayer.authenticate = { LocalPlayer(id: "me", displayName: "나") }
-            $0.multiplayer.startMatch = {}
-            $0.multiplayer.events = { .finished }
-        }
-        store.exhaustivity = .off(showSkippedAssertions: false)
-
-        await store.send(.startTapped) { $0.phase = .authenticating }
-        await store.receive(\.authenticated) {
-            $0.localPlayer = LocalPlayer(id: "me", displayName: "나")
-            $0.phase = .matchmaking
-        }
-        await store.receive(\.matchStarted) { $0.phase = .lobby }
-    }
-
-    @MainActor
-    func test_hostRunsRouletteWhenAllSubmitted() async {
-        let mePick = pick("aaa")   // "aaa" is min → host
-        let theirPick = pick("zzz")
-        var sent: [MultiplayerMessage] = []
+    func test_hostStartsBracketWhenAllSubmitted() async {
+        let sent = LockIsolatedBox()
         let store = TestStore(
             initialState: GroupDeciderFeature.State(
                 phase: .lobby,
                 localPlayer: LocalPlayer(id: "aaa", displayName: "나"),
                 players: [RemotePlayer(id: "zzz", displayName: "친구")],
-                menus: ["aaa": mePick]
+                menus: ["aaa": pick("aaa")]
             )
         ) {
             GroupDeciderFeature()
         } withDependencies: {
-            $0.random.pick = { items in items.first }   // deterministic
-            $0.multiplayer.send = { msg in sent.append(msg) }
+            $0.continuousClock = TestClock()
+            $0.multiplayer.send = { sent.append($0) }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
-        // friend's menu arrives -> all submitted -> host picks winner + broadcasts
-        await store.send(.eventReceived(.received(.menu(theirPick), from: "zzz")))
-        await store.receive(\.resultResolved) {
-            $0.winner = $0.winner  // winner set to the injected pick
-            $0.phase = .result
-        }
-        XCTAssertTrue(sent.contains(.result(winnerPlayerID: mePick.playerID)))
+        await store.send(.eventReceived(.received(.menu(pick("zzz")), from: "zzz")))
+        XCTAssertEqual(store.state.phase, .voting)
+        XCTAssertEqual(store.state.round, ["aaa", "zzz"])
+        XCTAssertTrue(sent.values.contains(.bracket(["aaa", "zzz"])))
+        XCTAssertTrue(sent.values.contains(.pair(index: 0)))
     }
 
+    /// A vote is recorded locally and sent to the others.
     @MainActor
-    func test_nonHostReceivesResult() async {
-        let winner = pick("zzz")
-        let store = TestStore(
-            initialState: GroupDeciderFeature.State(
-                phase: .lobby,
-                localPlayer: LocalPlayer(id: "zzz", displayName: "나"),
-                players: [RemotePlayer(id: "aaa", displayName: "호스트")],
-                menus: ["zzz": pick("zzz"), "aaa": pick("aaa")]
-            )
-        ) {
+    func test_voteRecordedAndSent() async {
+        let sent = LockIsolatedBox()
+        let store = TestStore(initialState: votingState()) {
             GroupDeciderFeature()
+        } withDependencies: {
+            $0.continuousClock = TestClock()
+            $0.multiplayer.send = { sent.append($0) }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
-        await store.send(.eventReceived(.received(.result(winnerPlayerID: "zzz"), from: "aaa")))
-        await store.receive(\.resultResolved) {
-            $0.winner = winner
-            $0.phase = .result
-        }
+        await store.send(.voteTapped("zzz"))
+        XCTAssertEqual(store.state.myVote, "zzz")
+        XCTAssertTrue(sent.values.contains(.vote(candidateID: "zzz")))
     }
+
+    /// After 5 seconds the host tallies; the majority advances and is broadcast.
+    @MainActor
+    func test_hostTalliesAfterCountdown_majorityWins() async {
+        let clock = TestClock()
+        let sent = LockIsolatedBox()
+        let store = TestStore(initialState: votingState()) {
+            GroupDeciderFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.multiplayer.send = { sent.append($0) }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        // Friend votes for "zzz"; we vote for "zzz" too -> zzz wins 2-0.
+        await store.send(.eventReceived(.received(.vote(candidateID: "zzz"), from: "zzz")))
+        await store.send(.voteTapped("zzz"))
+        // Drive the countdown effect explicitly: the reducer starts it internally
+        // whenever a pair is (re-)applied via `.eventReceived(.received(.pair...))`
+        // (both for a non-host applying the host's broadcast and, here, to kick off
+        // the timer on a hand-built `.voting` state without going through the full
+        // bracket-building flow). Re-announcing the same live pair (index 0) is a
+        // no-op on `round`/`votes` since the pair is unchanged.
+        await store.send(.eventReceived(.received(.pair(index: 0), from: "aaa")))
+        await clock.advance(by: .seconds(5))
+        await store.receive(\.hostTally)
+        XCTAssertEqual(store.state.lastTally?.winner, "zzz")
+        XCTAssertTrue(sent.values.contains { if case .roundResult(let w, _, _) = $0 { return w == "zzz" } else { return false } })
+    }
+
+    /// Tie (or no votes) -> the candidate earlier in the bracket order wins.
+    @MainActor
+    func test_tieGoesToEarlierCandidate() async {
+        let clock = TestClock()
+        let store = TestStore(initialState: votingState()) {
+            GroupDeciderFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.multiplayer.send = { _ in }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.eventReceived(.received(.pair(index: 0), from: "aaa")))
+        await clock.advance(by: .seconds(5))
+        await store.receive(\.hostTally)
+        XCTAssertEqual(store.state.lastTally?.winner, "aaa")   // no votes -> earlier wins
+    }
+
+    /// A non-host simply applies the champion it is told about.
+    @MainActor
+    func test_nonHostAppliesChampion() async {
+        var state = votingState()
+        state.localPlayer = LocalPlayer(id: "zzz", displayName: "나")   // not the host
+        let store = TestStore(initialState: state) { GroupDeciderFeature() } withDependencies: {
+            $0.continuousClock = TestClock()
+            $0.multiplayer.send = { _ in }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        await store.send(.eventReceived(.received(.champion("aaa"), from: "aaa")))
+        XCTAssertEqual(store.state.phase, .champion)
+        XCTAssertEqual(store.state.championPick?.playerID, "aaa")
+    }
+
+    private func votingState() -> GroupDeciderFeature.State {
+        var state = GroupDeciderFeature.State(
+            phase: .voting,
+            localPlayer: LocalPlayer(id: "aaa", displayName: "나"),
+            players: [RemotePlayer(id: "zzz", displayName: "친구")],
+            menus: ["aaa": pick("aaa"), "zzz": pick("zzz")]
+        )
+        state.order = ["aaa", "zzz"]
+        state.round = ["aaa", "zzz"]
+        state.pairIndex = 0
+        return state
+    }
+}
+
+/// Tiny lock-backed collector (ConcurrencyExtras' LockIsolated isn't linked here).
+private final class LockIsolatedBox: @unchecked Sendable {
+    private var storage: [MultiplayerMessage] = []
+    private let lock = NSLock()
+    func append(_ value: MultiplayerMessage) { lock.lock(); storage.append(value); lock.unlock() }
+    var values: [MultiplayerMessage] { lock.lock(); defer { lock.unlock() }; return storage }
 }

@@ -11,9 +11,16 @@ final class MultiplayerTypesTests: XCTestCase {
         XCTAssertEqual(decoded, msg)
     }
 
-    func test_message_result_codableRoundTrip() throws {
-        let msg = MultiplayerMessage.result(winnerPlayerID: "p2")
+    func test_message_roundResult_codableRoundTrip() throws {
+        let msg = MultiplayerMessage.roundResult(winnerID: "p1", leftVotes: 2, rightVotes: 1)
         let data = try JSONEncoder().encode(msg)
         XCTAssertEqual(try JSONDecoder().decode(MultiplayerMessage.self, from: data), msg)
+    }
+
+    func test_message_bracketAndVote_codableRoundTrip() throws {
+        for msg in [MultiplayerMessage.bracket(["a", "b"]), .pair(index: 2), .vote(candidateID: "b"), .champion("a")] {
+            let data = try JSONEncoder().encode(msg)
+            XCTAssertEqual(try JSONDecoder().decode(MultiplayerMessage.self, from: data), msg)
+        }
     }
 }

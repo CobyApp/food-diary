@@ -33,7 +33,11 @@ public struct MenuPick: Equatable, Sendable, Codable, Identifiable {
 /// Wire protocol exchanged between players over the Game Center match connection.
 public enum MultiplayerMessage: Equatable, Sendable, Codable {
     case menu(MenuPick)
-    case result(winnerPlayerID: String)
+    case bracket([String])                    // candidate order (playerIDs), from the host
+    case pair(index: Int)                     // which match is live
+    case vote(candidateID: String)            // a player's vote for the live match
+    case roundResult(winnerID: String, leftVotes: Int, rightVotes: Int)
+    case champion(String)
 }
 
 /// Local events surfaced from the multiplayer session to the app layer.
