@@ -125,6 +125,10 @@ public struct RecapView: View {
             }
         }
         .task { store.send(.onAppear) }
+        .task(id: store.caption) {
+            guard !images.isEmpty else { return }
+            await renderExport()
+        }
         .task(id: store.weekCutouts) {
             let names = store.weekCutouts.map(\.fileName)
             images = await CutoutImageLoader.shared.images(
@@ -141,7 +145,8 @@ public struct RecapView: View {
         return RecapStoryCard(
             images: images,
             mealCount: store.mealCount,
-            rangeText: store.rangeText
+            rangeText: store.rangeText,
+            caption: store.caption
         )
         .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
@@ -164,7 +169,8 @@ public struct RecapView: View {
             RecapStoryCard(
                 images: images,
                 mealCount: store.mealCount,
-                rangeText: store.rangeText
+                rangeText: store.rangeText,
+                caption: store.caption
             )
             .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
         )

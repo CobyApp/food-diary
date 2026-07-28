@@ -138,7 +138,7 @@ public struct GameHubView: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(L10n.text("함께 월드컵"))
                                 .font(.appTitle).foregroundStyle(.appInk)
-                            Text(L10n.text("친구들과 5초 안에 투표해서 정해요"))
+                            Text(L10n.text("group.start.subtitle"))
                                 .font(.appCaption).foregroundStyle(.appMuted)
                         }
                         Spacer(minLength: 0)

@@ -9,6 +9,8 @@ struct RecapStoryCard: View {
     let images: [UIImage]
     let mealCount: Int
     let rangeText: String
+    /// Apple Intelligence's line; falls back to the localized static one.
+    var caption: String?
 
     static let size = CGSize(width: 360, height: 640)
     private static let collageTints: [StickerTint] = [.pink, .blue, .butter]
@@ -105,7 +107,7 @@ struct RecapStoryCard: View {
 
     private var footer: some View {
         HStack(spacing: 6) {
-            Text(L10n.text("맛있게 잘 먹었다"))
+            Text(caption ?? L10n.text("맛있게 잘 먹었다"))
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(.appInk)
             Image(systemName: "heart.fill")

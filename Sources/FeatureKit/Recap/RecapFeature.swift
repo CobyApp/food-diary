@@ -11,6 +11,8 @@ public struct RecapFeature {
         public var mealCount = 0
         public var rangeText = ""
         public var isLoading = false
+        /// Apple Intelligence's closing line; nil until it answers (or if it can't).
+        public var caption: String?
 
         public init() {}
     }
@@ -18,11 +20,14 @@ public struct RecapFeature {
     public enum Action: Equatable {
         case onAppear
         case loaded(cutouts: [CutoutSnapshot], mealCount: Int, rangeText: String)
+        case captionGenerated(String?)
         case close
     }
 
     @Dependency(\.date.now) var now
     @Dependency(\.persistence) var persistence
+    @Dependency(\.caption) var caption
+    @Dependency(\.locale) var locale
 
     public init() {}
 
@@ -33,6 +38,7 @@ public struct RecapFeature {
                 state.isLoading = true
                 let end = now
                 let start = Calendar.current.date(byAdding: .day, value: -7, to: end) ?? end
+                let languageCode = locale.language.languageCode?.identifier ?? "en"
                 return .run { send in
                     let meals = try await persistence.allMeals()
                     let week = meals.filter { $0.eatenAt >= start && $0.eatenAt <= end }
@@ -41,6 +47,11 @@ public struct RecapFeature {
                         cutouts: week.flatMap(\.cutouts),
                         mealCount: week.count,
                         rangeText: range
+                    ))
+                    guard !week.isEmpty else { return }
+                    let places = week.compactMap { $0.place?.name }.filter { !$0.isEmpty }
+                    await send(.captionGenerated(
+                        await caption.weeklyCaption(week.count, places, languageCode)
                     ))
                 } catch: { _, send in
                     await send(.loaded(
@@ -55,6 +66,10 @@ public struct RecapFeature {
                 state.weekCutouts = cutouts
                 state.mealCount = mealCount
                 state.rangeText = rangeText
+                return .none
+
+            case let .captionGenerated(line):
+                state.caption = line
                 return .none
 
             case .close:

@@ -25,7 +25,10 @@ final class RecapFeatureTests: XCTestCase {
             RecapFeature()
         } withDependencies: {
             $0.date = .constant(now)
+            $0.locale = Locale(identifier: "ko_KR")
             $0.persistence.allMeals = { meals }
+            // This test is about week filtering; the caption is covered separately.
+            $0.caption.weeklyCaption = { _, _, _ in nil }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -35,5 +38,7 @@ final class RecapFeatureTests: XCTestCase {
             $0.weekCutouts = [recentCutout]
             $0.mealCount = 1
         }
+        // The same effect then asks for a caption; the stub declines it.
+        await store.receive(\.captionGenerated) { $0.caption = nil }
     }
 }
