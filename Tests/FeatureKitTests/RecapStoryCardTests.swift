@@ -32,4 +32,30 @@ final class RecapStoryCardTests: XCTestCase {
         let ratio = RecapStoryCard.size.width / RecapStoryCard.size.height
         XCTAssertEqual(ratio, 9.0 / 16.0, accuracy: 0.001)
     }
+
+    @MainActor
+    func test_everyBoardThemeRendersWithSavedStickerPositions() {
+        let swatch = UIGraphicsImageRenderer(size: CGSize(width: 40, height: 40)).image {
+            UIColor.systemPink.setFill()
+            $0.fill(CGRect(x: 0, y: 0, width: 40, height: 40))
+        }
+        let positions = [
+            StickerBoardPlacement(xFraction: 0.22, y: 90),
+            StickerBoardPlacement(xFraction: 0.76, y: 230),
+        ]
+
+        for theme in StickerBoardTheme.allCases {
+            let renderer = ImageRenderer(
+                content: RecapStoryCard(
+                    images: [swatch, swatch],
+                    mealCount: 2,
+                    rangeText: "7.21~7.27",
+                    theme: theme,
+                    boardPlacements: positions
+                )
+                .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
+            )
+            XCTAssertNotNil(renderer.uiImage, "\(theme.rawValue) should render")
+        }
+    }
 }

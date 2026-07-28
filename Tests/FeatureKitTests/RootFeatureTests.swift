@@ -12,7 +12,7 @@ final class RootFeatureTests: XCTestCase {
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
         await store.send(.collection(.cutoutTapped(cutoutID)))
-        XCTAssertEqual(store.state.collection.flippedCutoutID, cutoutID)
+        XCTAssertEqual(store.state.collection.selectedCutoutID, cutoutID)
         XCTAssertTrue(store.state.path.isEmpty)
     }
 

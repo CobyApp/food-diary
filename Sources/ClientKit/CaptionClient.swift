@@ -6,7 +6,7 @@ import Foundation
 import FoundationModels
 #endif
 
-/// Writes the weekly recap's closing line with Apple Intelligence, on device.
+/// Writes a selected recap period's closing line with Apple Intelligence, on device.
 ///
 /// Returns `nil` whenever generation isn't possible — the device doesn't support
 /// Apple Intelligence, the user hasn't enabled it, the model is still
@@ -15,8 +15,8 @@ import FoundationModels
 @DependencyClient
 public struct CaptionClient: Sendable {
     /// - Parameters:
-    ///   - mealCount: how many meals the week holds.
-    ///   - places: restaurant names from that week (may be empty).
+    ///   - mealCount: how many meals the selected period holds.
+    ///   - places: restaurant names from that period (may be empty).
     ///   - languageCode: BCP-47 code of the UI language, so the caption comes
     ///     back in the language the user is actually reading.
     public var weeklyCaption: @Sendable (
@@ -36,7 +36,7 @@ extension CaptionClient: DependencyKey {
             let language = Self.languageName(for: languageCode)
             let session = LanguageModelSession(
                 instructions: """
-                You write one short closing line for a food diary's weekly recap card.
+                You write one short closing line for a food diary recap card.
                 Rules: reply with the line only — no quotes, no emoji, no hashtags, \
                 no explanation. Keep it under 24 characters. Warm, playful, first \
                 person, past tense. Write it in \(language).
@@ -47,7 +47,7 @@ extension CaptionClient: DependencyKey {
                 ? "no restaurant names recorded"
                 : places.prefix(6).joined(separator: ", ")
             let prompt = """
-            This week I ate \(mealCount) meal(s). Places: \(placeList).
+            During this recap period I ate \(mealCount) meal(s). Places: \(placeList).
             Write the closing line.
             """
 
@@ -94,7 +94,7 @@ extension CaptionClient: DependencyKey {
 extension CaptionClient: TestDependencyKey {
     public static let testValue = CaptionClient()
     public static let previewValue = CaptionClient(
-        weeklyCaption: { _, _, _ in "이번 주도 잘 먹었어요" }
+        weeklyCaption: { _, _, _ in "오늘도 맛있게 먹었어요" }
     )
 }
 

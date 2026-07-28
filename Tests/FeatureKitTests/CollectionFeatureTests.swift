@@ -31,7 +31,7 @@ final class CollectionFeatureTests: XCTestCase {
         let cutout = CutoutSnapshot(id: cutoutID, fileName: "a.png", createdAt: eatenAt, label: nil)
         let place = PlaceInfo(id: "place-1", name: "스시야", address: "서울")
         let meal = MealSnapshot(
-            id: UUID(), eatenAt: eatenAt, place: place, memo: "맛있었다", rating: nil, cutouts: [cutout]
+            id: UUID(), eatenAt: eatenAt, place: place, memo: "맛있었다", rating: 5, cutouts: [cutout]
         )
         let store = TestStore(initialState: CollectionFeature.State()) {
             CollectionFeature()
@@ -48,7 +48,12 @@ final class CollectionFeatureTests: XCTestCase {
         }
         await store.receive(\.mealInfoLoaded) {
             $0.cutoutMealInfo = [
-                cutoutID: CutoutMealInfo(placeName: "스시야", dateText: expectedDateText, memo: "맛있었다"),
+                cutoutID: CutoutMealInfo(
+                    placeName: "스시야",
+                    dateText: expectedDateText,
+                    memo: "맛있었다",
+                    rating: 5
+                ),
             ]
         }
     }
@@ -169,13 +174,13 @@ final class CollectionFeatureTests: XCTestCase {
     }
 
     @MainActor
-    func test_cutoutTapped_togglesFlip() async {
+    func test_cutoutTapped_presentsAndDismissesDetail() async {
         let id = UUID()
         let store = TestStore(initialState: CollectionFeature.State()) {
             CollectionFeature()
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
-        await store.send(.cutoutTapped(id)) { $0.flippedCutoutID = id }
-        await store.send(.cutoutTapped(id)) { $0.flippedCutoutID = nil }
+        await store.send(.cutoutTapped(id)) { $0.selectedCutoutID = id }
+        await store.send(.dismissCutoutDetail) { $0.selectedCutoutID = nil }
     }
 }

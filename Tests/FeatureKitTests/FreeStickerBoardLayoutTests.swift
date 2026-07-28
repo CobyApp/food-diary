@@ -53,4 +53,47 @@ final class FreeStickerBoardLayoutTests: XCTestCase {
 
         XCTAssertGreaterThan(height, 720)
     }
+
+    func test_boardThemesHaveStableUniqueStorageValues() {
+        XCTAssertEqual(StickerBoardTheme.allCases.count, 4)
+        XCTAssertEqual(
+            Set(StickerBoardTheme.allCases.map(\.rawValue)).count,
+            StickerBoardTheme.allCases.count
+        )
+        XCTAssertEqual(
+            StickerBoardTheme(rawValue: StickerBoardTheme.lavenderPop.rawValue),
+            .lavenderPop
+        )
+    }
+
+    func test_oldSavedPlacementDecodesWithoutTransformValues() throws {
+        let data = Data(#"{"xFraction":0.4,"y":180}"#.utf8)
+        let placement = try JSONDecoder().decode(StickerBoardPlacement.self, from: data)
+
+        XCTAssertEqual(placement.displayScale, 1)
+        XCTAssertNil(placement.rotation)
+    }
+
+    func test_scaleAndRotationAreKeptInsideSafeRanges() {
+        XCTAssertEqual(FreeStickerBoardLayout.clampedScale(0.1), 0.68)
+        XCTAssertEqual(FreeStickerBoardLayout.clampedScale(4), 1.5)
+        XCTAssertEqual(FreeStickerBoardLayout.normalizedRotation(450), 90)
+        XCTAssertEqual(FreeStickerBoardLayout.normalizedRotation(-450), -90)
+    }
+
+    func test_largeStickerCenterIsClampedFurtherFromTheEdge() {
+        let regular = FreeStickerBoardLayout.clamped(
+            CGPoint(x: 0, y: 100),
+            width: 354,
+            height: 500
+        )
+        let large = FreeStickerBoardLayout.clamped(
+            CGPoint(x: 0, y: 100),
+            width: 354,
+            height: 500,
+            scale: 1.5
+        )
+
+        XCTAssertGreaterThan(large.x, regular.x)
+    }
 }

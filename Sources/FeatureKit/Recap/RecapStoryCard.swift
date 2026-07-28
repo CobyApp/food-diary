@@ -8,6 +8,8 @@ struct RecapStoryCard: View {
     let mealCount: Int
     let rangeText: String
     var caption: String?
+    var theme: StickerBoardTheme = .strawberryCheck
+    var boardPlacements: [StickerBoardPlacement?] = []
 
     static let size = CGSize(width: 360, height: 640)
 
@@ -33,18 +35,18 @@ struct RecapStoryCard: View {
                 .padding(9)
         }
         .overlay(alignment: .topLeading) {
-            WashiTape(.appButter)
+            WashiTape(theme.secondary)
                 .rotationEffect(.degrees(-12))
                 .offset(x: -15, y: 13)
         }
         .overlay(alignment: .topTrailing) {
-            StoryBow()
+            StoryBow(primary: theme.accent, secondary: theme.secondary)
                 .frame(width: 55, height: 44)
                 .rotationEffect(.degrees(8))
                 .offset(x: -11, y: 12)
         }
         .overlay(alignment: .bottomLeading) {
-            StoryCheckerPattern(color: .appCherry.opacity(0.72), cellSize: 9)
+            StoryCheckerPattern(color: theme.accent.opacity(0.72), cellSize: 9)
                 .frame(width: 86, height: 28)
                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 .rotationEffect(.degrees(7))
@@ -58,7 +60,7 @@ struct RecapStoryCard: View {
                 Text(L10n.text("recap.story.kicker"))
                     .font(.system(size: 10, weight: .black, design: .rounded))
                     .tracking(1.7)
-                    .foregroundStyle(.appPinkInk)
+                    .foregroundStyle(theme.accent)
                 Spacer()
                 Text(rangeText)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -66,10 +68,10 @@ struct RecapStoryCard: View {
             }
 
             HStack(alignment: .lastTextBaseline, spacing: 8) {
-                Text(L10n.text("이번 주 한 끼"))
+                Text(L10n.text("나의 맛있는 기록"))
                     .font(.system(size: 34, weight: .black, design: .rounded))
                     .foregroundStyle(.appInk)
-                    .shadow(color: Color.appPink.opacity(0.85), radius: 0, x: 2, y: 2)
+                    .shadow(color: theme.secondary.opacity(0.85), radius: 0, x: 2, y: 2)
                     .minimumScaleFactor(0.78)
                     .lineLimit(1)
                 Text(L10n.format("recap.story.count", mealCount))
@@ -77,7 +79,7 @@ struct RecapStoryCard: View {
                     .foregroundStyle(.appChocolate)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
-                    .background(Color.appButter, in: Capsule())
+                    .background(theme.secondary, in: Capsule())
                     .rotationEffect(.degrees(2))
             }
         }
@@ -87,7 +89,7 @@ struct RecapStoryCard: View {
         GeometryReader { proxy in
             let count = min(images.count, 9)
             ZStack {
-                StoryCheckerPattern(color: .appPinkInk.opacity(0.18), cellSize: 18)
+                StoryCheckerPattern(color: theme.accent.opacity(0.18), cellSize: 18)
                     .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
                     .padding(5)
                 RoundedRectangle(cornerRadius: 34, style: .continuous)
@@ -118,11 +120,11 @@ struct RecapStoryCard: View {
                 }
 
                 KitschSparkle()
-                    .fill(Color.appCherry.opacity(0.76))
+                    .fill(theme.accent.opacity(0.76))
                     .frame(width: 20, height: 20)
                     .position(x: 31, y: 53)
                 Circle()
-                    .stroke(Color.appBlueInk.opacity(0.36), lineWidth: 3)
+                    .stroke(theme.accent.opacity(0.36), lineWidth: 3)
                     .frame(width: 29, height: 29)
                     .position(x: proxy.size.width - 31, y: proxy.size.height - 48)
                 StoryDoodle()
@@ -140,14 +142,14 @@ struct RecapStoryCard: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 11)
                     .padding(.vertical, 7)
-                    .background(Color.appCherry, in: Capsule())
+                    .background(theme.accent, in: Capsule())
                     .overlay(Capsule().stroke(Color.appCard, lineWidth: 2))
                     .rotationEffect(.degrees(7))
                     .position(x: proxy.size.width - 58, y: 31)
                     .zIndex(20)
 
                 StoryHeart()
-                    .fill(Color.appPinkInk.opacity(0.82))
+                    .fill(theme.accent.opacity(0.82))
                     .frame(width: 22, height: 20)
                     .rotationEffect(.degrees(-12))
                     .position(x: proxy.size.width - 28, y: proxy.size.height - 34)
@@ -160,7 +162,7 @@ struct RecapStoryCard: View {
         HStack(alignment: .top, spacing: 9) {
             Text("“")
                 .font(.system(size: 30, weight: .black, design: .serif))
-                .foregroundStyle(.appPinkInk)
+                .foregroundStyle(theme.accent)
                 .offset(y: -5)
             Text(displayCaption)
                 .font(.system(size: 14, weight: .bold, design: .rounded))
@@ -177,13 +179,13 @@ struct RecapStoryCard: View {
         .background {
             ZStack {
                 Color.appCard.opacity(0.96)
-                StoryCheckerPattern(color: .appPink.opacity(0.18), cellSize: 11)
+                StoryCheckerPattern(color: theme.secondary.opacity(0.18), cellSize: 11)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.appPink.opacity(0.78), lineWidth: 1.5)
+                .stroke(theme.accent.opacity(0.58), lineWidth: 1.5)
         }
         .rotationEffect(.degrees(-0.7))
     }
@@ -204,7 +206,7 @@ struct RecapStoryCard: View {
                     .foregroundStyle(.appChocolate)
             }
             Spacer()
-            Text(verbatim: "@yumkie · WEEKLY FOOD NOTE")
+            Text(verbatim: "@yumkie · MY FOOD NOTE")
                 .font(.system(size: 9, weight: .heavy, design: .rounded))
                 .tracking(0.5)
                 .foregroundStyle(.appMuted)
@@ -213,32 +215,9 @@ struct RecapStoryCard: View {
 
     private var background: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color.appMilk,
-                    Color.appTilePink.opacity(0.92),
-                    Color.appTileButter.opacity(0.72),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            Circle()
-                .fill(Color.appBlue.opacity(0.18))
-                .frame(width: 190, height: 190)
-                .offset(x: 170, y: -250)
-                .blur(radius: 2)
-            Circle()
-                .fill(Color.appPink.opacity(0.20))
-                .frame(width: 180, height: 180)
-                .offset(x: -170, y: 276)
-                .blur(radius: 3)
+            StickerBoardThemeBackground(theme: theme)
             StoryDotPattern()
-                .foregroundStyle(Color.appChocolate.opacity(0.08))
-            Image("StickerPaper")
-                .resizable()
-                .scaledToFill()
-                .opacity(0.28)
-                .blendMode(.multiply)
+                .foregroundStyle(theme.accent.opacity(0.06))
         }
         .clipped()
     }
@@ -282,6 +261,24 @@ struct RecapStoryCard: View {
             ]
         }
         let spec = specs[min(index, specs.count - 1)]
+        if index < boardPlacements.count, let saved = boardPlacements[index] {
+            let sourceHeight = max(
+                340,
+                CGFloat(boardPlacements.compactMap { $0?.y }.max() ?? 0) + 70
+            )
+            let xFraction = min(max(CGFloat(saved.xFraction), 0.16), 0.84)
+            let yFraction = min(max(CGFloat(saved.y) / sourceHeight, 0.17), 0.83)
+            let savedScale = CGFloat(saved.scale ?? 1)
+            let storySide = min(
+                max(spec.2 * savedScale, spec.2 * 0.68),
+                min(canvas.width * 0.78, 260)
+            )
+            return (
+                CGPoint(x: canvas.width * xFraction, y: canvas.height * yFraction),
+                storySide,
+                saved.rotation ?? rotations[index % rotations.count]
+            )
+        }
         return (
             CGPoint(x: canvas.width * spec.0, y: canvas.height * spec.1),
             spec.2,
@@ -316,30 +313,33 @@ private struct StoryCheckerPattern: View {
 }
 
 private struct StoryBow: View {
+    let primary: Color
+    let secondary: Color
+
     var body: some View {
         ZStack {
             Capsule()
-                .fill(Color.appCherry)
+                .fill(primary)
                 .frame(width: 34, height: 24)
                 .rotationEffect(.degrees(28))
                 .offset(x: -14)
             Capsule()
-                .fill(Color.appCherry)
+                .fill(primary)
                 .frame(width: 34, height: 24)
                 .rotationEffect(.degrees(-28))
                 .offset(x: 14)
             RoundedRectangle(cornerRadius: 3)
-                .fill(Color.appPinkInk)
+                .fill(primary.opacity(0.82))
                 .frame(width: 11, height: 24)
                 .rotationEffect(.degrees(18))
                 .offset(x: -5, y: 14)
             RoundedRectangle(cornerRadius: 3)
-                .fill(Color.appPinkInk)
+                .fill(primary.opacity(0.82))
                 .frame(width: 11, height: 24)
                 .rotationEffect(.degrees(-18))
                 .offset(x: 5, y: 14)
             Circle()
-                .fill(Color.appButter)
+                .fill(secondary)
                 .frame(width: 17, height: 17)
                 .overlay(Circle().stroke(Color.appCard, lineWidth: 2))
         }

@@ -8,7 +8,7 @@ public struct RecapExport: Transferable {
 
     public static var transferRepresentation: some TransferRepresentation {
         DataRepresentation(exportedContentType: .png) { $0.data }
-            .suggestedFileName("yumkie-weekly-story.png")
+            .suggestedFileName("yumkie-food-recap.png")
     }
 }
 
@@ -28,7 +28,7 @@ public struct RecapCardView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("이번 주 한 끼")
+                Text("나의 맛있는 기록")
                     .font(.appTitle)
                     .foregroundStyle(.appInk)
                 Text(L10n.format("recap.meals", mealCount, rangeText))
@@ -76,7 +76,14 @@ public struct RecapCardView: View {
 public struct RecapView: View {
     @Bindable var store: StoreOf<RecapFeature>
     @State private var images: [UIImage] = []
+    @State private var imageCutoutIDs: [UUID] = []
     @State private var export: RecapExport?
+    @State private var showingDatePicker = false
+    @State private var draftStartDate = Date()
+    @State private var draftEndDate = Date()
+    @AppStorage("collection.freeStickerBoard.v1") private var savedStickerPlacements = ""
+    @AppStorage("collection.stickerBoardTheme.v1")
+    private var selectedThemeRaw = StickerBoardTheme.strawberryCheck.rawValue
 
     public init(store: StoreOf<RecapFeature>) {
         self.store = store
@@ -86,37 +93,50 @@ public struct RecapView: View {
         NavigationStack {
             ZStack {
                 PaperBackground()
-                if store.isLoading {
-                    KitschLoadingView(
-                        "이번 주 카드를 만드는 중",
-                        messages: ["맛있는 순간을 한 장에 모으고 있어요"]
-                    )
-                    .padding(24)
-                } else if store.weekCutouts.isEmpty {
-                    EmptyState(
-                        systemImage: "film.stack",
-                        title: "이번 주 기록이 없어요",
-                        subtitle: "한 끼를 담으면 주간 카드가 만들어져요!"
-                    )
-                } else {
-                    ScrollView {
-                        VStack(spacing: 14) {
-                            card
-                            captionEditor
-                            if let export {
-                                ShareLink(item: export, preview: SharePreview("이번 주 한 끼")) {
-                                    Label("스토리로 공유하기", systemImage: "square.and.arrow.up")
-                                }
-                                .buttonStyle(KitschFilledButtonStyle())
-                                .padding(.horizontal, 24)
-                            }
-                        }
-                        .padding(.vertical, 12)
+                VStack(spacing: 0) {
+                    if store.startDate != nil {
+                        dateRangeButton
+                            .padding(.horizontal, 20)
+                            .padding(.top, 10)
+                            .padding(.bottom, 8)
                     }
-                    .scrollIndicators(.hidden)
+
+                    if store.isLoading {
+                        Spacer()
+                        KitschLoadingView(
+                            "리캡 카드를 만드는 중",
+                            messages: ["선택한 기간의 맛있는 순간을 모으고 있어요"]
+                        )
+                        .padding(24)
+                        Spacer()
+                    } else if store.weekCutouts.isEmpty {
+                        EmptyState(
+                            systemImage: "film.stack",
+                            title: "선택한 기간에 기록이 없어요",
+                            subtitle: "다른 날짜를 골라 맛있는 기록을 찾아보세요!"
+                        )
+                        .padding(.horizontal, 22)
+                        Spacer()
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 14) {
+                                card
+                                captionEditor
+                                if let export {
+                                    ShareLink(item: export, preview: SharePreview("나의 푸드 리캡")) {
+                                        Label("스토리로 공유하기", systemImage: "square.and.arrow.up")
+                                    }
+                                    .buttonStyle(KitschFilledButtonStyle())
+                                    .padding(.horizontal, 24)
+                                }
+                            }
+                            .padding(.vertical, 12)
+                        }
+                        .scrollIndicators(.hidden)
+                    }
                 }
             }
-            .navigationTitle("주간 리캡")
+            .navigationTitle("푸드 리캡")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -124,19 +144,102 @@ public struct RecapView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingDatePicker) {
+            RecapDateRangePicker(
+                startDate: $draftStartDate,
+                endDate: $draftEndDate,
+                onApply: {
+                    store.send(.dateRangeChanged(
+                        start: draftStartDate,
+                        end: draftEndDate
+                    ))
+                    showingDatePicker = false
+                }
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
         .task { store.send(.onAppear) }
         .task(id: store.caption) {
             guard !images.isEmpty else { return }
             await renderExport()
         }
-        .task(id: store.weekCutouts) {
-            let names = store.weekCutouts.map(\.fileName)
-            images = await CutoutImageLoader.shared.images(
-                fileNames: names,
-                maxPixelDimension: 720
-            )
+        .task(id: "\(selectedThemeRaw)|\(savedStickerPlacements)") {
+            guard !images.isEmpty else { return }
             await renderExport()
         }
+        .task(id: store.weekCutouts) {
+            var loadedImages: [UIImage] = []
+            var loadedIDs: [UUID] = []
+            for cutout in store.weekCutouts {
+                if let image = await CutoutImageLoader.shared.image(
+                    fileName: cutout.fileName,
+                    cacheKey: cutout.fileName,
+                    maxPixelDimension: 720
+                ) {
+                    loadedImages.append(image)
+                    loadedIDs.append(cutout.id)
+                }
+            }
+            images = loadedImages
+            imageCutoutIDs = loadedIDs
+            await renderExport()
+        }
+    }
+
+    private var dateRangeButton: some View {
+        Button {
+            draftStartDate = store.startDate ?? Date()
+            draftEndDate = store.endDate ?? Date()
+            showingDatePicker = true
+        } label: {
+            HStack(spacing: 10) {
+                KitschIcon(
+                    "calendar",
+                    tint: .appPinkInk,
+                    background: .appPink,
+                    size: 38
+                )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("공유 기간")
+                        .font(.appCaption)
+                        .foregroundStyle(.appMuted)
+                    Text(store.rangeText)
+                        .font(.appSection)
+                        .foregroundStyle(.appInk)
+                }
+                Spacer()
+                Text("기간 설정")
+                    .font(.appCaption)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.appCherry, in: Capsule())
+            }
+            .padding(11)
+            .background(Color.appCard, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.appPinkInk.opacity(0.28), lineWidth: 1.5)
+            }
+            .softShadow()
+        }
+        .buttonStyle(KitschPressStyle())
+    }
+
+    private var selectedTheme: StickerBoardTheme {
+        StickerBoardTheme(rawValue: selectedThemeRaw) ?? .strawberryCheck
+    }
+
+    private var storyBoardPlacements: [StickerBoardPlacement?] {
+        guard let data = savedStickerPlacements.data(using: .utf8),
+              let placements = try? JSONDecoder().decode(
+                [String: StickerBoardPlacement].self,
+                from: data
+              ) else {
+            return Array(repeating: nil, count: images.count)
+        }
+        return imageCutoutIDs.map { placements[$0.uuidString] }
     }
 
     /// Preview the exact card that gets shared, scaled down to fit the sheet.
@@ -146,7 +249,9 @@ public struct RecapView: View {
             images: images,
             mealCount: store.mealCount,
             rangeText: store.rangeText,
-            caption: store.caption
+            caption: store.caption,
+            theme: selectedTheme,
+            boardPlacements: storyBoardPlacements
         )
         .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
@@ -219,12 +324,108 @@ public struct RecapView: View {
                 images: images,
                 mealCount: store.mealCount,
                 rangeText: store.rangeText,
-                caption: store.caption
+                caption: store.caption,
+                theme: selectedTheme,
+                boardPlacements: storyBoardPlacements
             )
             .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
         )
         renderer.scale = 3
         export = renderer.uiImage?.pngData().map(RecapExport.init(data:))
+    }
+}
+
+private struct RecapDateRangePicker: View {
+    @Binding var startDate: Date
+    @Binding var endDate: Date
+    let onApply: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    private let calendar = Calendar.current
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(spacing: 8) {
+                    presetButton("오늘") {
+                        let today = calendar.startOfDay(for: Date())
+                        startDate = today
+                        endDate = today
+                    }
+                    presetButton("최근 7일") {
+                        let today = calendar.startOfDay(for: Date())
+                        startDate = calendar.date(byAdding: .day, value: -6, to: today) ?? today
+                        endDate = today
+                    }
+                    presetButton("이번 달") {
+                        let today = calendar.startOfDay(for: Date())
+                        startDate = calendar.dateInterval(of: .month, for: today)?.start ?? today
+                        endDate = today
+                    }
+                }
+
+                VStack(spacing: 12) {
+                    dateRow(
+                        "시작일",
+                        selection: $startDate,
+                        range: Date.distantPast...endDate
+                    )
+                    dateRow("종료일", selection: $endDate, range: startDate...Date())
+                }
+                .padding(16)
+                .background(Color.appCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(Color.appPinkInk.opacity(0.22), lineWidth: 1.5)
+                }
+
+                PillButton("이 기간으로 만들기", action: onApply)
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .background(PaperBackground())
+            .navigationTitle("기간 설정")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("닫기") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func presetButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(LocalizedStringKey(title))
+        }
+        .buttonStyle(
+            KitschOutlineButtonStyle(
+                color: .appPinkInk,
+                fullWidth: true,
+                verticalPadding: 9
+            )
+        )
+    }
+
+    private func dateRow(
+        _ title: String,
+        selection: Binding<Date>,
+        range: ClosedRange<Date>
+    ) -> some View {
+        HStack {
+            Text(LocalizedStringKey(title))
+                .font(.appSection)
+                .foregroundStyle(.appInk)
+            Spacer()
+            DatePicker(
+                LocalizedStringKey(title),
+                selection: selection,
+                in: range,
+                displayedComponents: .date
+            )
+            .labelsHidden()
+            .tint(.appCherry)
+        }
     }
 }
 
