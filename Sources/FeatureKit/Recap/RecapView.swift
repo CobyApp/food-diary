@@ -8,7 +8,7 @@ public struct RecapExport: Transferable {
 
     public static var transferRepresentation: some TransferRepresentation {
         DataRepresentation(exportedContentType: .png) { $0.data }
-            .suggestedFileName("foodie-diary-week.png")
+            .suggestedFileName("yumkie-weekly-story.png")
     }
 }
 
@@ -108,9 +108,14 @@ public struct RecapView: View {
                                     .foregroundStyle(.white)
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 14)
-                                    .background(Color.appBlue, in: Capsule())
+                                    .background(Color.appCherry, in: Capsule())
+                                    .overlay {
+                                        Capsule()
+                                            .stroke(Color.appCard, lineWidth: 2)
+                                            .padding(2)
+                                    }
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(KitschPressStyle())
                             .padding(.horizontal, 24)
                         }
                     }

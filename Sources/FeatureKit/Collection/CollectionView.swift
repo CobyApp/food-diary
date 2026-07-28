@@ -7,12 +7,26 @@ public struct CollectionView: View {
     @State private var confirmingDeletion = false
     @State private var pendingSingleDeleteID: UUID?
     @State private var motion = ParallaxMotion()
+    @State private var peelCoordinator = PeelCoordinator()
+    @State private var isSpilling = false
+    @State private var revealedColumn: Int?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     public init(store: StoreOf<CollectionFeature>) { self.store = store }
 
-    private let columns = [GridItem(.adaptive(minimum: 100), spacing: 12)]
+    private var columnCount: Int { horizontalSizeClass == .regular ? 5 : 3 }
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount)
+    }
+    private var tiltCandidateColumn: Int? {
+        StickerBoardMotion.revealedColumn(
+            tiltX: motion.tiltX,
+            columnCount: columnCount,
+            threshold: 0.55
+        )
+    }
 
     public var body: some View {
-        ScreenScaffold(title: "컬렉션") {
+        ScreenScaffold(title: "컬렉션", onRefresh: refreshBoard) {
             HStack(spacing: 8) {
                 HStack(spacing: 5) {
                     Image(systemName: "flame.fill")
@@ -59,6 +73,10 @@ public struct CollectionView: View {
             } else {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(Array(store.cutouts.enumerated()), id: \.element.id) { index, cutout in
+                        let cell = CGPoint(
+                            x: index % columnCount,
+                            y: index / columnCount
+                        )
                         Button {
                             store.send(
                                 store.isEditing
@@ -67,6 +85,11 @@ public struct CollectionView: View {
                             )
                         } label: {
                             let isFlipped = store.flippedCutoutID == cutout.id
+                            let lean = StickerBoardMotion.lean(
+                                index: index,
+                                tiltX: motion.tiltX,
+                                tiltY: motion.tiltY
+                            )
                             ZStack {
                                 // FRONT
                                 StickerTile(tint: .rotating(index)) {
@@ -95,6 +118,15 @@ public struct CollectionView: View {
                                             .padding(5)
                                     }
                                 }
+                                .overlay(alignment: .bottom) {
+                                    if revealedColumn == index % columnCount,
+                                       let place = store.cutoutMealInfo[cutout.id]?.placeName,
+                                       !place.isEmpty {
+                                        PastelChip(place, tone: .pink)
+                                            .padding(5)
+                                            .transition(.scale(scale: 0.85).combined(with: .opacity))
+                                    }
+                                }
                                 .opacity(isFlipped ? 0 : 1)
 
                                 // BACK
@@ -103,15 +135,49 @@ public struct CollectionView: View {
                                     .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
                             }
                             .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
-                            .rotationEffect(.degrees(index.isMultiple(of: 3) ? -1.2 : index.isMultiple(of: 2) ? 1 : 0))
+                            .rotationEffect(.degrees(
+                                (index.isMultiple(of: 3) ? -1.2 : index.isMultiple(of: 2) ? 1 : 0)
+                                    + StickerBoardMotion.leanRotation(
+                                        index: index,
+                                        tiltX: motion.tiltX
+                                    )
+                            ))
+                            .offset(
+                                x: lean.width,
+                                y: lean.height + (
+                                    isSpilling
+                                        ? 720 + CGFloat(index / columnCount) * 18
+                                        : 0
+                                )
+                            )
                             .opacity(
-                                store.isEditing && !store.selectedCutoutIDs.contains(cutout.id)
+                                isSpilling
+                                    ? 0.05
+                                    : store.isEditing && !store.selectedCutoutIDs.contains(cutout.id)
                                     ? 0.62
                                     : 1
                             )
-                            .parallax(8, motion: motion)
+                            .animation(
+                                isSpilling
+                                    ? .easeIn(duration: 0.3).delay(
+                                        StickerBoardMotion.spillDelay(index: index)
+                                    )
+                                    : .spring(response: 0.5, dampingFraction: 0.68).delay(
+                                        StickerBoardMotion.spillDelay(index: index) * 0.35
+                                    ),
+                                value: isSpilling
+                            )
+                            .animation(
+                                .interactiveSpring(response: 0.34, dampingFraction: 0.76),
+                                value: lean
+                            )
                         }
                         .buttonStyle(KitschPressStyle())
+                        .peelable(
+                            cell: cell,
+                            coordinator: peelCoordinator,
+                            enabled: !store.isEditing
+                        )
                         .contextMenu {
                             Button {
                                 store.send(.cutoutTapped(cutout.id))
@@ -162,6 +228,23 @@ public struct CollectionView: View {
             store.send(.streakOnAppear)
             motion.start()
         }
+        .task(id: tiltCandidateColumn) {
+            guard let candidate = tiltCandidateColumn else {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    revealedColumn = nil
+                }
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, tiltCandidateColumn == candidate else { return }
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.72)) {
+                revealedColumn = candidate
+            }
+        }
+        .onDisappear {
+            motion.stop()
+            peelCoordinator.release()
+        }
         .sheet(item: $store.scope(state: \.achievements, action: \.achievements)) { achStore in
             AchievementsView(store: achStore)
         }
@@ -204,6 +287,15 @@ public struct CollectionView: View {
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: store.isEditing)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: store.selectedCutoutIDs)
+    }
+
+    @MainActor
+    private func refreshBoard() async {
+        guard !isSpilling else { return }
+        isSpilling = true
+        try? await Task.sleep(for: .milliseconds(760))
+        await store.send(.onAppear).finish()
+        isSpilling = false
     }
 
     private var selectionToolbar: some View {

@@ -16,23 +16,18 @@ public final class ParallaxMotion {
         manager.deviceMotionUpdateInterval = 1.0 / 30.0
         manager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
             guard let self, let m = motion else { return }
-            // Clamp to a gentle range so the wall drifts subtly.
-            self.tiltX = max(-1, min(1, m.attitude.roll / 0.8))
-            self.tiltY = max(-1, min(1, m.attitude.pitch / 0.8))
+            let targetX = max(-1, min(1, m.attitude.roll / 0.8))
+            let targetY = max(-1, min(1, m.attitude.pitch / 0.8))
+            // Low-pass the 30Hz sensor stream. Raw attitude values make the
+            // sticker edges shimmer even while a device is held still.
+            self.tiltX += (targetX - self.tiltX) * 0.16
+            self.tiltY += (targetY - self.tiltY) * 0.16
         }
     }
 
-    public func stop() { manager.stopDeviceMotionUpdates() }
-}
-
-public extension View {
-    func parallax(_ strength: CGFloat, motion: ParallaxMotion) -> some View {
-        offset(x: CGFloat(motion.tiltX) * strength, y: CGFloat(motion.tiltY) * strength)
-            .shadow(
-                color: Color(.sRGB, red: 150 / 255, green: 120 / 255, blue: 180 / 255, opacity: 0.10),
-                radius: 8,
-                x: CGFloat(-motion.tiltX) * strength * 0.6,
-                y: CGFloat(-motion.tiltY) * strength * 0.6
-            )
+    public func stop() {
+        manager.stopDeviceMotionUpdates()
+        tiltX = 0
+        tiltY = 0
     }
 }
