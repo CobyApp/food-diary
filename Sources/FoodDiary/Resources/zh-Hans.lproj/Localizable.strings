@@ -161,8 +161,6 @@
 "achievement.decorations.title" = "贴纸艺术家 · %d";
 "achievement.collected" = "已收藏";
 "game.minimum" = "需要%d张贴纸";
-"game.myCutouts" = "我的贴纸 %d 张";
-"game.needMore" = "再攒 %d 张就全部解锁";
 "round.count" = "%d强";
 "recap.meals" = "%d餐 · %@";
 "capture.processing.progress" = "正在制作第%d/%d张照片的贴纸";
@@ -176,3 +174,10 @@
 "제출 완료! 다른 사람들을 기다리는 중… ⏳" = "提交完成！正在等待其他人… ⏳";
 "group.voting.progress" = "%d / %d人投票";
 "group.champion.title" = "今天是%@的%@!";
+"토너먼트 시작하기" = "开始淘汰赛";
+"누끼를 더 담아와!" = "再多攒些贴纸！";
+"함께 월드컵" = "一起世界杯";
+"친구들과 5초 안에 투표해서 정해요" = "和朋友在5秒内投票决定";
+"5초 투표" = "5秒投票";
+"다수결 승리" = "多数胜出";
+"친구 초대하기" = "邀请朋友";

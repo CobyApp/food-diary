@@ -161,8 +161,6 @@
 "achievement.decorations.title" = "스티커 아티스트 · %d";
 "achievement.collected" = "수집 완료";
 "game.minimum" = "누끼 %d개 필요";
-"game.myCutouts" = "내 누끼 %d개";
-"game.needMore" = "%d개만 더 모으면 다 열려요";
 "round.count" = "%d강";
 "recap.meals" = "%d끼 · %@";
 "capture.processing.progress" = "사진 %d/%d 누끼 만드는 중";
@@ -176,3 +174,9 @@
 "제출 완료! 다른 사람들을 기다리는 중… ⏳" = "제출 완료! 다른 사람들을 기다리는 중… ⏳";
 "group.voting.progress" = "%d / %d명 투표";
 "group.champion.title" = "오늘은 %@님의 %@!";
+"토너먼트 시작하기" = "토너먼트 시작하기";
+"누끼를 더 담아와!" = "누끼를 더 담아와!";
+"함께 월드컵" = "함께 월드컵";
+"5초 투표" = "5초 투표";
+"다수결 승리" = "다수결 승리";
+"친구 초대하기" = "친구 초대하기";

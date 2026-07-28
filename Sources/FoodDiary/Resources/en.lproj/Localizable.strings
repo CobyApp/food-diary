@@ -161,8 +161,6 @@
 "achievement.decorations.title" = "Sticker Artist · %d";
 "achievement.collected" = "COLLECTED";
 "game.minimum" = "%d stickers needed";
-"game.myCutouts" = "%d stickers";
-"game.needMore" = "%d more to unlock all";
 "round.count" = "Round of %d";
 "recap.meals" = "%d meals · %@";
 "capture.processing.progress" = "Making stickers · Photo %d/%d";
@@ -176,3 +174,10 @@
 "제출 완료! 다른 사람들을 기다리는 중… ⏳" = "Submitted! Waiting for others… ⏳";
 "group.voting.progress" = "%d / %d voted";
 "group.champion.title" = "Today it's %@'s %@!";
+"토너먼트 시작하기" = "Start the tournament";
+"누끼를 더 담아와!" = "Collect more stickers!";
+"함께 월드컵" = "Group World Cup";
+"친구들과 5초 안에 투표해서 정해요" = "Vote with friends in 5 seconds";
+"5초 투표" = "5s vote";
+"다수결 승리" = "Majority wins";
+"친구 초대하기" = "Invite friends";

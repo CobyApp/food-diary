@@ -161,8 +161,6 @@
 "achievement.decorations.title" = "ステッカーアーティスト · %d";
 "achievement.collected" = "コレクション済み";
 "game.minimum" = "ステッカーが%d枚必要";
-"game.myCutouts" = "ヌッキ %d個";
-"game.needMore" = "あと%d個で全部開きます";
 "round.count" = "ベスト%d";
 "recap.meals" = "%d食 · %@";
 "capture.processing.progress" = "写真%d/%dのステッカーを作成中";
@@ -176,3 +174,10 @@
 "제출 완료! 다른 사람들을 기다리는 중… ⏳" = "提出完了！他のメンバーを待っています… ⏳";
 "group.voting.progress" = "%d / %d人投票";
 "group.champion.title" = "今日は%@さんの%@!";
+"토너먼트 시작하기" = "トーナメントを始める";
+"누끼를 더 담아와!" = "ステッカーをもっと集めて！";
+"함께 월드컵" = "みんなでワールドカップ";
+"친구들과 5초 안에 투표해서 정해요" = "友だちと5秒で投票して決めます";
+"5초 투표" = "5秒投票";
+"다수결 승리" = "多数決で勝ち";
+"친구 초대하기" = "友だちを招待";
