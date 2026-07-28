@@ -2,17 +2,6 @@
 "뭐먹지" = "Pick";
 "지도" = "Map";
 "컬렉션" = "Collection";
-"내 프로필" = "My Profile";
-"프로필 저장" = "Save Profile";
-"반가워요!" = "Nice to meet you!";
-"나만의 푸드 다이어리" = "Your own food diary";
-"먹은 순간을 귀여운 누끼로 모아보세요." = "Collect delicious moments as cute cutout stickers.";
-"내 캐릭터" = "My Character";
-"시작하기" = "Get Started";
-"이름" = "Name";
-"어떻게 불러드릴까요?" = "What should we call you?";
-"최애 음식" = "Favorite Food";
-"예: 라멘" = "e.g. Ramen";
 
 "한 끼 담기" = "Add a Meal";
 "음식 사진 고르기" = "Choose a Food Photo";
@@ -141,12 +130,6 @@
 "위치가 있는 사진으로 한 끼를 담아보세요!" = "Add a meal from a photo with location data!";
 "한 끼" = "Meal";
 "맛있는 순간을 준비하는 중" = "Getting your tasty moments ready";
-"러블리" = "Lovely";
-"리본" = "Ribbon";
-"체리" = "Cherry";
-"플라워" = "Flower";
-"스타" = "Star";
-"케이크" = "Cake";
 
 "streak.days" = "%d days";
 "streak.best" = "Best %d";

@@ -16,7 +16,6 @@ struct FoodDiaryApp: App {
             RootFeature()
         } withDependencies: {
             $0.persistence = .live(container: container, imageStore: imageStore)
-            $0.profileSettings = .live()
             $0.widgetData = .live()
         }
     }

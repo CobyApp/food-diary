@@ -33,9 +33,6 @@ public struct CollectionView: View {
 
                 Spacer()
 
-                headerButton(systemImage: "person.crop.circle.fill", color: .appPink) {
-                    store.send(.profileButtonTapped)
-                }
                 headerButton(systemImage: "rectangle.stack.fill", color: .appBlueInk) {
                     store.send(.recapButtonTapped)
                 }
@@ -163,7 +160,6 @@ public struct CollectionView: View {
         .task {
             store.send(.onAppear)
             store.send(.streakOnAppear)
-            store.send(.profileCheck)
             motion.start()
         }
         .sheet(item: $store.scope(state: \.achievements, action: \.achievements)) { achStore in
@@ -171,9 +167,6 @@ public struct CollectionView: View {
         }
         .sheet(item: $store.scope(state: \.recap, action: \.recap)) { recapStore in
             RecapView(store: recapStore)
-        }
-        .sheet(item: $store.scope(state: \.profile, action: \.profile)) { profileStore in
-            ProfileView(store: profileStore)
         }
         .confirmationDialog(
             L10n.format(

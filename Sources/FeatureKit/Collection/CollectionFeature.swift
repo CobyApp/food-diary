@@ -27,7 +27,6 @@ public struct CollectionFeature {
         public var streak = MealStreak()
         @Presents public var achievements: AchievementsFeature.State?
         @Presents public var recap: RecapFeature.State?
-        @Presents public var profile: ProfileFeature.State?
         public init() {}
     }
 
@@ -51,11 +50,6 @@ public struct CollectionFeature {
         case achievements(PresentationAction<AchievementsFeature.Action>)
         case recapButtonTapped
         case recap(PresentationAction<RecapFeature.Action>)
-        case profileCheck
-        case profileLoaded(ProfileSnapshot)
-        case profileButtonTapped
-        case profileEditorLoaded(ProfileSnapshot)
-        case profile(PresentationAction<ProfileFeature.Action>)
     }
 
     @Dependency(\.persistence) var persistence
@@ -183,27 +177,6 @@ public struct CollectionFeature {
                 return .none
             case .recap:
                 return .none
-            case .profileCheck:
-                return .run { send in
-                    await send(.profileLoaded(profileSettings.load()))
-                }
-            case let .profileLoaded(profile):
-                if !profile.hasCompletedOnboarding {
-                    state.profile = ProfileFeature.State(profile: profile, isOnboarding: true)
-                }
-                return .none
-            case .profileButtonTapped:
-                return .run { send in
-                    await send(.profileEditorLoaded(profileSettings.load()))
-                }
-            case let .profileEditorLoaded(profile):
-                state.profile = ProfileFeature.State(profile: profile)
-                return .none
-            case .profile(.presented(.saved)), .profile(.presented(.close)):
-                state.profile = nil
-                return .none
-            case .profile:
-                return .none
             }
         }
         .ifLet(\.$achievements, action: \.achievements) {
@@ -212,10 +185,5 @@ public struct CollectionFeature {
         .ifLet(\.$recap, action: \.recap) {
             RecapFeature()
         }
-        .ifLet(\.$profile, action: \.profile) {
-            ProfileFeature()
-        }
     }
-
-    @Dependency(\.profileSettings) var profileSettings
 }
