@@ -6,24 +6,11 @@ public struct CollectionView: View {
     @Bindable var store: StoreOf<CollectionFeature>
     @State private var confirmingDeletion = false
     @State private var pendingSingleDeleteID: UUID?
-    @State private var motion = ParallaxMotion()
-    @State private var peelCoordinator = PeelCoordinator()
     @State private var isSpilling = false
-    @State private var revealedColumn: Int?
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var activeStickerID: UUID?
+    @State private var stickerPlacements: [String: StickerBoardPlacement] = [:]
+    @AppStorage("collection.freeStickerBoard.v1") private var savedStickerPlacements = ""
     public init(store: StoreOf<CollectionFeature>) { self.store = store }
-
-    private var columnCount: Int { horizontalSizeClass == .regular ? 5 : 3 }
-    private var columns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount)
-    }
-    private var tiltCandidateColumn: Int? {
-        StickerBoardMotion.revealedColumn(
-            tiltX: motion.tiltX,
-            columnCount: columnCount,
-            threshold: 0.55
-        )
-    }
 
     public var body: some View {
         ScreenScaffold(title: "컬렉션", onRefresh: refreshBoard) {
@@ -71,138 +58,17 @@ public struct CollectionView: View {
                                subtitle: "음식 사진을 찍어 첫 누끼를 담아보세요!")
                 }
             } else {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(Array(store.cutouts.enumerated()), id: \.element.id) { index, cutout in
-                        let cell = CGPoint(
-                            x: index % columnCount,
-                            y: index / columnCount
-                        )
-                        Button {
-                            store.send(
-                                store.isEditing
-                                    ? .selectionToggled(cutout.id)
-                                    : .cutoutTapped(cutout.id)
-                            )
-                        } label: {
-                            let isFlipped = store.flippedCutoutID == cutout.id
-                            let lean = StickerBoardMotion.lean(
-                                index: index,
-                                tiltX: motion.tiltX,
-                                tiltY: motion.tiltY
-                            )
-                            ZStack {
-                                // FRONT
-                                StickerTile(tint: .rotating(index)) {
-                                    CutoutImage(fileName: cutout.fileName)
-                                }
-                                .overlay(alignment: .topTrailing) {
-                                    if store.isEditing {
-                                        Image(systemName:
-                                            store.selectedCutoutIDs.contains(cutout.id)
-                                                ? "checkmark.circle.fill"
-                                                : "circle"
-                                        )
-                                        .font(.title2.bold())
-                                        .foregroundStyle(
-                                            store.selectedCutoutIDs.contains(cutout.id)
-                                                ? Color.appCherry
-                                                : Color.appMuted
-                                        )
-                                        .padding(7)
-                                        .transition(.scale.combined(with: .opacity))
-                                    }
-                                }
-                                .overlay(alignment: .bottomTrailing) {
-                                    if let symbol = CutoutDecoration(label: cutout.label).symbol {
-                                        KitschIcon(symbol, tint: .appPinkInk, background: .appPink, size: 34)
-                                            .padding(5)
-                                    }
-                                }
-                                .overlay(alignment: .bottom) {
-                                    if revealedColumn == index % columnCount,
-                                       let place = store.cutoutMealInfo[cutout.id]?.placeName,
-                                       !place.isEmpty {
-                                        PastelChip(place, tone: .pink)
-                                            .padding(5)
-                                            .transition(.scale(scale: 0.85).combined(with: .opacity))
-                                    }
-                                }
-                                .opacity(isFlipped ? 0 : 1)
-
-                                // BACK
-                                cutoutBack(cutout)
-                                    .opacity(isFlipped ? 1 : 0)
-                                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-                            }
-                            .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
-                            .rotationEffect(.degrees(
-                                (index.isMultiple(of: 3) ? -1.2 : index.isMultiple(of: 2) ? 1 : 0)
-                                    + StickerBoardMotion.leanRotation(
-                                        index: index,
-                                        tiltX: motion.tiltX
-                                    )
-                            ))
-                            .offset(
-                                x: lean.width,
-                                y: lean.height + (
-                                    isSpilling
-                                        ? 720 + CGFloat(index / columnCount) * 18
-                                        : 0
-                                )
-                            )
-                            .opacity(
-                                isSpilling
-                                    ? 0.05
-                                    : store.isEditing && !store.selectedCutoutIDs.contains(cutout.id)
-                                    ? 0.62
-                                    : 1
-                            )
-                            .animation(
-                                isSpilling
-                                    ? .easeIn(duration: 0.3).delay(
-                                        StickerBoardMotion.spillDelay(index: index)
-                                    )
-                                    : .spring(response: 0.5, dampingFraction: 0.68).delay(
-                                        StickerBoardMotion.spillDelay(index: index) * 0.35
-                                    ),
-                                value: isSpilling
-                            )
-                            .animation(
-                                .interactiveSpring(response: 0.34, dampingFraction: 0.76),
-                                value: lean
-                            )
-                        }
-                        .buttonStyle(KitschPressStyle())
-                        .peelable(
-                            cell: cell,
-                            coordinator: peelCoordinator,
-                            enabled: !store.isEditing
-                        )
-                        .contextMenu {
-                            Button {
-                                store.send(.cutoutTapped(cutout.id))
-                            } label: {
-                                Label("기록 보기", systemImage: "book.pages")
-                            }
-                            Button {
-                                store.send(.beginSelection(cutout.id))
-                            } label: {
-                                Label("여러 개 선택", systemImage: "checkmark.circle")
-                            }
-                            Divider()
-                            Button(role: .destructive) {
-                                pendingSingleDeleteID = cutout.id
-                                confirmingDeletion = true
-                            } label: {
-                                Label("이 음식 삭제", systemImage: "trash")
-                            }
-                        } preview: {
-                            CutoutImage(fileName: cutout.fileName, maxPixelDimension: 320)
-                                .frame(width: 190, height: 190)
-                                .padding(16)
-                                .background(Color.appMilk)
-                        }
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        KitschSparkle()
+                            .fill(Color.appCherry)
+                            .frame(width: 12, height: 12)
+                        Text("스티커를 잡아 원하는 곳에 붙여보세요")
+                            .font(.appCaption)
+                            .foregroundStyle(.appPinkInk)
                     }
+
+                    freeStickerBoard
                 }
 
                 if store.isEditing {
@@ -224,26 +90,17 @@ public struct CollectionView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .task {
+            loadStickerPlacements()
             store.send(.onAppear)
             store.send(.streakOnAppear)
-            motion.start()
         }
-        .task(id: tiltCandidateColumn) {
-            guard let candidate = tiltCandidateColumn else {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    revealedColumn = nil
-                }
-                return
+        .onChange(of: store.cutouts.map(\.id)) { _, ids in
+            let validKeys = Set(ids.map(\.uuidString))
+            let cleaned = stickerPlacements.filter { validKeys.contains($0.key) }
+            if cleaned != stickerPlacements {
+                stickerPlacements = cleaned
+                persistStickerPlacements()
             }
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled, tiltCandidateColumn == candidate else { return }
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.72)) {
-                revealedColumn = candidate
-            }
-        }
-        .onDisappear {
-            motion.stop()
-            peelCoordinator.release()
         }
         .sheet(item: $store.scope(state: \.achievements, action: \.achievements)) { achStore in
             AchievementsView(store: achStore)
@@ -287,6 +144,197 @@ public struct CollectionView: View {
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: store.isEditing)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: store.selectedCutoutIDs)
+    }
+
+    private var freeStickerBoard: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let placements = store.cutouts.compactMap {
+                stickerPlacements[$0.id.uuidString]
+            }
+            let height = FreeStickerBoardLayout.boardHeight(
+                count: store.cutouts.count,
+                width: width,
+                placements: placements
+            )
+            let side = FreeStickerBoardLayout.itemSide(width: width)
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(Color.appCard.opacity(0.42))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .stroke(
+                                Color.appPinkInk.opacity(0.18),
+                                style: StrokeStyle(lineWidth: 1.5, dash: [7, 7])
+                            )
+                    }
+
+                ForEach(Array(store.cutouts.enumerated()), id: \.element.id) { index, cutout in
+                    let point = FreeStickerBoardLayout.point(
+                        for: stickerPlacements[cutout.id.uuidString],
+                        index: index,
+                        width: width,
+                        height: height
+                    )
+                    Button {
+                        store.send(
+                            store.isEditing
+                                ? .selectionToggled(cutout.id)
+                                : .cutoutTapped(cutout.id)
+                        )
+                    } label: {
+                        let isFlipped = store.flippedCutoutID == cutout.id
+                        ZStack {
+                            StickerTile(tint: .rotating(index)) {
+                                CutoutImage(fileName: cutout.fileName)
+                            }
+                            .overlay(alignment: .topTrailing) {
+                                if store.isEditing {
+                                    Image(systemName:
+                                        store.selectedCutoutIDs.contains(cutout.id)
+                                            ? "checkmark.circle.fill"
+                                            : "circle"
+                                    )
+                                    .font(.title2.bold())
+                                    .foregroundStyle(
+                                        store.selectedCutoutIDs.contains(cutout.id)
+                                            ? Color.appCherry
+                                            : Color.appMuted
+                                    )
+                                    .padding(7)
+                                }
+                            }
+                            .overlay(alignment: .bottomTrailing) {
+                                if let symbol = CutoutDecoration(label: cutout.label).symbol {
+                                    KitschIcon(
+                                        symbol,
+                                        tint: .appPinkInk,
+                                        background: .appPink,
+                                        size: 34
+                                    )
+                                    .padding(5)
+                                }
+                            }
+                            .opacity(isFlipped ? 0 : 1)
+
+                            cutoutBack(cutout)
+                                .opacity(isFlipped ? 1 : 0)
+                                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                        }
+                        .frame(width: side, height: side)
+                        .rotation3DEffect(
+                            .degrees(isFlipped ? 180 : 0),
+                            axis: (x: 0, y: 1, z: 0)
+                        )
+                        .rotationEffect(.degrees(
+                            index.isMultiple(of: 3) ? -2.4 : index.isMultiple(of: 2) ? 2 : 0.5
+                        ))
+                        .opacity(
+                            isSpilling
+                                ? 0.05
+                                : store.isEditing && !store.selectedCutoutIDs.contains(cutout.id)
+                                ? 0.62
+                                : 1
+                        )
+                        .offset(
+                            y: isSpilling
+                                ? 720 + CGFloat(index / FreeStickerBoardLayout.columns) * 18
+                                : 0
+                        )
+                        .animation(
+                            isSpilling
+                                ? .easeIn(duration: 0.3).delay(
+                                    StickerBoardMotion.spillDelay(index: index)
+                                )
+                                : .spring(response: 0.48, dampingFraction: 0.72),
+                            value: isSpilling
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .position(point)
+                    .modifier(
+                        FreeStickerDrag(
+                            position: point,
+                            enabled: !store.isEditing,
+                            isActive: activeStickerID == cutout.id,
+                            onActiveChange: { active in
+                                activeStickerID = active ? cutout.id : nil
+                            },
+                            onMove: { destination in
+                                stickerPlacements[cutout.id.uuidString] =
+                                    FreeStickerBoardLayout.placement(
+                                        for: destination,
+                                        width: width,
+                                        height: height
+                                    )
+                                persistStickerPlacements()
+                            }
+                        )
+                    )
+                    .zIndex(activeStickerID == cutout.id ? 100 : Double(index))
+                    .contextMenu {
+                        Button {
+                            store.send(.cutoutTapped(cutout.id))
+                        } label: {
+                            Label("기록 보기", systemImage: "book.pages")
+                        }
+                        Button {
+                            stickerPlacements.removeValue(forKey: cutout.id.uuidString)
+                            persistStickerPlacements()
+                        } label: {
+                            Label("자리 원래대로", systemImage: "arrow.counterclockwise")
+                        }
+                        Button {
+                            store.send(.beginSelection(cutout.id))
+                        } label: {
+                            Label("여러 개 선택", systemImage: "checkmark.circle")
+                        }
+                        Divider()
+                        Button(role: .destructive) {
+                            pendingSingleDeleteID = cutout.id
+                            confirmingDeletion = true
+                        } label: {
+                            Label("이 음식 삭제", systemImage: "trash")
+                        }
+                    } preview: {
+                        CutoutImage(fileName: cutout.fileName, maxPixelDimension: 320)
+                            .frame(width: 190, height: 190)
+                            .padding(16)
+                            .background(Color.appMilk)
+                    }
+                }
+            }
+            .frame(width: width, height: height)
+        }
+        .frame(height: boardHeightForCurrentWidth)
+    }
+
+    private var boardHeightForCurrentWidth: CGFloat {
+        // ScreenScaffold uses 18pt horizontal margins on an iPhone-only target.
+        let width = max(UIScreen.main.bounds.width - 36, 284)
+        return FreeStickerBoardLayout.boardHeight(
+            count: store.cutouts.count,
+            width: width,
+            placements: store.cutouts.compactMap {
+                stickerPlacements[$0.id.uuidString]
+            }
+        )
+    }
+
+    private func loadStickerPlacements() {
+        guard let data = savedStickerPlacements.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode(
+                [String: StickerBoardPlacement].self,
+                from: data
+              ) else { return }
+        stickerPlacements = decoded
+    }
+
+    private func persistStickerPlacements() {
+        guard let data = try? JSONEncoder().encode(stickerPlacements),
+              let encoded = String(data: data, encoding: .utf8) else { return }
+        savedStickerPlacements = encoded
     }
 
     @MainActor
@@ -386,5 +434,47 @@ public struct CollectionView: View {
                 .softShadow()
         }
         .buttonStyle(KitschPressStyle())
+    }
+}
+
+private struct FreeStickerDrag: ViewModifier {
+    let position: CGPoint
+    let enabled: Bool
+    let isActive: Bool
+    let onActiveChange: (Bool) -> Void
+    let onMove: (CGPoint) -> Void
+
+    @GestureState private var translation: CGSize = .zero
+
+    func body(content: Content) -> some View {
+        content
+            .offset(translation)
+            .scaleEffect(isActive ? 1.08 : 1)
+            .shadow(
+                color: Color.appPinkInk.opacity(isActive ? 0.24 : 0),
+                radius: isActive ? 16 : 0,
+                y: isActive ? 10 : 0
+            )
+            .animation(.spring(response: 0.24, dampingFraction: 0.72), value: isActive)
+            .highPriorityGesture(dragGesture, including: enabled ? .all : .none)
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 5)
+            .updating($translation) { value, state, _ in
+                state = value.translation
+            }
+            .onChanged { _ in
+                if !isActive {
+                    onActiveChange(true)
+                }
+            }
+            .onEnded { value in
+                onMove(CGPoint(
+                    x: position.x + value.translation.width,
+                    y: position.y + value.translation.height
+                ))
+                onActiveChange(false)
+            }
     }
 }

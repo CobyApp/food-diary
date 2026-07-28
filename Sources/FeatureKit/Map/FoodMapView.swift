@@ -267,26 +267,9 @@ private struct FoodStickerMapPin: View {
             if isSelected {
                 Circle()
                     .fill(Color.appPink.opacity(0.32))
-                    .frame(width: 88, height: 88)
-                    .offset(y: -6)
+                    .frame(width: 86, height: 86)
                     .transition(.scale.combined(with: .opacity))
             }
-
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .fill(Color.appCard)
-                .frame(width: 19, height: 19)
-                .rotationEffect(.degrees(45))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .stroke(Color.appCard, lineWidth: 5)
-                        .rotationEffect(.degrees(45))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .stroke(isSelected ? Color.appCherry : Color.appPinkInk, lineWidth: 2)
-                        .rotationEffect(.degrees(45))
-                }
-                .offset(y: 31)
 
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(Color.appCard)
@@ -302,19 +285,11 @@ private struct FoodStickerMapPin: View {
                             lineWidth: isSelected ? 3.5 : 2.5
                         )
                 }
-                .offset(y: -6)
 
             if let fileName {
                 CutoutImage(fileName: fileName, maxPixelDimension: 200)
                     .frame(width: 62, height: 62)
-                    .offset(y: -7)
             }
-
-            Circle()
-                .fill(isSelected ? Color.appCherry : Color.appPink)
-                .frame(width: 8, height: 8)
-                .overlay(Circle().stroke(Color.appCard, lineWidth: 2))
-                .offset(y: 36)
 
             if extraCount > 0 {
                 Text("+\(extraCount)")
@@ -324,10 +299,10 @@ private struct FoodStickerMapPin: View {
                     .frame(height: 22)
                     .background(Color.appCherry, in: Capsule())
                     .overlay(Capsule().stroke(Color.appCard, lineWidth: 2))
-                    .offset(x: 27, y: -34)
+                    .offset(x: 27, y: -31)
             }
         }
-        .frame(width: 84, height: 90)
+        .frame(width: 84, height: 78)
         .shadow(color: Color.appChocolate.opacity(0.22), radius: 0, x: 3, y: 4)
     }
 }
