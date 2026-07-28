@@ -47,7 +47,7 @@ public struct RecapCardView: View {
 
             HStack {
                 Spacer()
-                Text("FOODIE DIARY / WEEKLY")
+                Text(verbatim: "YUMKIE / WEEKLY")
                     .font(.appCaption)
                     .foregroundStyle(.appMuted)
             }
@@ -103,7 +103,7 @@ public struct RecapView: View {
                         card
                         if let export {
                             ShareLink(item: export, preview: SharePreview("이번 주 한 끼")) {
-                                Label("카드 공유하기", systemImage: "square.and.arrow.up")
+                                Label("스토리로 공유하기", systemImage: "square.and.arrow.up")
                                     .font(.appSection)
                                     .foregroundStyle(.white)
                                     .frame(maxWidth: .infinity)
@@ -135,13 +135,22 @@ public struct RecapView: View {
         }
     }
 
+    /// Preview the exact card that gets shared, scaled down to fit the sheet.
     private var card: some View {
-        RecapCardView(
+        let scale: CGFloat = 0.78
+        return RecapStoryCard(
             images: images,
             mealCount: store.mealCount,
             rangeText: store.rangeText
         )
+        .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .softShadow()
+        .scaleEffect(scale)
+        .frame(
+            width: RecapStoryCard.size.width * scale,
+            height: RecapStoryCard.size.height * scale
+        )
     }
 
     @MainActor
@@ -150,12 +159,14 @@ public struct RecapView: View {
             export = nil
             return
         }
+        // 360x640 pt at scale 3 == 1080x1920 px, the native Story size.
         let renderer = ImageRenderer(content:
-            RecapCardView(
+            RecapStoryCard(
                 images: images,
                 mealCount: store.mealCount,
                 rangeText: store.rangeText
             )
+            .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
         )
         renderer.scale = 3
         export = renderer.uiImage?.pngData().map(RecapExport.init(data:))
