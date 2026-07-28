@@ -331,16 +331,13 @@ public struct CollectionView: View {
                 }
                 Text(LocalizedStringKey(title))
             }
-            .font(.appCaption)
-            .foregroundStyle(.appBlueInk)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 8)
-            .background(Color.appBlue.opacity(0.5), in: Capsule())
-            .overlay {
-                Capsule().stroke(Color.appBlueInk.opacity(0.35), lineWidth: 1.5)
-            }
         }
-        .buttonStyle(KitschPressStyle())
+        .buttonStyle(
+            KitschOutlineButtonStyle(
+                color: .appBlueInk,
+                verticalPadding: 8
+            )
+        )
     }
 
     @ViewBuilder
@@ -380,11 +377,11 @@ public struct CollectionView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.title3)
-                .foregroundStyle(color)
+                .foregroundStyle(.white)
                 .frame(width: 38, height: 38)
-                .background(color.opacity(0.18), in: Circle())
+                .background(color, in: Circle())
                 .overlay {
-                    Circle().stroke(color.opacity(0.5), lineWidth: 1.5)
+                    Circle().stroke(Color.appCard, lineWidth: 2.5)
                 }
                 .softShadow()
         }

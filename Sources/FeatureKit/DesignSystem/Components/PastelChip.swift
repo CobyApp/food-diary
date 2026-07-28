@@ -39,7 +39,7 @@ public struct PastelChip: View {
         .padding(.vertical, 6)
         .background(background)
         .clipShape(Capsule())
-        .overlay { Capsule().stroke(foreground.opacity(0.16), lineWidth: 1) }
+        .overlay { Capsule().stroke(foreground.opacity(0.32), lineWidth: 1.5) }
     }
 }
 

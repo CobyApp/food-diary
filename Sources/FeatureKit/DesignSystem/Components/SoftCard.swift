@@ -12,7 +12,7 @@ public struct SoftCard<Content: View>: View {
             .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
-                    .stroke(Color.appChocolate.opacity(0.12), lineWidth: 1.5)
+                    .stroke(Color.appPinkInk.opacity(0.18), lineWidth: 1.5)
             }
             .softShadow()
     }

@@ -19,7 +19,7 @@ public struct FloatingTabBar: View {
         .padding(7)
         .background(Color.appCard)
         .clipShape(Capsule())
-        .overlay { Capsule().stroke(Color.appChocolate.opacity(0.14), lineWidth: 1.5) }
+        .overlay { Capsule().stroke(Color.appPinkInk.opacity(0.24), lineWidth: 1.5) }
         .softShadow()
         .padding(.horizontal, 14)
         .padding(.bottom, 6)
@@ -41,12 +41,12 @@ public struct FloatingTabBar: View {
             .foregroundStyle(active ? Color.white : Color.appInk)
             .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
-            .background(active ? Color.appCherry : Color.appMilk.opacity(0.72))
+            .background(active ? Color.appCherry : Color.appCard)
             .clipShape(Capsule())
             .overlay {
                 Capsule().stroke(
-                    active ? Color.appCard : Color.appChocolate.opacity(0.08),
-                    lineWidth: active ? 2 : 1
+                    active ? Color.appCard : Color.appPinkInk.opacity(0.18),
+                    lineWidth: active ? 2.5 : 1
                 )
             }
             .offset(y: active ? -2 : 0)

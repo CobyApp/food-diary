@@ -25,7 +25,10 @@ public struct FoodMapView: View {
                             Button { store.send(.pinTapped(meal.id)) } label: {
                                 pin(meal, isSelected: store.selectedMealID == meal.id)
                             }
-                                .buttonStyle(.plain)
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(meal.place?.name ?? L10n.text("한 끼"))
+                            .accessibilityHint(L10n.text("음식 스티커를 눌러 추억을 펼쳐보세요"))
+                            .zIndex(store.selectedMealID == meal.id ? 10 : 1)
                         }
                     }
                 }
@@ -59,14 +62,19 @@ public struct FoodMapView: View {
             }
 
             if !store.pins.isEmpty {
-                Text(L10n.format("map.records", store.pins.count))
+                HStack(spacing: 6) {
+                    KitschSparkle()
+                        .fill(Color.appCherry)
+                        .frame(width: 11, height: 11)
+                    Text(L10n.format("map.records", store.pins.count))
+                }
                     .font(.appCaption)
-                    .foregroundStyle(.appChocolate)
+                    .foregroundStyle(.appInk)
                     .padding(.horizontal, 13)
                     .padding(.vertical, 8)
-                    .background(Color.appCard.opacity(0.94), in: Capsule())
+                    .background(Color.appCard, in: Capsule())
                     .overlay {
-                        Capsule().stroke(Color.appPink.opacity(0.9), lineWidth: 2)
+                        Capsule().stroke(Color.appCherry.opacity(0.72), lineWidth: 2)
                     }
                     .rotationEffect(.degrees(1.5))
                     .softShadow()
@@ -98,14 +106,14 @@ public struct FoodMapView: View {
             } else if !store.pins.isEmpty && !store.isLoading {
                 Text("음식 스티커를 눌러 추억을 펼쳐보세요")
                     .font(.appCaption)
-                    .foregroundStyle(.appChocolate)
+                    .foregroundStyle(.appInk)
                     .padding(.horizontal, 15)
                     .padding(.vertical, 10)
-                    .background(Color.appCard.opacity(0.94))
+                    .background(Color.appCard)
                     .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .stroke(Color.appChocolate.opacity(0.14), lineWidth: 1.5)
+                            .stroke(Color.appPinkInk.opacity(0.42), lineWidth: 1.5)
                     }
                     .rotationEffect(.degrees(-1))
                     .softShadow()
@@ -119,36 +127,13 @@ public struct FoodMapView: View {
     }
 
     private func pin(_ meal: MealSnapshot, isSelected: Bool) -> some View {
-        ZStack {
-            FoodStickerPinShape()
-                .fill(Color.appCard)
-                .overlay {
-                    FoodStickerPinShape()
-                        .stroke(
-                            isSelected ? Color.appCherry : Color.appPink,
-                            lineWidth: isSelected ? 4 : 3
-                        )
-                }
-                .softShadow()
-            if let first = meal.cutouts.first {
-                CutoutImage(fileName: first.fileName, maxPixelDimension: 180)
-                    .frame(width: 54, height: 54)
-                    .offset(y: -5)
-            }
-            if meal.cutouts.count > 1 {
-                Text("+\(meal.cutouts.count - 1)")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 7)
-                    .frame(height: 22)
-                    .background(Color.appCherry, in: Capsule())
-                    .overlay(Capsule().stroke(Color.appCard, lineWidth: 2))
-                    .offset(x: 25, y: -30)
-            }
-        }
-        .frame(width: 72, height: 80)
-        .scaleEffect(isSelected ? 1.12 : 1)
-        .rotationEffect(.degrees(isSelected ? 0 : -1.5))
+        FoodStickerMapPin(
+            fileName: meal.cutouts.first?.fileName,
+            extraCount: max(meal.cutouts.count - 1, 0),
+            isSelected: isSelected
+        )
+        .scaleEffect(isSelected ? 1.13 : 1)
+        .rotationEffect(.degrees(isSelected ? 0 : -1.2))
         .animation(.spring(response: 0.32, dampingFraction: 0.7), value: isSelected)
     }
 
@@ -157,8 +142,11 @@ public struct FoodMapView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 12) {
                     if let first = meal.cutouts.first {
-                        CutoutImage(fileName: first.fileName, maxPixelDimension: 260)
-                            .frame(width: 88, height: 88)
+                        StickerTile(tint: .pink) {
+                            CutoutImage(fileName: first.fileName, maxPixelDimension: 260)
+                        }
+                        .frame(width: 96, height: 96)
+                        .rotationEffect(.degrees(-2))
                     }
                     VStack(alignment: .leading, spacing: 6) {
                         Button {
@@ -202,13 +190,13 @@ public struct FoodMapView: View {
                     Button { store.send(.dismissCard) } label: {
                         Image(systemName: "xmark")
                             .font(.caption.bold())
-                            .foregroundStyle(.appInk)
+                            .foregroundStyle(.appPinkInk)
                             .frame(width: 30, height: 30)
-                            .background(Color.appCard, in: Circle())
+                            .background(Color.appTilePink, in: Circle())
                             .overlay {
                                 Circle().stroke(
-                                    Color.appChocolate.opacity(0.25),
-                                    lineWidth: 1.5
+                                    Color.appPinkInk.opacity(0.35),
+                                    lineWidth: 2
                                 )
                             }
                     }
@@ -237,20 +225,19 @@ public struct FoodMapView: View {
                 Button {
                     openPlaceInMaps(meal)
                 } label: {
-                    Text("지도 앱에서 가게 보기")
-                        .font(.appSection)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background(Color.appBlueInk, in: Capsule())
-                        .overlay {
-                            Capsule()
-                                .stroke(Color.appCard, lineWidth: 2)
-                                .padding(2)
-                        }
+                    Label("지도 앱에서 가게 보기", systemImage: "arrow.up.right")
                 }
-                .buttonStyle(KitschPressStyle())
+                .buttonStyle(
+                    KitschFilledButtonStyle(
+                        color: .appBlueInk,
+                        verticalPadding: 11
+                    )
+                )
             }
+        }
+        .overlay(alignment: .top) {
+            WashiTape(.appPink)
+                .offset(y: -7)
         }
     }
 
@@ -270,15 +257,77 @@ public struct FoodMapView: View {
     }
 }
 
-private struct FoodStickerPinShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let bubble = CGRect(x: 2, y: 2, width: rect.width - 4, height: rect.height - 14)
-        path.addRoundedRect(in: bubble, cornerSize: CGSize(width: 23, height: 23))
-        path.move(to: CGPoint(x: rect.midX - 9, y: bubble.maxY - 2))
-        path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY - 1))
-        path.addLine(to: CGPoint(x: rect.midX + 9, y: bubble.maxY - 2))
-        path.closeSubpath()
-        return path
+private struct FoodStickerMapPin: View {
+    let fileName: String?
+    let extraCount: Int
+    let isSelected: Bool
+
+    var body: some View {
+        ZStack {
+            if isSelected {
+                Circle()
+                    .fill(Color.appPink.opacity(0.32))
+                    .frame(width: 88, height: 88)
+                    .offset(y: -6)
+                    .transition(.scale.combined(with: .opacity))
+            }
+
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(Color.appCard)
+                .frame(width: 19, height: 19)
+                .rotationEffect(.degrees(45))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .stroke(Color.appCard, lineWidth: 5)
+                        .rotationEffect(.degrees(45))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .stroke(isSelected ? Color.appCherry : Color.appPinkInk, lineWidth: 2)
+                        .rotationEffect(.degrees(45))
+                }
+                .offset(y: 31)
+
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color.appCard)
+                .frame(width: 72, height: 70)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(Color.appCard, lineWidth: 6)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(
+                            isSelected ? Color.appCherry : Color.appPinkInk.opacity(0.72),
+                            lineWidth: isSelected ? 3.5 : 2.5
+                        )
+                }
+                .offset(y: -6)
+
+            if let fileName {
+                CutoutImage(fileName: fileName, maxPixelDimension: 200)
+                    .frame(width: 62, height: 62)
+                    .offset(y: -7)
+            }
+
+            Circle()
+                .fill(isSelected ? Color.appCherry : Color.appPink)
+                .frame(width: 8, height: 8)
+                .overlay(Circle().stroke(Color.appCard, lineWidth: 2))
+                .offset(y: 36)
+
+            if extraCount > 0 {
+                Text("+\(extraCount)")
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .frame(height: 22)
+                    .background(Color.appCherry, in: Capsule())
+                    .overlay(Capsule().stroke(Color.appCard, lineWidth: 2))
+                    .offset(x: 27, y: -34)
+            }
+        }
+        .frame(width: 84, height: 90)
+        .shadow(color: Color.appChocolate.opacity(0.22), radius: 0, x: 3, y: 4)
     }
 }

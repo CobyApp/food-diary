@@ -13,6 +13,8 @@ public struct RecapFeature {
         public var isLoading = false
         /// Apple Intelligence's closing line; nil until it answers (or if it can't).
         public var caption: String?
+        /// Keeps a late AI response from replacing the line the user already wrote.
+        public var hasEditedCaption = false
 
         public init() {}
     }
@@ -21,6 +23,7 @@ public struct RecapFeature {
         case onAppear
         case loaded(cutouts: [CutoutSnapshot], mealCount: Int, rangeText: String)
         case captionGenerated(String?)
+        case captionChanged(String)
         case close
     }
 
@@ -69,7 +72,14 @@ public struct RecapFeature {
                 return .none
 
             case let .captionGenerated(line):
-                state.caption = line
+                if !state.hasEditedCaption {
+                    state.caption = line
+                }
+                return .none
+
+            case let .captionChanged(line):
+                state.caption = String(line.prefix(60))
+                state.hasEditedCaption = true
                 return .none
 
             case .close:

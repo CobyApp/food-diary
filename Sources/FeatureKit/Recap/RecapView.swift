@@ -86,39 +86,34 @@ public struct RecapView: View {
         NavigationStack {
             ZStack {
                 PaperBackground()
-                VStack(spacing: 20) {
-                    if store.isLoading {
-                        KitschLoadingView(
-                            "이번 주 카드를 만드는 중",
-                            messages: ["맛있는 순간을 한 장에 모으고 있어요"]
-                        )
-                        .padding(24)
-                    } else if store.weekCutouts.isEmpty {
-                        EmptyState(
-                            systemImage: "film.stack",
-                            title: "이번 주 기록이 없어요",
-                            subtitle: "한 끼를 담으면 주간 카드가 만들어져요!"
-                        )
-                    } else {
-                        card
-                        if let export {
-                            ShareLink(item: export, preview: SharePreview("이번 주 한 끼")) {
-                                Label("스토리로 공유하기", systemImage: "square.and.arrow.up")
-                                    .font(.appSection)
-                                    .foregroundStyle(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(Color.appCherry, in: Capsule())
-                                    .overlay {
-                                        Capsule()
-                                            .stroke(Color.appCard, lineWidth: 2)
-                                            .padding(2)
-                                    }
+                if store.isLoading {
+                    KitschLoadingView(
+                        "이번 주 카드를 만드는 중",
+                        messages: ["맛있는 순간을 한 장에 모으고 있어요"]
+                    )
+                    .padding(24)
+                } else if store.weekCutouts.isEmpty {
+                    EmptyState(
+                        systemImage: "film.stack",
+                        title: "이번 주 기록이 없어요",
+                        subtitle: "한 끼를 담으면 주간 카드가 만들어져요!"
+                    )
+                } else {
+                    ScrollView {
+                        VStack(spacing: 14) {
+                            card
+                            captionEditor
+                            if let export {
+                                ShareLink(item: export, preview: SharePreview("이번 주 한 끼")) {
+                                    Label("스토리로 공유하기", systemImage: "square.and.arrow.up")
+                                }
+                                .buttonStyle(KitschFilledButtonStyle())
+                                .padding(.horizontal, 24)
                             }
-                            .buttonStyle(KitschPressStyle())
-                            .padding(.horizontal, 24)
                         }
+                        .padding(.vertical, 12)
                     }
+                    .scrollIndicators(.hidden)
                 }
             }
             .navigationTitle("주간 리캡")
@@ -146,7 +141,7 @@ public struct RecapView: View {
 
     /// Preview the exact card that gets shared, scaled down to fit the sheet.
     private var card: some View {
-        let scale: CGFloat = 0.78
+        let scale: CGFloat = 0.72
         return RecapStoryCard(
             images: images,
             mealCount: store.mealCount,
@@ -161,6 +156,55 @@ public struct RecapView: View {
             width: RecapStoryCard.size.width * scale,
             height: RecapStoryCard.size.height * scale
         )
+    }
+
+    private var captionEditor: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("스토리 한 줄")
+                        .font(.appSection)
+                        .foregroundStyle(.appInk)
+                    Text("AI 초안을 자유롭게 고쳐보세요")
+                        .font(.appCaption)
+                        .foregroundStyle(.appPinkInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer(minLength: 6)
+                Text("\((store.caption ?? "").count)/60")
+                    .font(.appCaption)
+                    .foregroundStyle(.appMuted)
+                    .monospacedDigit()
+            }
+
+            TextField(
+                "직접 적어주세요",
+                text: Binding(
+                    get: { store.caption ?? "" },
+                    set: { store.send(.captionChanged($0)) }
+                ),
+                axis: .vertical
+            )
+            .font(.appBody)
+            .foregroundStyle(.appInk)
+            .lineLimit(2...3)
+            .padding(.horizontal, 15)
+            .padding(.vertical, 12)
+            .background(Color.appCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.appCherry.opacity(0.55), lineWidth: 2)
+            }
+        }
+        .padding(14)
+        .background(Color.appPink.opacity(0.42), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(alignment: .topTrailing) {
+            StoryEditorBow()
+                .frame(width: 34, height: 26)
+                .offset(x: -12, y: -9)
+        }
+        .padding(.horizontal, 20)
     }
 
     @MainActor
@@ -181,5 +225,27 @@ public struct RecapView: View {
         )
         renderer.scale = 3
         export = renderer.uiImage?.pngData().map(RecapExport.init(data:))
+    }
+}
+
+private struct StoryEditorBow: View {
+    var body: some View {
+        ZStack {
+            Capsule()
+                .fill(Color.appCherry)
+                .frame(width: 20, height: 13)
+                .rotationEffect(.degrees(25))
+                .offset(x: -8)
+            Capsule()
+                .fill(Color.appCherry)
+                .frame(width: 20, height: 13)
+                .rotationEffect(.degrees(-25))
+                .offset(x: 8)
+            Circle()
+                .fill(Color.appButter)
+                .frame(width: 10, height: 10)
+                .overlay(Circle().stroke(Color.appCard, lineWidth: 1.5))
+        }
+        .shadow(color: Color.appChocolate.opacity(0.16), radius: 2, y: 2)
     }
 }

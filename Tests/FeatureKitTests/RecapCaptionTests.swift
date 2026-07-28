@@ -51,6 +51,30 @@ final class RecapCaptionTests: XCTestCase {
         await store.receive(\.loaded)
         await store.receive(\.captionGenerated) { $0.caption = nil }
     }
+
+    @MainActor
+    func test_userCanEditTheStoryCaption() async {
+        let store = TestStore(initialState: RecapFeature.State()) {
+            RecapFeature()
+        }
+
+        await store.send(.captionChanged("이번 주도 야무지게 먹었다")) {
+            $0.caption = "이번 주도 야무지게 먹었다"
+            $0.hasEditedCaption = true
+        }
+    }
+
+    @MainActor
+    func test_lateGeneratedCaptionDoesNotReplaceTheUsersLine() async {
+        var state = RecapFeature.State()
+        state.caption = "내가 쓴 한 줄"
+        state.hasEditedCaption = true
+        let store = TestStore(initialState: state) {
+            RecapFeature()
+        }
+
+        await store.send(.captionGenerated("AI가 늦게 만든 문구"))
+    }
 }
 
 /// Lock-backed box so the @Sendable dependency closure can record its input.
