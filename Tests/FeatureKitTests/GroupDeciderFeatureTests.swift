@@ -100,6 +100,60 @@ final class GroupDeciderFeatureTests: XCTestCase {
         XCTAssertEqual(store.state.lastTally?.winner, "aaa")   // no votes -> earlier wins
     }
 
+    /// Odd bracket (3 candidates): once the first match resolves, the trailing
+    /// unpaired candidate `c` gets an automatic bye into the next round instead
+    /// of being dropped, and the tournament keeps going (voting, not champion)
+    /// since two candidates remain.
+    @MainActor
+    func test_oddBracketByeAdvancesTrailingCandidate() async {
+        let clock = TestClock()
+        let sent = LockIsolatedBox()
+        var state = GroupDeciderFeature.State(
+            phase: .voting,
+            localPlayer: LocalPlayer(id: "aaa", displayName: "나"),
+            players: [
+                RemotePlayer(id: "bbb", displayName: "친구1"),
+                RemotePlayer(id: "ccc", displayName: "친구2"),
+            ],
+            menus: ["aaa": pick("aaa"), "bbb": pick("bbb"), "ccc": pick("ccc")]
+        )
+        state.order = ["aaa", "bbb", "ccc"]
+        state.round = ["aaa", "bbb", "ccc"]
+        state.pairIndex = 0
+
+        let store = TestStore(initialState: state) {
+            GroupDeciderFeature()
+        } withDependencies: {
+            $0.continuousClock = clock
+            $0.multiplayer.send = { sent.append($0) }
+        }
+        store.exhaustivity = .off(showSkippedAssertions: false)
+
+        // "bbb" votes for itself, so the first match (aaa vs bbb) resolves as
+        // a genuine majority rather than falling back to the tie rule.
+        await store.send(.eventReceived(.received(.vote(candidateID: "bbb"), from: "bbb")))
+        await store.send(.eventReceived(.received(.pair(index: 0), from: "aaa")))
+        await clock.advance(by: .seconds(5))
+        await store.receive(\.hostTally)
+        XCTAssertEqual(store.state.lastTally?.winner, "bbb")
+
+        // First `.advance`: the round is odd, so the trailing unpaired
+        // candidate "ccc" is folded in as a bye instead of being dropped.
+        await clock.advance(by: .milliseconds(1500))
+        await store.receive(\.advance)
+        XCTAssertEqual(store.state.nextRound, ["bbb", "ccc"])
+        XCTAssertEqual(store.state.phase, .reveal)
+
+        // Second `.advance`: the round is now exhausted, so ["bbb", "ccc"]
+        // becomes the next round and voting resumes -- the game is NOT over.
+        await clock.advance(by: .milliseconds(1500))
+        await store.receive(\.advance)
+        XCTAssertEqual(store.state.round, ["bbb", "ccc"])
+        XCTAssertEqual(store.state.nextRound, [])
+        XCTAssertEqual(store.state.phase, .voting)
+        XCTAssertFalse(sent.values.contains { if case .champion = $0 { return true } else { return false } })
+    }
+
     /// A non-host simply applies the champion it is told about.
     @MainActor
     func test_nonHostAppliesChampion() async {
