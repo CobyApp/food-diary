@@ -190,14 +190,4 @@ final class CollectionFeatureTests: XCTestCase {
         }
     }
 
-    @MainActor
-    func test_cutoutTapped_presentsAndDismissesDetail() async {
-        let id = UUID()
-        let store = TestStore(initialState: CollectionFeature.State()) {
-            CollectionFeature()
-        }
-        store.exhaustivity = .off(showSkippedAssertions: false)
-        await store.send(.cutoutTapped(id)) { $0.selectedCutoutID = id }
-        await store.send(.dismissCutoutDetail) { $0.selectedCutoutID = nil }
-    }
 }

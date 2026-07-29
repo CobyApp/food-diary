@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// Numbers about a sticker tile that callers need, kept off the generic view so
+/// they can be read without naming its content type.
+public enum StickerTileMetrics {
+    /// Padding between the tile's frame and the cutout inside it. There is no card
+    /// behind the sticker, so this gap is the difference between the frame and what
+    /// can actually be seen — anything drawing around a sticker must subtract it.
+    public static let contentInset: CGFloat = 14
+}
+
 public struct StickerTile<Content: View>: View {
     private let tint: StickerTint
     private let content: Content
@@ -11,7 +20,7 @@ public struct StickerTile<Content: View>: View {
 
     public var body: some View {
         content
-            .padding(14)
+            .padding(StickerTileMetrics.contentInset)
             .frame(maxWidth: .infinity)
             .aspectRatio(1, contentMode: .fit)
             .contentShape(Rectangle())

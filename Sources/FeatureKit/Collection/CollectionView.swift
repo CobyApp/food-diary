@@ -121,34 +121,6 @@ public struct CollectionView: View {
             .presentationDragIndicator(.visible)
             .presentationBackground(Color.appMilk)
         }
-        .sheet(
-            isPresented: Binding(
-                get: { store.selectedCutoutID != nil },
-                set: { if !$0 { store.send(.dismissCutoutDetail) } }
-            )
-        ) {
-            if let selectedCutoutID = store.selectedCutoutID,
-               let cutout = store.cutouts.first(where: { $0.id == selectedCutoutID }) {
-                NavigationStack {
-                    StickerDetailSheet(
-                        cutout: cutout,
-                        info: store.cutoutMealInfo[selectedCutoutID],
-                        theme: selectedTheme
-                    )
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("닫기") { store.send(.dismissCutoutDetail) }
-                        }
-                    }
-                }
-                .presentationDetents([.fraction(0.68), .large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(30)
-                .presentationBackground(Color.appMilk)
-                .presentationContentInteraction(.scrolls)
-            }
-        }
         .confirmationDialog(
             L10n.format(
                 "collection.delete.confirm",
@@ -385,6 +357,7 @@ public struct CollectionView: View {
                     // A sticker under a finger, or mid-spill, already has motion
                     // of its own — leaning it as well just fights that.
                     let isBusy = activeStickerID == cutout.id
+                        || transformingStickerID == cutout.id
                     let lean = isBusy
                         ? CGSize.zero
                         : StickerBoardMotion.lean(
@@ -396,11 +369,10 @@ public struct CollectionView: View {
                         ? 0
                         : StickerBoardMotion.leanRotation(index: index, tiltX: motion.tiltX)
                     Button {
-                        store.send(
-                            store.isEditing
-                                ? .selectionToggled(cutout.id)
-                                : .cutoutTapped(cutout.id)
-                        )
+                        // Outside edit mode a sticker is just an object on the
+                        // board; its actions live in the long-press menu.
+                        guard store.isEditing else { return }
+                        store.send(.selectionToggled(cutout.id))
                     } label: {
                         StickerTile(tint: .rotating(index)) {
                             CutoutImage(fileName: cutout.fileName)
@@ -450,7 +422,7 @@ public struct CollectionView: View {
                         // Tilt response goes on last and unanimated: the sensor
                         // stream is already smoothed, and a spring here would
                         // only add lag between the device and the board.
-                        .scaleEffect(isRevealed ? 1.06 : 1)
+                        .scaleEffect(isRevealed && !isBusy ? 1.06 : 1)
                         .rotationEffect(.degrees(leanRotation))
                         .offset(x: lean.width, y: lean.height)
                     }
@@ -525,11 +497,6 @@ public struct CollectionView: View {
                     .zIndex(activeStickerID == cutout.id ? 100 : Double(index))
                     .contextMenu {
                         Button {
-                            store.send(.cutoutTapped(cutout.id))
-                        } label: {
-                            Label("기록 보기", systemImage: "book.pages")
-                        }
-                        Button {
                             stickerPlacements.removeValue(forKey: cutout.id.uuidString)
                             persistStickerPlacements()
                         } label: {
@@ -578,10 +545,13 @@ public struct CollectionView: View {
                     let scale = placement?.displayScale ?? 1
                     let rotation = placement?.rotation
                         ?? FreeStickerBoardLayout.defaultRotation(index: index)
+                    // The sticker has no card behind it, so what is visible is the
+                    // frame minus StickerTile's padding.
+                    let visibleSide = side - StickerTileMetrics.contentInset * 2
 
                     StickerTransformHandle(
                         center: center,
-                        side: side,
+                        side: visibleSide,
                         scale: scale,
                         rotationDegrees: rotation,
                         onDrag: { location in
@@ -589,7 +559,7 @@ public struct CollectionView: View {
                                 for: id,
                                 handle: location,
                                 center: center,
-                                side: side,
+                                side: visibleSide,
                                 width: width,
                                 height: height
                             )
@@ -602,7 +572,7 @@ public struct CollectionView: View {
                         StickerTransformBadge(preview: transformPreview)
                             .position(
                                 x: center.x,
-                                y: max(14, center.y - side * scale / 2 - 16)
+                                y: max(14, center.y - visibleSide * scale / 2 - 18)
                             )
                             .zIndex(2_001)
                     }
@@ -896,151 +866,6 @@ private extension Optional where Wrapped == String {
     var orEmpty: String { self ?? "" }
 }
 
-private struct StickerDetailSheet: View {
-    let cutout: FoodEntrySnapshot
-    let info: CutoutMealInfo?
-    let theme: StickerBoardTheme
-
-    private var tags: [String] {
-        info?.tags ?? []
-    }
-
-    var body: some View {
-        ZStack {
-            PaperBackground()
-
-            VStack {
-                ZStack {
-                    Circle()
-                        .fill(theme.secondary.opacity(0.34))
-                        .frame(width: 210, height: 210)
-                        .offset(x: 145, y: -92)
-                    Circle()
-                        .fill(theme.accent.opacity(0.08))
-                        .frame(width: 150, height: 150)
-                        .offset(x: -145, y: -38)
-                }
-                .frame(height: 130)
-                Spacer()
-            }
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
-
-            ScrollView {
-                VStack(spacing: 16) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("한 끼 기록")
-                                .font(.appTitle)
-                                .foregroundStyle(.appInk)
-                            Text(info?.dateText ?? "")
-                                .font(.appCaption)
-                                .foregroundStyle(.appMuted)
-                        }
-                        Spacer()
-                    }
-
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 36, style: .continuous)
-                            .fill(Color.appCard.opacity(0.90))
-                        Circle()
-                            .fill(theme.secondary.opacity(0.34))
-                            .frame(width: 210, height: 210)
-                        StickerTile(tint: .plain) {
-                            CutoutImage(fileName: cutout.fileName, maxPixelDimension: 520)
-                        }
-                        .frame(width: 218, height: 218)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 244)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 36, style: .continuous)
-                            .stroke(
-                                theme.accent.opacity(0.30),
-                                style: StrokeStyle(lineWidth: 1.5, dash: [7, 6])
-                            )
-                    }
-                    .softShadow()
-
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 8) {
-                            detailChips
-                        }
-                        VStack(alignment: .leading, spacing: 8) {
-                            detailChips
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    VStack(alignment: .leading, spacing: 9) {
-                        HStack {
-                            Text("별점")
-                                .font(.appSection)
-                                .foregroundStyle(.appInk)
-                            Spacer()
-                            if let rating = info?.rating {
-                                Text("\(rating)/5")
-                                    .font(.appCaption)
-                                    .foregroundStyle(.appButterInk)
-                                    .monospacedDigit()
-                            } else {
-                                Text("아직 별점이 없어요")
-                                    .font(.appCaption)
-                                    .foregroundStyle(.appMuted)
-                            }
-                        }
-                        StarRating(rating: info?.rating)
-                    }
-                    .padding(15)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.appCard, in: RoundedRectangle(cornerRadius: 20))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color.appButterInk.opacity(0.22), lineWidth: 1.5)
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("태그")
-                            .font(.appSection)
-                            .foregroundStyle(.appInk)
-                        if tags.isEmpty {
-                            Text("아직 태그가 없어요")
-                                .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundStyle(.appMuted)
-                                .padding(.vertical, 4)
-                        } else {
-                            TagFlow(tags) { TagChip($0) }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 2)
-                        }
-                    }
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.appCard.opacity(0.96), in: RoundedRectangle(cornerRadius: 20))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(theme.accent.opacity(0.28), lineWidth: 1.5)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 28)
-            }
-            .scrollIndicators(.hidden)
-        }
-    }
-
-    @ViewBuilder
-    private var detailChips: some View {
-        if let placeName = info?.placeName, !placeName.isEmpty {
-            PastelChip(placeName, symbol: "mappin", tone: .pink)
-        }
-        if !cutout.label.orEmpty.isEmpty {
-            PastelChip(cutout.label.orEmpty, tone: .blue)
-        }
-    }
-}
-
 private struct StickerTransformPreview: Equatable {
     let id: UUID
     let scale: CGFloat
@@ -1273,7 +1098,7 @@ private struct StickerTransformHandle: View {
     var body: some View {
         ZStack {
             // Outline of what is being adjusted.
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.appCherry.opacity(0.9), style: StrokeStyle(lineWidth: 2, dash: [6, 5]))
                 .frame(width: side * scale, height: side * scale)
                 .rotationEffect(.degrees(rotationDegrees))

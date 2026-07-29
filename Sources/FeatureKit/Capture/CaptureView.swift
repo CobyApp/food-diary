@@ -265,7 +265,7 @@ public struct CaptureView: View {
             }
         }
         .padding(.horizontal, 18)
-        .padding(.bottom, 26)
+        .padding(.bottom, 96)   // clears the floating tab bar
     }
 
     /// Three short lines so the empty first screen still says something useful.

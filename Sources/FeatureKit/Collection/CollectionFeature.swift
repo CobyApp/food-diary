@@ -26,7 +26,6 @@ public struct CollectionFeature {
         public var isDeleting = false
         public var isDeleteErrorPresented = false
         public var selectedCutoutIDs: Set<UUID> = []
-        public var selectedCutoutID: UUID?
         public var cutoutMealInfo: [UUID: CutoutMealInfo] = [:]
         public var streak = MealStreak()
         @Presents public var achievements: AchievementsFeature.State?
@@ -40,8 +39,6 @@ public struct CollectionFeature {
         case onAppear
         case cutoutsLoaded([FoodEntrySnapshot])
         case mealInfoLoaded([UUID: CutoutMealInfo])
-        case cutoutTapped(UUID)
-        case dismissCutoutDetail
         case editButtonTapped
         case beginSelection(UUID)
         case selectionToggled(UUID)
@@ -90,22 +87,12 @@ public struct CollectionFeature {
                 state.isLoading = false
                 state.cutouts = cutouts
                 state.selectedCutoutIDs.formIntersection(Set(cutouts.map(\.id)))
-                if let selectedCutoutID = state.selectedCutoutID,
-                   !cutouts.contains(where: { $0.id == selectedCutoutID }) {
-                    state.selectedCutoutID = nil
-                }
                 if cutouts.isEmpty {
                     state.isEditing = false
                 }
                 return .none
             case let .mealInfoLoaded(info):
                 state.cutoutMealInfo = info
-                return .none
-            case let .cutoutTapped(id):
-                state.selectedCutoutID = id
-                return .none
-            case .dismissCutoutDetail:
-                state.selectedCutoutID = nil
                 return .none
             case .editButtonTapped:
                 state.isEditing.toggle()
@@ -153,10 +140,6 @@ public struct CollectionFeature {
                 }
             case let .cutoutsDeleted(ids):
                 state.cutouts.removeAll { ids.contains($0.id) }
-                if let selectedCutoutID = state.selectedCutoutID,
-                   ids.contains(selectedCutoutID) {
-                    state.selectedCutoutID = nil
-                }
                 state.selectedCutoutIDs.removeAll()
                 state.isDeleting = false
                 state.isEditing = false

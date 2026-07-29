@@ -4,18 +4,6 @@ import Models
 @testable import FeatureKit
 
 final class RootFeatureTests: XCTestCase {
-    @MainActor
-    func test_cutoutTapped_flipsInChild_doesNotPush() async {
-        let cutoutID = UUID()
-        let store = TestStore(initialState: RootFeature.State()) {
-            RootFeature()
-        }
-        store.exhaustivity = .off(showSkippedAssertions: false)
-        await store.send(.collection(.cutoutTapped(cutoutID)))
-        XCTAssertEqual(store.state.collection.selectedCutoutID, cutoutID)
-        XCTAssertTrue(store.state.path.isEmpty)
-    }
-
     /// Arriving on a tab is what reloads it, now that the board has no pull
     /// gesture and does not scroll.
     @MainActor
