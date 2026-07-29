@@ -11,6 +11,8 @@ public struct CollectionView: View {
     @State private var stickerPlacements: [String: StickerBoardPlacement] = [:]
     @State private var showingRecapDatePicker = false
     @State private var showingBoardStylePicker = false
+    @State private var showingCutoutDrawer = false
+    @State private var showingRecapOptions = false
     @State private var draftRecapStartDate = Date()
     @State private var draftRecapEndDate = Date()
     @State private var transformPreview: StickerTransformPreview?
@@ -20,13 +22,22 @@ public struct CollectionView: View {
     /// Set only after the tilt has been held, so a passing wobble doesn't flash
     /// every place name on the board.
     @State private var revealedSide: StickerBoardMotion.BoardSide?
+    @State private var offBoardIDs: Set<String> = []
     @AppStorage("collection.freeStickerBoard.v1") private var savedStickerPlacements = ""
+    /// Cutouts taken off the board. Absence means on the board, so a newly saved
+    /// meal lands on it by itself — the way a new file appears on a desktop.
+    @AppStorage("collection.stickerBoardOffBoard.v1") private var savedOffBoardIDs = ""
     @AppStorage("collection.stickerBoardTheme.v1")
     private var selectedThemeRaw = StickerBoardTheme.strawberryCheck.rawValue
     public init(store: StoreOf<CollectionFeature>) { self.store = store }
 
     private var selectedTheme: StickerBoardTheme {
         StickerBoardTheme(rawValue: selectedThemeRaw) ?? .strawberryCheck
+    }
+
+    /// What is actually out on the board.
+    private var boardCutouts: [CutoutSnapshot] {
+        store.cutouts.filter { !offBoardIDs.contains($0.id.uuidString) }
     }
 
     public var body: some View {
@@ -56,6 +67,7 @@ public struct CollectionView: View {
         .toolbar(.hidden, for: .navigationBar)
         .task {
             loadStickerPlacements()
+            loadOffBoardIDs()
             store.send(.onAppear)
             store.send(.streakOnAppear)
             motion.start()
@@ -63,11 +75,17 @@ public struct CollectionView: View {
         .onDisappear { motion.stop() }
         .task(id: tiltedSide) { await holdTiltToReveal() }
         .onChange(of: store.cutouts.map(\.id)) { _, ids in
+            // A deleted food leaves both the board and the drawer.
             let validKeys = Set(ids.map(\.uuidString))
             let cleaned = stickerPlacements.filter { validKeys.contains($0.key) }
             if cleaned != stickerPlacements {
                 stickerPlacements = cleaned
                 persistStickerPlacements()
+            }
+            let keptOffBoard = offBoardIDs.intersection(validKeys)
+            if keptOffBoard != offBoardIDs {
+                offBoardIDs = keptOffBoard
+                persistOffBoardIDs()
             }
         }
         .sheet(item: $store.scope(state: \.achievements, action: \.achievements)) { achStore in
@@ -90,6 +108,43 @@ public struct CollectionView: View {
             )
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingCutoutDrawer) {
+            NavigationStack {
+                cutoutDrawer
+                    .background(PaperBackground())
+                    .navigationTitle("누끼 서랍")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("닫기") { showingCutoutDrawer = false }
+                        }
+                    }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Color.appMilk)
+        }
+        .sheet(isPresented: $showingRecapOptions) {
+            NavigationStack {
+                VStack(spacing: 14) {
+                    recapPeriodCard
+                    Spacer(minLength: 0)
+                }
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .background(PaperBackground())
+                .navigationTitle("리캡 만들기")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("닫기") { showingRecapOptions = false }
+                    }
+                }
+            }
+            .presentationDetents([.height(220)])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Color.appMilk)
         }
         .sheet(isPresented: $showingBoardStylePicker) {
             NavigationStack {
@@ -203,6 +258,7 @@ public struct CollectionView: View {
             Spacer(minLength: 4)
 
             Button {
+                showingRecapOptions = false
                 store.send(.recapButtonTapped)
             } label: {
                 Label("리캡 만들기", systemImage: "square.and.arrow.up")
@@ -228,7 +284,7 @@ public struct CollectionView: View {
     /// when there is almost nothing on it.
     private var canvas: some View {
         ScrollView {
-            if store.cutouts.isEmpty {
+            if boardCutouts.isEmpty {
                 emptyBoard
                     .padding(.horizontal, 18)
                     .padding(.top, controlsHeight + 28)
@@ -261,6 +317,66 @@ public struct CollectionView: View {
         .refreshable { await refreshBoard() }
     }
 
+    /// Every cutout ever saved. The board shows a chosen few; this is the drawer
+    /// they come out of, so taking one off the board never loses it.
+    private var cutoutDrawer: some View {
+        ScrollView {
+            if store.cutouts.isEmpty {
+                EmptyState(systemImage: "fork.knife", title: "아직 누끼가 없어요",
+                           subtitle: "음식 사진을 찍어 첫 누끼를 담아보세요!")
+                    .padding(.top, 30)
+                    .padding(.horizontal, 18)
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(L10n.format("drawer.count", boardCutouts.count, store.cutouts.count))
+                        .font(.appCaption)
+                        .foregroundStyle(.appMuted)
+
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 96), spacing: 12)],
+                        spacing: 12
+                    ) {
+                        ForEach(Array(store.cutouts.enumerated()), id: \.element.id) { index, cutout in
+                            let isOut = !offBoardIDs.contains(cutout.id.uuidString)
+                            Button {
+                                if isOut {
+                                    removeFromBoard(cutout)
+                                } else {
+                                    addToBoard(cutout)
+                                }
+                            } label: {
+                                StickerTile(tint: .rotating(index)) {
+                                    CutoutImage(fileName: cutout.fileName)
+                                }
+                                .aspectRatio(1, contentMode: .fit)
+                                .opacity(isOut ? 1 : 0.45)
+                                .overlay(alignment: .topTrailing) {
+                                    Image(systemName: isOut ? "checkmark.circle.fill" : "plus.circle")
+                                        .font(.title3.bold())
+                                        .foregroundStyle(isOut ? Color.appCherry : Color.appMuted)
+                                        .padding(6)
+                                }
+                            }
+                            .buttonStyle(KitschPressStyle())
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    pendingSingleDeleteID = cutout.id
+                                    showingCutoutDrawer = false
+                                    confirmingDeletion = true
+                                } label: {
+                                    Label("이 음식 삭제", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(18)
+            }
+        }
+        .scrollIndicators(.hidden)
+        .animation(.spring(response: 0.32, dampingFraction: 0.8), value: offBoardIDs)
+    }
+
     @ViewBuilder
     private var emptyBoard: some View {
         if store.isLoading {
@@ -269,9 +385,13 @@ public struct CollectionView: View {
                 messages: ["컬렉션을 가지런히 정리하고 있어요"],
                 compact: true
             )
-        } else {
+        } else if store.cutouts.isEmpty {
             EmptyState(systemImage: "fork.knife", title: "아직 누끼가 없어요",
                        subtitle: "음식 사진을 찍어 첫 누끼를 담아보세요!")
+        } else {
+            // Food exists, it is just all in the drawer.
+            EmptyState(systemImage: "square.grid.2x2", title: "보드가 비어 있어요",
+                       subtitle: "서랍에서 누끼를 꺼내 보드에 올려보세요!")
         }
     }
 
@@ -299,6 +419,11 @@ public struct CollectionView: View {
 
                 Spacer()
 
+                headerButton(systemImage: "square.grid.2x2.fill", color: .appBlueInk) {
+                    showingCutoutDrawer = true
+                }
+                .accessibilityLabel(Text("누끼 서랍"))
+
                 headerButton(systemImage: "paintpalette.fill", color: .appPinkInk) {
                     showingBoardStylePicker = true
                 }
@@ -307,9 +432,12 @@ public struct CollectionView: View {
                 headerButton(systemImage: "rosette", color: .appButterInk) {
                     store.send(.achievementsButtonTapped)
                 }
-            }
 
-            recapPeriodCard
+                headerButton(systemImage: "square.and.arrow.up", color: .appChocolate) {
+                    showingRecapOptions = true
+                }
+                .accessibilityLabel(Text("리캡 만들기"))
+            }
 
             if store.isEditing {
                 selectionToolbar
@@ -331,11 +459,12 @@ public struct CollectionView: View {
     private var freeStickerBoard: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
-            let placements = store.cutouts.compactMap {
+            let cutouts = boardCutouts
+            let placements = cutouts.compactMap {
                 stickerPlacements[$0.id.uuidString]
             }
             let height = FreeStickerBoardLayout.boardHeight(
-                count: store.cutouts.count,
+                count: cutouts.count,
                 width: width,
                 placements: placements,
                 topInset: controlsHeight,
@@ -344,7 +473,7 @@ public struct CollectionView: View {
             let side = FreeStickerBoardLayout.itemSide(width: width)
 
             ZStack {
-                ForEach(Array(store.cutouts.enumerated()), id: \.element.id) { index, cutout in
+                ForEach(Array(cutouts.enumerated()), id: \.element.id) { index, cutout in
                     let savedPlacement = stickerPlacements[cutout.id.uuidString]
                     let point = FreeStickerBoardLayout.point(
                         for: savedPlacement,
@@ -526,6 +655,11 @@ public struct CollectionView: View {
                             Label("자리 원래대로", systemImage: "arrow.counterclockwise")
                         }
                         Button {
+                            removeFromBoard(cutout)
+                        } label: {
+                            Label("보드에서 내리기", systemImage: "tray.and.arrow.down")
+                        }
+                        Button {
                             store.send(.beginSelection(cutout.id))
                         } label: {
                             Label("여러 개 선택", systemImage: "checkmark.circle")
@@ -644,10 +778,11 @@ public struct CollectionView: View {
     private var boardHeightForCurrentWidth: CGFloat {
         // Full-bleed now: the canvas runs edge to edge.
         let width = max(UIScreen.main.bounds.width, 284)
+        let cutouts = boardCutouts
         return FreeStickerBoardLayout.boardHeight(
-            count: store.cutouts.count,
+            count: cutouts.count,
             width: width,
-            placements: store.cutouts.compactMap {
+            placements: cutouts.compactMap {
                 stickerPlacements[$0.id.uuidString]
             },
             topInset: controlsHeight,
@@ -662,6 +797,56 @@ public struct CollectionView: View {
                 from: data
               ) else { return }
         stickerPlacements = decoded
+    }
+
+    private func loadOffBoardIDs() {
+        guard let data = savedOffBoardIDs.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode(Set<String>.self, from: data)
+        else { return }
+        offBoardIDs = decoded
+    }
+
+    private func persistOffBoardIDs() {
+        guard let data = try? JSONEncoder().encode(offBoardIDs),
+              let encoded = String(data: data, encoding: .utf8) else { return }
+        savedOffBoardIDs = encoded
+    }
+
+    /// Takes a sticker off the board. The food itself stays in the drawer.
+    private func removeFromBoard(_ cutout: CutoutSnapshot) {
+        offBoardIDs.insert(cutout.id.uuidString)
+        stickerPlacements.removeValue(forKey: cutout.id.uuidString)
+        persistOffBoardIDs()
+        persistStickerPlacements()
+    }
+
+    /// Puts a sticker back out, in the first slot nothing else is sitting in.
+    private func addToBoard(_ cutout: CutoutSnapshot) {
+        let width = max(UIScreen.main.bounds.width, 284)
+        let height = boardHeightForCurrentWidth
+        let occupied = boardCutouts.map {
+            FreeStickerBoardLayout.point(
+                for: stickerPlacements[$0.id.uuidString],
+                index: 0,
+                width: width,
+                height: height,
+                topInset: controlsHeight
+            )
+        }
+        let slot = FreeStickerBoardLayout.firstFreeSlot(
+            occupied: occupied,
+            width: width,
+            height: height,
+            topInset: controlsHeight
+        )
+        offBoardIDs.remove(cutout.id.uuidString)
+        stickerPlacements[cutout.id.uuidString] = FreeStickerBoardLayout.placement(
+            for: slot,
+            width: width,
+            height: height
+        )
+        persistOffBoardIDs()
+        persistStickerPlacements()
     }
 
     private func persistStickerPlacements() {

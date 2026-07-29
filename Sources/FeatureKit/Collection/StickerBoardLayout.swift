@@ -275,6 +275,37 @@ enum FreeStickerBoardLayout {
         )
     }
 
+    /// Where to drop a sticker being put back on the board from the drawer.
+    ///
+    /// Walks the default grid slots and takes the first one that is not already
+    /// under another sticker, the way a desktop drops a new icon into the next
+    /// free space rather than on top of one.
+    static func firstFreeSlot(
+        occupied: [CGPoint],
+        width: CGFloat,
+        height: CGFloat,
+        topInset: CGFloat = 0
+    ) -> CGPoint {
+        let side = itemSide(width: width)
+        let clearance = side * 0.75
+        // Bounded so a board packed solid still returns promptly.
+        let slots = max(columns, Int((height / max(side * 0.92, 1)).rounded(.up)) * columns) + columns
+        for index in 0..<slots {
+            let candidate = defaultPoint(index: index, width: width, topInset: topInset)
+            guard candidate.y <= height else { break }
+            let isClear = occupied.allSatisfy {
+                hypot(candidate.x - $0.x, candidate.y - $0.y) > clearance
+            }
+            if isClear { return candidate }
+        }
+        // Nothing free: land it in the middle rather than off the canvas.
+        return clamped(
+            CGPoint(x: width / 2, y: min(topInset + side, height / 2)),
+            width: width,
+            height: height
+        )
+    }
+
     static func clamped(
         _ point: CGPoint,
         width: CGFloat,

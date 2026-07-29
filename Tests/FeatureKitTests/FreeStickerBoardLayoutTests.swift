@@ -102,6 +102,60 @@ final class FreeStickerBoardLayoutTests: XCTestCase {
         XCTAssertGreaterThan(height, 720)
     }
 
+    // MARK: - Putting a sticker back on the board
+
+    /// Adding from the drawer must not drop a sticker on top of one already out.
+    func test_firstFreeSlotAvoidsOccupiedPositions() {
+        let width: CGFloat = 393
+        let taken = FreeStickerBoardLayout.defaultPoint(index: 0, width: width)
+        let slot = FreeStickerBoardLayout.firstFreeSlot(
+            occupied: [taken],
+            width: width,
+            height: 900
+        )
+
+        let side = FreeStickerBoardLayout.itemSide(width: width)
+        XCTAssertGreaterThan(hypot(slot.x - taken.x, slot.y - taken.y), side * 0.7)
+    }
+
+    func test_firstFreeSlotUsesTheFirstSlotOnAnEmptyBoard() {
+        let width: CGFloat = 393
+        XCTAssertEqual(
+            FreeStickerBoardLayout.firstFreeSlot(occupied: [], width: width, height: 900),
+            FreeStickerBoardLayout.defaultPoint(index: 0, width: width)
+        )
+    }
+
+    /// Every slot taken is still better than an off-board coordinate, so it falls
+    /// back to a point inside the canvas rather than returning nothing.
+    func test_firstFreeSlotStaysOnTheBoardWhenEverySlotIsTaken() {
+        let width: CGFloat = 393
+        let height: CGFloat = 500
+        let occupied = (0..<200).map {
+            FreeStickerBoardLayout.defaultPoint(index: $0, width: width)
+        }
+        let slot = FreeStickerBoardLayout.firstFreeSlot(
+            occupied: occupied,
+            width: width,
+            height: height
+        )
+
+        XCTAssertGreaterThanOrEqual(slot.x, 0)
+        XCTAssertLessThanOrEqual(slot.x, width)
+        XCTAssertGreaterThanOrEqual(slot.y, 0)
+        XCTAssertLessThanOrEqual(slot.y, height)
+    }
+
+    func test_firstFreeSlotRespectsTheControlInset() {
+        let slot = FreeStickerBoardLayout.firstFreeSlot(
+            occupied: [],
+            width: 393,
+            height: 900,
+            topInset: 200
+        )
+        XCTAssertGreaterThan(slot.y, 200)
+    }
+
     func test_boardThemesHaveStableUniqueStorageValues() {
         XCTAssertEqual(StickerBoardTheme.allCases.count, 4)
         XCTAssertEqual(

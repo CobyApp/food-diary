@@ -212,3 +212,10 @@
 "태그 삭제" = "Delete tag";
 "아직 태그가 없어요" = "No tags yet";
 "capture.tags.picked" = "%d picked";
+
+// Sticker drawer
+"누끼 서랍" = "Sticker Drawer";
+"drawer.count" = "%d on the board · %d total";
+"보드에서 내리기" = "Take off the board";
+"보드가 비어 있어요" = "The board is empty";
+"서랍에서 누끼를 꺼내 보드에 올려보세요!" = "Pull a sticker out of the drawer!";
