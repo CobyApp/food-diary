@@ -114,18 +114,6 @@ final class FreeStickerBoardLayoutTests: XCTestCase {
         )
     }
 
-    func test_boardFramesHaveStableUniqueStorageValues() {
-        XCTAssertEqual(StickerBoardFrame.allCases.count, 4)
-        XCTAssertEqual(
-            Set(StickerBoardFrame.allCases.map(\.rawValue)).count,
-            StickerBoardFrame.allCases.count
-        )
-        XCTAssertEqual(
-            StickerBoardFrame(rawValue: StickerBoardFrame.ticket.rawValue),
-            .ticket
-        )
-    }
-
     func test_oldSavedPlacementDecodesWithoutTransformValues() throws {
         let data = Data(#"{"xFraction":0.4,"y":180}"#.utf8)
         let placement = try JSONDecoder().decode(StickerBoardPlacement.self, from: data)

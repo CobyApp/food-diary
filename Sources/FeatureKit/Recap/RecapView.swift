@@ -81,8 +81,6 @@ public struct RecapView: View {
     @AppStorage("collection.freeStickerBoard.v1") private var savedStickerPlacements = ""
     @AppStorage("collection.stickerBoardTheme.v1")
     private var selectedThemeRaw = StickerBoardTheme.strawberryCheck.rawValue
-    @AppStorage("collection.stickerBoardFrame.v1")
-    private var selectedFrameRaw = StickerBoardFrame.softPaper.rawValue
 
     public init(store: StoreOf<RecapFeature>) {
         self.store = store
@@ -141,7 +139,7 @@ public struct RecapView: View {
             guard !images.isEmpty else { return }
             await renderExport()
         }
-        .task(id: "\(selectedThemeRaw)|\(selectedFrameRaw)|\(savedStickerPlacements)") {
+        .task(id: "\(selectedThemeRaw)|\(savedStickerPlacements)") {
             guard !images.isEmpty else { return }
             await renderExport()
         }
@@ -168,10 +166,6 @@ public struct RecapView: View {
         StickerBoardTheme(rawValue: selectedThemeRaw) ?? .strawberryCheck
     }
 
-    private var selectedFrame: StickerBoardFrame {
-        StickerBoardFrame(rawValue: selectedFrameRaw) ?? .softPaper
-    }
-
     private var storyBoardPlacements: [StickerBoardPlacement?] {
         guard let data = savedStickerPlacements.data(using: .utf8),
               let placements = try? JSONDecoder().decode(
@@ -192,7 +186,6 @@ public struct RecapView: View {
             rangeText: store.rangeText,
             caption: store.caption,
             theme: selectedTheme,
-            boardFrame: selectedFrame,
             boardPlacements: storyBoardPlacements
         )
         .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
@@ -268,8 +261,7 @@ public struct RecapView: View {
                 rangeText: store.rangeText,
                 caption: store.caption,
                 theme: selectedTheme,
-                boardFrame: selectedFrame,
-                boardPlacements: storyBoardPlacements
+                    boardPlacements: storyBoardPlacements
             )
             .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
         )

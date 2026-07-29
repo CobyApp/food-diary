@@ -60,23 +60,20 @@ final class RecapStoryCardTests: XCTestCase {
     }
 
     @MainActor
-    func test_everyBoardFrameRendersInStoryCard() {
+    func test_storyCardRendersWithASingleBoardShape() {
         let swatch = UIGraphicsImageRenderer(size: CGSize(width: 40, height: 40)).image {
             UIColor.systemPink.setFill()
             $0.fill(CGRect(x: 0, y: 0, width: 40, height: 40))
         }
 
-        for frame in StickerBoardFrame.allCases {
-            let renderer = ImageRenderer(
-                content: RecapStoryCard(
-                    images: [swatch],
-                    mealCount: 1,
-                    rangeText: "7.28",
-                    boardFrame: frame
-                )
-                .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
+        let renderer = ImageRenderer(
+            content: RecapStoryCard(
+                images: [swatch],
+                mealCount: 1,
+                rangeText: "7.28"
             )
-            XCTAssertNotNil(renderer.uiImage, "\(frame.rawValue) should render")
-        }
+            .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
+        )
+        XCTAssertNotNil(renderer.uiImage)
     }
 }

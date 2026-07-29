@@ -23,16 +23,10 @@ public struct CollectionView: View {
     @AppStorage("collection.freeStickerBoard.v1") private var savedStickerPlacements = ""
     @AppStorage("collection.stickerBoardTheme.v1")
     private var selectedThemeRaw = StickerBoardTheme.strawberryCheck.rawValue
-    @AppStorage("collection.stickerBoardFrame.v1")
-    private var selectedFrameRaw = StickerBoardFrame.softPaper.rawValue
     public init(store: StoreOf<CollectionFeature>) { self.store = store }
 
     private var selectedTheme: StickerBoardTheme {
         StickerBoardTheme(rawValue: selectedThemeRaw) ?? .strawberryCheck
-    }
-
-    private var selectedFrame: StickerBoardFrame {
-        StickerBoardFrame(rawValue: selectedFrameRaw) ?? .softPaper
     }
 
     public var body: some View {
@@ -45,7 +39,20 @@ public struct CollectionView: View {
             canvas
 
             floatingControls
+
+            // Screen-anchored, not board-anchored: inside the canvas it scrolled
+            // away with the stickers and sat behind the floating chrome.
+            if let transformPreview {
+                StickerTransformHUD(preview: transformPreview)
+                    .padding(.top, controlsHeight + 12)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(1_000)
+            }
         }
+        .animation(
+            .spring(response: 0.25, dampingFraction: 0.82),
+            value: transformPreview != nil
+        )
         .toolbar(.hidden, for: .navigationBar)
         .task {
             loadStickerPlacements()
@@ -538,18 +545,8 @@ public struct CollectionView: View {
                     }
                 }
 
-                if let transformPreview {
-                    StickerTransformHUD(preview: transformPreview)
-                        .position(x: width / 2, y: 28)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .zIndex(1_000)
-                }
             }
             .frame(width: width, height: height)
-            .animation(
-                .spring(response: 0.25, dampingFraction: 0.82),
-                value: transformPreview != nil
-            )
         }
         .frame(height: boardHeightForCurrentWidth)
     }
@@ -616,67 +613,6 @@ public struct CollectionView: View {
                                     .stroke(
                                         selected
                                             ? theme.accent.opacity(0.65)
-                                            : Color.appChocolate.opacity(0.10),
-                                        lineWidth: selected ? 2 : 1
-                                    )
-                            }
-                        }
-                        .buttonStyle(KitschPressStyle())
-                        .accessibilityAddTraits(selected ? .isSelected : [])
-                    }
-                }
-                .padding(.horizontal, 2)
-                .padding(.bottom, 5)
-            }
-            .scrollIndicators(.hidden)
-
-            Text("보드 모양")
-                .font(.appCaption)
-                .foregroundStyle(.appPinkInk)
-                .padding(.top, 2)
-
-            ScrollView(.horizontal) {
-                HStack(spacing: 10) {
-                    ForEach(StickerBoardFrame.allCases) { frame in
-                        let selected = selectedFrame == frame
-                        Button {
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
-                                selectedFrameRaw = frame.rawValue
-                            }
-                        } label: {
-                            VStack(spacing: 6) {
-                                StickerBoardSurface(
-                                    theme: selectedTheme,
-                                    frame: frame,
-                                    borderOpacity: selected ? 0.72 : 0.30
-                                )
-                                .frame(width: 74, height: 52)
-                                .overlay(alignment: .bottomTrailing) {
-                                    if selected {
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 9, weight: .black))
-                                            .foregroundStyle(.white)
-                                            .frame(width: 20, height: 20)
-                                            .background(selectedTheme.accent, in: Circle())
-                                            .overlay(Circle().stroke(Color.appCard, lineWidth: 2))
-                                            .offset(x: 4, y: 4)
-                                    }
-                                }
-
-                                Text(L10n.text(frame.titleKey))
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(
-                                        selected ? selectedTheme.accent : Color.appInk
-                                    )
-                                    .lineLimit(1)
-                            }
-                            .padding(7)
-                            .background(Color.appCard, in: RoundedRectangle(cornerRadius: 18))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 18)
-                                    .stroke(
-                                        selected
-                                            ? selectedTheme.accent.opacity(0.65)
                                             : Color.appChocolate.opacity(0.10),
                                         lineWidth: selected ? 2 : 1
                                     )
@@ -1138,6 +1074,10 @@ private struct FreeStickerDrag: ViewModifier {
     @GestureState private var isDragging = false
     @GestureState private var isMagnifying = false
     @GestureState private var isRotating = false
+    /// Latched for the whole gesture, because a two-finger pinch also feeds the
+    /// drag gesture: without this the sticker slides away while being resized,
+    /// and the stray translation is then saved as its new position.
+    @State private var isTransforming = false
 
     private var isInteracting: Bool {
         isDragging || isMagnifying || isRotating
@@ -1176,7 +1116,7 @@ private struct FreeStickerDrag: ViewModifier {
             )
             // Translation comes last so a scaled sticker still follows the
             // finger one-for-one instead of multiplying the drag distance.
-            .offset(translation)
+            .offset(isTransforming ? .zero : translation)
             .animation(.spring(response: 0.24, dampingFraction: 0.72), value: isActive)
             .animation(.spring(response: 0.22, dampingFraction: 0.78), value: isInteracting)
             .highPriorityGesture(dragGesture, including: enabled ? .all : .none)
@@ -1186,6 +1126,10 @@ private struct FreeStickerDrag: ViewModifier {
                 onActiveChange(active)
                 if active {
                     UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                } else {
+                    // Cleared only once every finger is up, so a pinch that ends
+                    // just before the drag does cannot let the move through.
+                    isTransforming = false
                 }
             }
     }
@@ -1199,6 +1143,7 @@ private struct FreeStickerDrag: ViewModifier {
                 state = true
             }
             .onEnded { value in
+                guard !isTransforming else { return }
                 onMove(CGPoint(
                     x: position.x + value.translation.width,
                     y: position.y + value.translation.height
@@ -1215,6 +1160,7 @@ private struct FreeStickerDrag: ViewModifier {
                 state = true
             }
             .onChanged { value in
+                isTransforming = true
                 onPreview(
                     CGFloat(
                         FreeStickerBoardLayout.clampedScale(
@@ -1245,6 +1191,7 @@ private struct FreeStickerDrag: ViewModifier {
                 state = true
             }
             .onChanged { value in
+                isTransforming = true
                 onPreview(
                     liveScale,
                     FreeStickerBoardLayout.normalizedRotation(

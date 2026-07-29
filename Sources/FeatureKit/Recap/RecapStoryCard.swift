@@ -9,7 +9,6 @@ struct RecapStoryCard: View {
     let rangeText: String
     var caption: String?
     var theme: StickerBoardTheme = .strawberryCheck
-    var boardFrame: StickerBoardFrame = .softPaper
     var boardPlacements: [StickerBoardPlacement?] = []
 
     static let size = CGSize(width: 360, height: 640)
@@ -92,7 +91,6 @@ struct RecapStoryCard: View {
             ZStack {
                 StickerBoardSurface(
                     theme: theme,
-                    frame: boardFrame,
                     borderOpacity: 0.42
                 )
                     .frame(width: proxy.size.width - 10, height: proxy.size.height - 18)
