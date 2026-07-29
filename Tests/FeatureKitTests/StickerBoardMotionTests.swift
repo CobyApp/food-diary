@@ -137,28 +137,54 @@ final class StickerBoardMotionTests: XCTestCase {
     // MARK: - Tilt to browse
 
     func test_noColumnRevealedBelowThreshold() {
-        XCTAssertNil(
-            StickerBoardMotion.revealedColumn(tiltX: 0.3, columnCount: 3, threshold: 0.55)
-        )
+        XCTAssertNil(StickerBoardMotion.revealedSide(tiltX: 0.3, threshold: 0.55))
     }
 
-    func test_tiltRightRevealsLastColumn() {
+    func test_tiltRightRevealsTrailingSide() {
         XCTAssertEqual(
-            StickerBoardMotion.revealedColumn(tiltX: 0.7, columnCount: 3, threshold: 0.55),
-            2
+            StickerBoardMotion.revealedSide(tiltX: 0.7, threshold: 0.55),
+            .trailing
         )
     }
 
-    func test_tiltLeftRevealsFirstColumn() {
+    func test_tiltLeftRevealsLeadingSide() {
         XCTAssertEqual(
-            StickerBoardMotion.revealedColumn(tiltX: -0.9, columnCount: 3, threshold: 0.55),
-            0
+            StickerBoardMotion.revealedSide(tiltX: -0.9, threshold: 0.55),
+            .leading
         )
     }
 
-    func test_noColumnRevealedOnAnEmptyBoard() {
-        XCTAssertNil(
-            StickerBoardMotion.revealedColumn(tiltX: 1, columnCount: 0, threshold: 0.55)
-        )
+    /// Stickers sit anywhere on a freeform board, so a sticker is revealed by
+    /// which half it landed in rather than by a grid column.
+    func test_onlyStickersOnTheTiltedHalfAreRevealed() {
+        XCTAssertTrue(StickerBoardMotion.isRevealed(xFraction: 0.8, side: .trailing))
+        XCTAssertFalse(StickerBoardMotion.isRevealed(xFraction: 0.2, side: .trailing))
+        XCTAssertTrue(StickerBoardMotion.isRevealed(xFraction: 0.2, side: .leading))
+        XCTAssertFalse(StickerBoardMotion.isRevealed(xFraction: 0.8, side: .leading))
+    }
+
+    func test_nothingIsRevealedWithoutATilt() {
+        XCTAssertFalse(StickerBoardMotion.isRevealed(xFraction: 0.1, side: nil))
+        XCTAssertFalse(StickerBoardMotion.isRevealed(xFraction: 0.9, side: nil))
+    }
+
+    // MARK: - Tilt normalisation
+
+    /// A phone is read at an angle, so pitch rests well away from zero. Without
+    /// a reference the board would sit permanently shoved to one side.
+    func test_tiltIsMeasuredRelativeToHowTheDeviceIsHeld() {
+        let resting = StickerBoardMotion.normalizedTilt(0.9, reference: 0.9)
+        XCTAssertEqual(resting, 0, accuracy: 0.0001)
+    }
+
+    func test_tiltIsClampedToUnitRange() {
+        XCTAssertEqual(StickerBoardMotion.normalizedTilt(9, reference: 0), 1, accuracy: 0.0001)
+        XCTAssertEqual(StickerBoardMotion.normalizedTilt(-9, reference: 0), -1, accuracy: 0.0001)
+    }
+
+    func test_tiltGrowsWithDeviationFromTheReference() {
+        let small = StickerBoardMotion.normalizedTilt(0.1, reference: 0)
+        let large = StickerBoardMotion.normalizedTilt(0.4, reference: 0)
+        XCTAssertGreaterThan(large, small)
     }
 }

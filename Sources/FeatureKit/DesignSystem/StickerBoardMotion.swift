@@ -84,11 +84,38 @@ enum StickerBoardMotion {
         min(Double(max(0, index)) * step, cap)
     }
 
+    // MARK: - Tilt normalisation
+
+    /// Normalises a raw CoreMotion attitude angle to -1...1.
+    ///
+    /// `reference` is the angle the device rested at when tracking began: a phone
+    /// is read tilted back, so pitch never starts near zero, and measuring
+    /// absolutely would leave the board permanently shoved to one side.
+    static func normalizedTilt(_ value: Double, reference: Double, range: Double = 0.8) -> Double {
+        guard range > 0 else { return 0 }
+        return max(-1, min(1, (value - reference) / range))
+    }
+
     // MARK: - Tilt to browse
 
-    /// The column the board leans toward, once the tilt is decisive.
-    static func revealedColumn(tiltX: Double, columnCount: Int, threshold: Double) -> Int? {
-        guard columnCount > 0, abs(tiltX) >= threshold else { return nil }
-        return tiltX > 0 ? columnCount - 1 : 0
+    /// Half of the board, for the tilt-to-browse reveal.
+    enum BoardSide: Equatable {
+        case leading
+        case trailing
+    }
+
+    /// The half the board leans toward, once the tilt is decisive.
+    static func revealedSide(tiltX: Double, threshold: Double) -> BoardSide? {
+        guard abs(tiltX) >= threshold else { return nil }
+        return tiltX > 0 ? .trailing : .leading
+    }
+
+    /// Whether a sticker at `xFraction` across the board sits on the tilted half.
+    static func isRevealed(xFraction: Double, side: BoardSide?) -> Bool {
+        switch side {
+        case .none: return false
+        case .leading: return xFraction < 0.5
+        case .trailing: return xFraction >= 0.5
+        }
     }
 }

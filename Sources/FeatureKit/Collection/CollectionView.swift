@@ -14,6 +14,10 @@ public struct CollectionView: View {
     @State private var draftRecapStartDate = Date()
     @State private var draftRecapEndDate = Date()
     @State private var transformPreview: StickerTransformPreview?
+    @State private var motion = ParallaxMotion()
+    /// Set only after the tilt has been held, so a passing wobble doesn't flash
+    /// every place name on the board.
+    @State private var revealedSide: StickerBoardMotion.BoardSide?
     @AppStorage("collection.freeStickerBoard.v1") private var savedStickerPlacements = ""
     @AppStorage("collection.stickerBoardTheme.v1")
     private var selectedThemeRaw = StickerBoardTheme.strawberryCheck.rawValue
@@ -103,7 +107,10 @@ public struct CollectionView: View {
             loadStickerPlacements()
             store.send(.onAppear)
             store.send(.streakOnAppear)
+            motion.start()
         }
+        .onDisappear { motion.stop() }
+        .task(id: tiltedSide) { await holdTiltToReveal() }
         .onChange(of: store.cutouts.map(\.id)) { _, ids in
             let validKeys = Set(ids.map(\.uuidString))
             let cleaned = stickerPlacements.filter { validKeys.contains($0.key) }
@@ -293,6 +300,23 @@ public struct CollectionView: View {
                         width: width,
                         height: height
                     )
+                    let isRevealed = StickerBoardMotion.isRevealed(
+                        xFraction: width > 0 ? Double(point.x / width) : 0.5,
+                        side: revealedSide
+                    )
+                    // A sticker under a finger, or mid-spill, already has motion
+                    // of its own — leaning it as well just fights that.
+                    let isBusy = activeStickerID == cutout.id || isSpilling
+                    let lean = isBusy
+                        ? CGSize.zero
+                        : StickerBoardMotion.lean(
+                            index: index,
+                            tiltX: motion.tiltX,
+                            tiltY: motion.tiltY
+                        )
+                    let leanRotation = isBusy
+                        ? 0
+                        : StickerBoardMotion.leanRotation(index: index, tiltX: motion.tiltX)
                     Button {
                         store.send(
                             store.isEditing
@@ -337,6 +361,9 @@ public struct CollectionView: View {
                             }
                         }
                         .frame(width: side, height: side)
+                        .overlay(alignment: .top) {
+                            revealedPlaceChip(for: cutout, visible: isRevealed)
+                        }
                         .opacity(
                             isSpilling
                                 ? 0.05
@@ -357,6 +384,12 @@ public struct CollectionView: View {
                                 : .spring(response: 0.48, dampingFraction: 0.72),
                             value: isSpilling
                         )
+                        // Tilt response goes on last and unanimated: the sensor
+                        // stream is already smoothed, and a spring here would
+                        // only add lag between the device and the board.
+                        .scaleEffect(isRevealed ? 1.06 : 1)
+                        .rotationEffect(.degrees(leanRotation))
+                        .offset(x: lean.width, y: lean.height)
                     }
                     .buttonStyle(.plain)
                     .position(point)
@@ -645,6 +678,46 @@ public struct CollectionView: View {
         guard let data = try? JSONEncoder().encode(stickerPlacements),
               let encoded = String(data: data, encoding: .utf8) else { return }
         savedStickerPlacements = encoded
+    }
+
+    /// Which half the device leans toward right now, before the hold debounce.
+    private var tiltedSide: StickerBoardMotion.BoardSide? {
+        StickerBoardMotion.revealedSide(tiltX: motion.tiltX, threshold: 0.55)
+    }
+
+    /// Tilt and hold to read the place names on that half of the board. Driven by
+    /// `.task(id:)`, so changing or releasing the tilt cancels a pending reveal.
+    private func holdTiltToReveal() async {
+        guard let tiltedSide else {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) { revealedSide = nil }
+            return
+        }
+        do {
+            try await Task.sleep(for: .milliseconds(300))
+        } catch {
+            return
+        }
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
+            revealedSide = tiltedSide
+        }
+    }
+
+    @ViewBuilder
+    private func revealedPlaceChip(for cutout: CutoutSnapshot, visible: Bool) -> some View {
+        let placeName = store.cutoutMealInfo[cutout.id]?.placeName ?? ""
+        if visible, !placeName.isEmpty {
+            Text(placeName)
+                .font(.appCaption)
+                .foregroundStyle(.appInk)
+                .lineLimit(1)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.appCard.opacity(0.95), in: Capsule())
+                .softShadow()
+                .fixedSize()
+                .offset(y: -11)
+                .transition(.scale(scale: 0.6).combined(with: .opacity))
+        }
     }
 
     @MainActor
