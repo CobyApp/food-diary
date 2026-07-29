@@ -43,6 +43,54 @@ final class FreeStickerBoardLayoutTests: XCTestCase {
         XCTAssertEqual(restored.y, 220, accuracy: 0.001)
     }
 
+    /// The board now spans the whole screen with the controls floating over it,
+    /// so a fresh sticker must land clear of them instead of underneath.
+    func test_defaultPointsStartBelowTheFloatingControls() {
+        let plain = FreeStickerBoardLayout.defaultPoint(index: 0, width: 393)
+        let inset = FreeStickerBoardLayout.defaultPoint(index: 0, width: 393, topInset: 150)
+
+        XCTAssertEqual(inset.y - plain.y, 150, accuracy: 0.001)
+        XCTAssertEqual(inset.x, plain.x, accuracy: 0.001)
+    }
+
+    /// A sticker may still be dragged up into the chrome; only the default
+    /// layout keeps out of it.
+    func test_draggingIsNotRestrictedByTheControlInset() {
+        let point = FreeStickerBoardLayout.clamped(
+            CGPoint(x: 200, y: 0),
+            width: 393,
+            height: 900
+        )
+        let halfSide = FreeStickerBoardLayout.itemSide(width: 393) / 2
+
+        XCTAssertLessThan(point.y, 150)
+        XCTAssertGreaterThanOrEqual(point.y, halfSide)
+    }
+
+    /// An almost-empty canvas should still be a full screen of board, so there is
+    /// somewhere to drag a sticker to.
+    func test_boardFillsAtLeastTheGivenMinimumHeight() {
+        let height = FreeStickerBoardLayout.boardHeight(
+            count: 1,
+            width: 393,
+            placements: [],
+            minimum: 780
+        )
+
+        XCTAssertEqual(height, 780, accuracy: 0.001)
+    }
+
+    func test_boardGrowsPastTheMinimumForStickersPlacedLow() {
+        let height = FreeStickerBoardLayout.boardHeight(
+            count: 1,
+            width: 393,
+            placements: [StickerBoardPlacement(xFraction: 0.5, y: 1_200)],
+            minimum: 780
+        )
+
+        XCTAssertGreaterThan(height, 1_200)
+    }
+
     func test_boardGrowsToKeepSavedStickerVisible() {
         let placement = StickerBoardPlacement(xFraction: 0.5, y: 720)
         let height = FreeStickerBoardLayout.boardHeight(

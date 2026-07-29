@@ -9,10 +9,15 @@ public enum AppRadius {
 
 public struct SoftShadow: ViewModifier {
     public func body(content: Content) -> some View {
-        content.shadow(
-            color: Color.appChocolate.opacity(0.14),
-            radius: 0, x: 3, y: 4
-        )
+        // Flattened first, so the sticker casts one silhouette. Without this,
+        // SwiftUI applies the shadow to every layer underneath, which stamps a
+        // hard offset copy of each glyph onto the card the text sits on.
+        content
+            .compositingGroup()
+            .shadow(
+                color: Color.appChocolate.opacity(0.14),
+                radius: 0, x: 3, y: 4
+            )
     }
 }
 

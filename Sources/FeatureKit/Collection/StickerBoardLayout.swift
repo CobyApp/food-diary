@@ -102,9 +102,16 @@ struct StickerBoardThemeBackground: View {
         ZStack {
             theme.base
             pattern
-            Image("StickerPaper")
-                .resizable()
-                .scaledToFill()
+            // Behind a Color.clear overlay on purpose: a bare scaledToFill image
+            // reports its own oversized dimensions as an ideal size, which used to
+            // be harmless inside the board card's fixed frame but pushes a
+            // full-screen layout wider than the screen.
+            Color.clear
+                .overlay {
+                    Image("StickerPaper")
+                        .resizable()
+                        .scaledToFill()
+                }
                 .opacity(0.18)
                 .blendMode(.multiply)
         }
@@ -381,25 +388,38 @@ enum FreeStickerBoardLayout {
         min(max((width - 24) / CGFloat(columns), 84), 118)
     }
 
-    static func defaultPoint(index: Int, width: CGFloat) -> CGPoint {
+    /// - Parameter topInset: height of the controls floating over the board, so a
+    ///   sticker that has never been moved lands clear of them. Dragging is not
+    ///   restricted by it — `clamped` still allows the full canvas.
+    static func defaultPoint(index: Int, width: CGFloat, topInset: CGFloat = 0) -> CGPoint {
         let side = itemSide(width: width)
         let columnWidth = width / CGFloat(columns)
         let column = index % columns
         let row = index / columns
         return CGPoint(
             x: columnWidth * (CGFloat(column) + 0.5),
-            y: verticalInset + side / 2 + CGFloat(row) * (side * 0.92)
+            y: topInset + verticalInset + side / 2 + CGFloat(row) * (side * 0.92)
         )
     }
 
-    static func boardHeight(count: Int, width: CGFloat, placements: [StickerBoardPlacement]) -> CGFloat {
+    /// - Parameter minimum: floor for the canvas, so a nearly empty board still
+    ///   fills the screen and leaves somewhere to drag a sticker to.
+    static func boardHeight(
+        count: Int,
+        width: CGFloat,
+        placements: [StickerBoardPlacement],
+        topInset: CGFloat = 0,
+        minimum: CGFloat = minimumHeight
+    ) -> CGFloat {
         let side = itemSide(width: width)
-        let lastDefaultY = count > 0 ? defaultPoint(index: count - 1, width: width).y : 0
+        let lastDefaultY = count > 0
+            ? defaultPoint(index: count - 1, width: width, topInset: topInset).y
+            : 0
         let lastPlacedEdge = placements.map {
             CGFloat($0.y) + side * $0.displayScale / 2
         }.max() ?? 0
         return max(
-            minimumHeight,
+            minimum,
             max(lastDefaultY + side / 2, lastPlacedEdge) + verticalInset
         )
     }
@@ -408,9 +428,12 @@ enum FreeStickerBoardLayout {
         for placement: StickerBoardPlacement?,
         index: Int,
         width: CGFloat,
-        height: CGFloat
+        height: CGFloat,
+        topInset: CGFloat = 0
     ) -> CGPoint {
-        guard let placement else { return defaultPoint(index: index, width: width) }
+        guard let placement else {
+            return defaultPoint(index: index, width: width, topInset: topInset)
+        }
         return clamped(
             CGPoint(x: width * CGFloat(placement.xFraction), y: CGFloat(placement.y)),
             width: width,

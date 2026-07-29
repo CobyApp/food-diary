@@ -15,6 +15,8 @@ public struct CollectionView: View {
     @State private var draftRecapEndDate = Date()
     @State private var transformPreview: StickerTransformPreview?
     @State private var motion = ParallaxMotion()
+    /// Measured height of the floating chrome, used as the board's top inset.
+    @State private var controlsHeight: CGFloat = 0
     /// Set only after the tilt has been held, so a passing wobble doesn't flash
     /// every place name on the board.
     @State private var revealedSide: StickerBoardMotion.BoardSide?
@@ -34,73 +36,15 @@ public struct CollectionView: View {
     }
 
     public var body: some View {
-        ScreenScaffold(title: "컬렉션", onRefresh: refreshBoard) {
-            HStack(spacing: 8) {
-                HStack(spacing: 5) {
-                    Image(systemName: "flame.fill")
-                        .foregroundStyle(Color.appCherry)
-                    Text(L10n.format("streak.days", store.streak.current))
-                        .font(.appSection)
-                        .foregroundStyle(.appInk)
-                    if store.streak.best > store.streak.current {
-                        Text(L10n.format("streak.best", store.streak.best))
-                            .font(.appCaption)
-                            .foregroundStyle(.appMuted)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(Color.appCard, in: Capsule())
-                .softShadow()
+        ZStack(alignment: .top) {
+            // The whole screen is the board: the chosen style paints the page
+            // itself rather than filling a framed card sitting inside it.
+            StickerBoardThemeBackground(theme: selectedTheme)
+                .ignoresSafeArea()
 
-                Spacer()
+            canvas
 
-                headerButton(systemImage: "paintpalette.fill", color: .appPinkInk) {
-                    showingBoardStylePicker = true
-                }
-                .accessibilityLabel(Text("보드 꾸미기"))
-
-                headerButton(systemImage: "rosette", color: .appButterInk) {
-                    store.send(.achievementsButtonTapped)
-                }
-            }
-
-            recapPeriodCard
-
-            if store.isEditing {
-                selectionToolbar
-            }
-
-            if store.cutouts.isEmpty {
-                if store.isLoading {
-                    KitschLoadingView(
-                        "누끼 스티커를 꺼내는 중",
-                        messages: ["컬렉션을 가지런히 정리하고 있어요"],
-                        compact: true
-                    )
-                } else {
-                    EmptyState(systemImage: "fork.knife", title: "아직 누끼가 없어요",
-                               subtitle: "음식 사진을 찍어 첫 누끼를 담아보세요!")
-                }
-            } else {
-                freeStickerBoard
-
-                if store.isEditing {
-                    PillButton(
-                        store.isDeleting
-                            ? "삭제하는 중"
-                            : L10n.format(
-                                "collection.delete.count",
-                                store.selectedCutoutIDs.count
-                            ),
-                        enabled: !store.selectedCutoutIDs.isEmpty && !store.isDeleting
-                    ) {
-                        pendingSingleDeleteID = nil
-                        confirmingDeletion = true
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
+            floatingControls
         }
         .toolbar(.hidden, for: .navigationBar)
         .task {
@@ -273,6 +217,110 @@ public struct CollectionView: View {
         .softShadow()
     }
 
+    /// The scrolling canvas. Full-bleed, and tall enough to fill the screen even
+    /// when there is almost nothing on it.
+    private var canvas: some View {
+        ScrollView {
+            if store.cutouts.isEmpty {
+                emptyBoard
+                    .padding(.horizontal, 18)
+                    .padding(.top, controlsHeight + 28)
+                    .padding(.bottom, 96)
+            } else {
+                VStack(spacing: 14) {
+                    freeStickerBoard
+
+                    if store.isEditing {
+                        PillButton(
+                            store.isDeleting
+                                ? "삭제하는 중"
+                                : L10n.format(
+                                    "collection.delete.count",
+                                    store.selectedCutoutIDs.count
+                                ),
+                            enabled: !store.selectedCutoutIDs.isEmpty && !store.isDeleting
+                        ) {
+                            pendingSingleDeleteID = nil
+                            confirmingDeletion = true
+                        }
+                        .padding(.horizontal, 18)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+                .padding(.bottom, 96)
+            }
+        }
+        .scrollIndicators(.hidden)
+        .refreshable { await refreshBoard() }
+    }
+
+    @ViewBuilder
+    private var emptyBoard: some View {
+        if store.isLoading {
+            KitschLoadingView(
+                "누끼 스티커를 꺼내는 중",
+                messages: ["컬렉션을 가지런히 정리하고 있어요"],
+                compact: true
+            )
+        } else {
+            EmptyState(systemImage: "fork.knife", title: "아직 누끼가 없어요",
+                       subtitle: "음식 사진을 찍어 첫 누끼를 담아보세요!")
+        }
+    }
+
+    /// Chrome that stays put while the canvas scrolls under it. Its height feeds
+    /// the board's top inset so a sticker never spawns hidden behind it.
+    private var floatingControls: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                HStack(spacing: 5) {
+                    Image(systemName: "flame.fill")
+                        .foregroundStyle(Color.appCherry)
+                    Text(L10n.format("streak.days", store.streak.current))
+                        .font(.appSection)
+                        .foregroundStyle(.appInk)
+                    if store.streak.best > store.streak.current {
+                        Text(L10n.format("streak.best", store.streak.best))
+                            .font(.appCaption)
+                            .foregroundStyle(.appMuted)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(Color.appCard, in: Capsule())
+                .softShadow()
+
+                Spacer()
+
+                headerButton(systemImage: "paintpalette.fill", color: .appPinkInk) {
+                    showingBoardStylePicker = true
+                }
+                .accessibilityLabel(Text("보드 꾸미기"))
+
+                headerButton(systemImage: "rosette", color: .appButterInk) {
+                    store.send(.achievementsButtonTapped)
+                }
+            }
+
+            recapPeriodCard
+
+            if store.isEditing {
+                selectionToolbar
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(Color.appCard.opacity(0.95), in: Capsule())
+                    .softShadow()
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 6)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.height
+        } action: { height in
+            controlsHeight = height
+        }
+    }
+
     private var freeStickerBoard: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
@@ -282,23 +330,21 @@ public struct CollectionView: View {
             let height = FreeStickerBoardLayout.boardHeight(
                 count: store.cutouts.count,
                 width: width,
-                placements: placements
+                placements: placements,
+                topInset: controlsHeight,
+                minimum: canvasMinimumHeight
             )
             let side = FreeStickerBoardLayout.itemSide(width: width)
 
             ZStack {
-                StickerBoardSurface(
-                    theme: selectedTheme,
-                    frame: selectedFrame
-                )
-
                 ForEach(Array(store.cutouts.enumerated()), id: \.element.id) { index, cutout in
                     let savedPlacement = stickerPlacements[cutout.id.uuidString]
                     let point = FreeStickerBoardLayout.point(
                         for: savedPlacement,
                         index: index,
                         width: width,
-                        height: height
+                        height: height,
+                        topInset: controlsHeight
                     )
                     let isRevealed = StickerBoardMotion.isRevealed(
                         xFraction: width > 0 ? Double(point.x / width) : 0.5,
@@ -653,15 +699,23 @@ public struct CollectionView: View {
         }
     }
 
+    /// A canvas shorter than the screen would leave the styled page cut off part
+    /// way down, so it never goes below one screenful.
+    private var canvasMinimumHeight: CGFloat {
+        max(UIScreen.main.bounds.height, FreeStickerBoardLayout.minimumHeight)
+    }
+
     private var boardHeightForCurrentWidth: CGFloat {
-        // ScreenScaffold uses 18pt horizontal margins on an iPhone-only target.
-        let width = max(UIScreen.main.bounds.width - 36, 284)
+        // Full-bleed now: the canvas runs edge to edge.
+        let width = max(UIScreen.main.bounds.width, 284)
         return FreeStickerBoardLayout.boardHeight(
             count: store.cutouts.count,
             width: width,
             placements: store.cutouts.compactMap {
                 stickerPlacements[$0.id.uuidString]
-            }
+            },
+            topInset: controlsHeight,
+            minimum: canvasMinimumHeight
         )
     }
 
