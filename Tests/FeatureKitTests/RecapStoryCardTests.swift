@@ -15,8 +15,7 @@ final class RecapStoryCardTests: XCTestCase {
         let renderer = ImageRenderer(
             content: RecapStoryCard(
                 images: [swatch, swatch, swatch],
-                mealCount: 3,
-                rangeText: "7.21~7.27"
+                mealCount: 3
             )
             .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
         )
@@ -49,7 +48,6 @@ final class RecapStoryCardTests: XCTestCase {
                 content: RecapStoryCard(
                     images: [swatch, swatch],
                     mealCount: 2,
-                    rangeText: "7.21~7.27",
                     theme: theme,
                     boardPlacements: positions
                 )
@@ -69,8 +67,7 @@ final class RecapStoryCardTests: XCTestCase {
         let renderer = ImageRenderer(
             content: RecapStoryCard(
                 images: [swatch],
-                mealCount: 1,
-                rangeText: "7.28"
+                mealCount: 1
             )
             .frame(width: RecapStoryCard.size.width, height: RecapStoryCard.size.height)
         )

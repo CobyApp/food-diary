@@ -226,3 +226,19 @@
 "설정 열기" = "Open Settings";
 "설정 > Yumkie에서 카메라를 켜주세요. 사진 보관함에서 고르는 것은 그대로 됩니다." = "Turn the camera on in Settings > Yumkie. Picking from your library still works.";
 "이 음식 정보" = "About this food";
+
+// Capture wizard
+"capture.continue.count" = "Keep %d cutouts";
+"capture.next.selected" = "Describe %d";
+"capture.summary.count" = "Saving %d foods";
+"태그 없음" = "No tags";
+"식당 고르기" = "Pick a restaurant";
+"누끼 고르기" = "Pick cutouts";
+"음식 정보" = "Food details";
+"저장하기" = "Save";
+"사진을 가져오면 음식만 오려줄게요" = "Bring a photo and we cut the food out";
+"담고 싶은 음식만 골라주세요" = "Keep only the food you want";
+"좌우로 넘기며 음식마다 채워주세요" = "Swipe to fill in each food";
+"식당을 고르고 저장해요" = "Pick the restaurant and save";
+"지금 먹는 걸 바로 찍기" = "Shoot what you are eating now";
+"찍어둔 사진에서 최대 10장" = "Up to 10 from your library";

@@ -8,28 +8,12 @@ public struct AchievementsView: View {
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 14)]
 
     public var body: some View {
-        ZStack {
-            PaperBackground()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        Text("음식 도감").font(.appDisplay).foregroundStyle(.appInk)
-                        Spacer()
-                        Button { store.send(.close) } label: {
-                            Image(systemName: "xmark")
-                                .font(.caption.bold())
-                                .foregroundStyle(.appInk)
-                                .frame(width: 34, height: 34)
-                                .background(Color.appCard, in: Circle())
-                                .overlay {
-                                    Circle().stroke(
-                                        Color.appChocolate.opacity(0.25),
-                                        lineWidth: 1.5
-                                    )
-                                }
-                        }
-                        .buttonStyle(KitschPressStyle())
-                    }
+        // Same chrome as the other sheets: inline title, 닫기 top-trailing.
+        NavigationStack {
+            ZStack {
+                PaperBackground()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
                     Text(L10n.format(
                         "achievements.progress",
                         store.unlockedCount,
@@ -37,11 +21,19 @@ public struct AchievementsView: View {
                     ))
                         .font(.appSection).foregroundStyle(.appBlueInk)
 
-                    LazyVGrid(columns: columns, spacing: 14) {
-                        ForEach(store.achievements) { a in badge(a) }
+                        LazyVGrid(columns: columns, spacing: 14) {
+                            ForEach(store.achievements) { a in badge(a) }
+                        }
                     }
+                    .padding(18)
                 }
-                .padding(18)
+            }
+            .navigationTitle("음식 도감")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("닫기") { store.send(.close) }
+                }
             }
         }
         .task { store.send(.onAppear) }

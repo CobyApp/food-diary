@@ -4,47 +4,36 @@ import XCTest
 @testable import FeatureKit
 
 final class RecapFeatureTests: XCTestCase {
+    /// The recap shows the board it was handed. There is no query and no range,
+    /// so the count is simply how many stickers came in.
     @MainActor
-    func test_onAppear_defaultsToTodayAndRangeCanBeChanged() async {
-        let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let todayCutout = FoodEntrySnapshot(
-            id: UUID(), fileName: "today.png", eatenAt: now.addingTimeInterval(-60)
-        )
-        let yesterdayCutout = FoodEntrySnapshot(
-            id: UUID(), fileName: "yesterday.png", eatenAt: now.addingTimeInterval(-86_400)
-        )
-        let meals = [todayCutout, yesterdayCutout]
-        let store = TestStore(initialState: RecapFeature.State()) {
+    func test_recapShowsExactlyTheBoardItWasGiven() async {
+        let onBoard = [
+            FoodEntrySnapshot(id: UUID(), fileName: "a.png", eatenAt: Date()),
+            FoodEntrySnapshot(id: UUID(), fileName: "b.png", eatenAt: Date()),
+        ]
+        let store = TestStore(initialState: RecapFeature.State(cutouts: onBoard)) {
             RecapFeature()
         } withDependencies: {
-            $0.date = .constant(now)
             $0.locale = Locale(identifier: "ko_KR")
-            $0.persistence.allEntries = { meals }
             $0.caption.weeklyCaption = { _, _, _ in nil }
         }
-        store.exhaustivity = .off(showSkippedAssertions: false)
 
-        await store.send(.onAppear) { $0.isLoading = true }
-        await store.receive(\.loaded) {
-            $0.isLoading = false
-            $0.weekCutouts = [todayCutout]
-            $0.mealCount = 1
-        }
-        await store.receive(\.captionGenerated) { $0.caption = nil }
+        XCTAssertEqual(store.state.mealCount, 2)
+        await store.send(.onAppear)
+        // No change to assert: an unavailable model leaves the line nil, which is
+        // what it already was.
+        await store.receive(\.captionGenerated)
+    }
 
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now
-        await store.send(.dateRangeChanged(start: yesterday, end: now)) {
-            $0.startDate = Calendar.current.startOfDay(for: yesterday)
-            $0.endDate = Calendar.current.startOfDay(for: now)
-            $0.isLoading = true
-            $0.caption = nil
-            $0.hasEditedCaption = false
+    /// Nothing on the board means nothing to caption, so no request is made.
+    @MainActor
+    func test_anEmptyBoardAsksForNoCaption() async {
+        let store = TestStore(initialState: RecapFeature.State()) {
+            RecapFeature()
         }
-        await store.receive(\.loaded) {
-            $0.isLoading = false
-            $0.weekCutouts = [todayCutout, yesterdayCutout]
-            $0.mealCount = 2
-        }
-        await store.receive(\.captionGenerated) { $0.caption = nil }
+
+        XCTAssertEqual(store.state.mealCount, 0)
+        await store.send(.onAppear)
     }
 }

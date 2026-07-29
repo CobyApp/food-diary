@@ -33,8 +33,19 @@ public struct CaptureFeature {
         }
     }
 
+    /// Capture is a short wizard, one thing per screen. Doing it all on a single
+    /// screen meant the sources, the cutouts, the tags and the restaurant were all
+    /// competing for the same space.
+    public enum Step: Int, Equatable, Sendable, CaseIterable {
+        case source
+        case cutouts
+        case details
+        case finish
+    }
+
     @ObservableState
     public struct State: Equatable {
+        public var step: Step = .source
         public var coordinate: Coordinate?
         public var candidates: [CutoutCandidate]
         public var isProcessing = false
@@ -67,6 +78,11 @@ public struct CaptureFeature {
             editingIndex.map { candidates[$0] }
         }
 
+        /// Only what is actually being saved gets described.
+        public var selectedCandidates: [CutoutCandidate] {
+            candidates.filter(\.isSelected)
+        }
+
         public init(
             coordinate: Coordinate? = nil,
             candidates: [CutoutCandidate] = [],
@@ -87,6 +103,8 @@ public struct CaptureFeature {
         case cycleDecoration(UUID)
         case rotateCandidate(UUID)
         case rotationFinished(id: UUID, pngData: Data?)
+        case nextStep
+        case previousStep
         case cameraTapped
         case cameraAccessResolved(CameraAccess)
         case cameraDismissed
@@ -145,6 +163,10 @@ public struct CaptureFeature {
                         CutoutCandidate(pngData: $0, isSelected: true)
                     }
                 )
+                // Extracting is the point of picking a photo, so move straight on.
+                if !state.candidates.isEmpty, state.step == .source {
+                    state.step = .cutouts
+                }
                 return .none
 
             case let .toggleCandidate(id):
@@ -186,6 +208,32 @@ public struct CaptureFeature {
 
             case let .tagCatalogLoaded(tags):
                 state.tagCatalog = tags
+                return .none
+
+            case .nextStep:
+                switch state.step {
+                case .source:
+                    guard !state.candidates.isEmpty else { return .none }
+                    state.step = .cutouts
+                case .cutouts:
+                    guard state.candidates.contains(where: \.isSelected) else { return .none }
+                    state.step = .details
+                    // Open on the first food the user actually kept.
+                    state.editingCandidateID = state.candidates.first(where: \.isSelected)?.id
+                case .details:
+                    state.step = .finish
+                case .finish:
+                    return .none
+                }
+                return .none
+
+            case .previousStep:
+                switch state.step {
+                case .source: return .none
+                case .cutouts: state.step = .source
+                case .details: state.step = .cutouts
+                case .finish: state.step = .details
+                }
                 return .none
 
             case .cameraTapped:

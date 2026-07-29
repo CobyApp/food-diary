@@ -169,27 +169,21 @@ final class CollectionFeatureTests: XCTestCase {
         }
     }
 
+    /// The recap is a picture of the board, so whatever is on the board is what
+    /// gets handed over — there is no range to carry.
     @MainActor
-    func test_recapDateRange_isPassedWhenPresentingRecap() async {
-        let today = Calendar.current.startOfDay(
-            for: Date(timeIntervalSince1970: 1_800_000_000)
-        )
-        let start = Calendar.current.date(byAdding: .day, value: -6, to: today) ?? today
-        let store = TestStore(
-            initialState: CollectionFeature.State(
-                recapStartDate: today,
-                recapEndDate: today
-            )
-        ) {
+    func test_recapTakesTheBoardAsItStands() async {
+        let onBoard = [
+            FoodEntrySnapshot(id: UUID(), fileName: "a.png", eatenAt: Date(), tags: ["라멘"]),
+            FoodEntrySnapshot(id: UUID(), fileName: "b.png", eatenAt: Date()),
+        ]
+        let store = TestStore(initialState: CollectionFeature.State()) {
             CollectionFeature()
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
-        await store.send(.recapDateRangeChanged(start: start, end: today)) {
-            $0.recapStartDate = start
-            $0.recapEndDate = today
-        }
-        await store.send(.recapButtonTapped) {
-            $0.recap = RecapFeature.State(startDate: start, endDate: today)
+
+        await store.send(.recapButtonTapped(onBoard)) {
+            $0.recap = RecapFeature.State(cutouts: onBoard)
         }
         await store.send(.recap(.presented(.close))) {
             $0.recap = nil

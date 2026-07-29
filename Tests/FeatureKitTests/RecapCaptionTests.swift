@@ -12,12 +12,10 @@ final class RecapCaptionTests: XCTestCase {
             place: PlaceInfo(id: "p1", name: "라멘집", address: "")
         )
         let requested = LockBox()
-        let store = TestStore(initialState: RecapFeature.State()) {
+        let store = TestStore(initialState: RecapFeature.State(cutouts: [meal])) {
             RecapFeature()
         } withDependencies: {
-            $0.date = .constant(Date(timeIntervalSince1970: 1_000_100))
             $0.locale = Locale(identifier: "ja_JP")
-            $0.persistence.allEntries = { [meal] }
             $0.caption.weeklyCaption = { count, places, language in
                 requested.set("\(count)|\(places.joined(separator: ","))|\(language)")
                 return "おいしい一週間"
@@ -26,7 +24,6 @@ final class RecapCaptionTests: XCTestCase {
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.onAppear)
-        await store.receive(\.loaded)
         await store.receive(\.captionGenerated) { $0.caption = "おいしい一週間" }
         XCTAssertEqual(requested.value, "1|라멘집|ja")
     }
@@ -37,18 +34,15 @@ final class RecapCaptionTests: XCTestCase {
             id: UUID(), fileName: "a.png",
             eatenAt: Date(timeIntervalSince1970: 1_000_000)
         )
-        let store = TestStore(initialState: RecapFeature.State()) {
+        let store = TestStore(initialState: RecapFeature.State(cutouts: [meal])) {
             RecapFeature()
         } withDependencies: {
-            $0.date = .constant(Date(timeIntervalSince1970: 1_000_100))
             $0.locale = Locale(identifier: "ko_KR")
-            $0.persistence.allEntries = { [meal] }
             $0.caption.weeklyCaption = { _, _, _ in nil }   // model unavailable
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
         await store.send(.onAppear)
-        await store.receive(\.loaded)
         await store.receive(\.captionGenerated) { $0.caption = nil }
     }
 

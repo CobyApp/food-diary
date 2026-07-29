@@ -8,12 +8,8 @@ public struct CollectionView: View {
     @State private var pendingSingleDeleteID: UUID?
     @State private var activeStickerID: UUID?
     @State private var stickerPlacements: [String: StickerBoardPlacement] = [:]
-    @State private var showingRecapDatePicker = false
     @State private var showingBoardStylePicker = false
     @State private var showingCutoutDrawer = false
-    @State private var showingRecapOptions = false
-    @State private var draftRecapStartDate = Date()
-    @State private var draftRecapEndDate = Date()
     @State private var transformPreview: StickerTransformPreview?
     /// The sticker showing its corner handle. Adjusting is deliberate rather than
     /// something a stray pinch triggers.
@@ -87,21 +83,6 @@ public struct CollectionView: View {
         .sheet(item: $store.scope(state: \.recap, action: \.recap)) { recapStore in
             RecapView(store: recapStore)
         }
-        .sheet(isPresented: $showingRecapDatePicker) {
-            RecapDateRangePicker(
-                startDate: $draftRecapStartDate,
-                endDate: $draftRecapEndDate,
-                onApply: {
-                    store.send(.recapDateRangeChanged(
-                        start: draftRecapStartDate,
-                        end: draftRecapEndDate
-                    ))
-                    showingRecapDatePicker = false
-                }
-            )
-            .presentationDetents([.medium])
-            .presentationDragIndicator(.visible)
-        }
         .sheet(isPresented: $showingCutoutDrawer) {
             NavigationStack {
                 cutoutDrawer
@@ -115,27 +96,6 @@ public struct CollectionView: View {
                     }
             }
             .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-            .presentationBackground(Color.appMilk)
-        }
-        .sheet(isPresented: $showingRecapOptions) {
-            NavigationStack {
-                VStack(spacing: 14) {
-                    recapPeriodCard
-                    Spacer(minLength: 0)
-                }
-                .padding(18)
-                .frame(maxWidth: .infinity, alignment: .top)
-                .background(PaperBackground())
-                .navigationTitle("리캡 만들기")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("닫기") { showingRecapOptions = false }
-                    }
-                }
-            }
-            .presentationDetents([.height(220)])
             .presentationDragIndicator(.visible)
             .presentationBackground(Color.appMilk)
         }
@@ -169,12 +129,20 @@ public struct CollectionView: View {
         ) {
             if let selectedCutoutID = store.selectedCutoutID,
                let cutout = store.cutouts.first(where: { $0.id == selectedCutoutID }) {
-                StickerDetailSheet(
-                    cutout: cutout,
-                    info: store.cutoutMealInfo[selectedCutoutID],
-                    theme: selectedTheme,
-                    onClose: { store.send(.dismissCutoutDetail) }
-                )
+                NavigationStack {
+                    StickerDetailSheet(
+                        cutout: cutout,
+                        info: store.cutoutMealInfo[selectedCutoutID],
+                        theme: selectedTheme
+                    )
+                    .navigationTitle("기록")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("닫기") { store.send(.dismissCutoutDetail) }
+                        }
+                    }
+                }
                 .presentationDetents([.fraction(0.68), .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(30)
@@ -220,61 +188,6 @@ public struct CollectionView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: store.selectedCutoutIDs)
     }
 
-    private var recapPeriodCard: some View {
-        HStack(spacing: 10) {
-            Button {
-                draftRecapStartDate = store.recapStartDate
-                draftRecapEndDate = store.recapEndDate
-                showingRecapDatePicker = true
-            } label: {
-                HStack(spacing: 9) {
-                    KitschIcon(
-                        "calendar",
-                        tint: .appPinkInk,
-                        background: .appPink,
-                        size: 40
-                    )
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("공유 기간")
-                            .font(.appCaption)
-                            .foregroundStyle(.appMuted)
-                        Text(store.recapRangeText)
-                            .font(.appSection)
-                            .foregroundStyle(.appInk)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
-                    }
-                }
-            }
-            .buttonStyle(KitschPressStyle())
-
-            Spacer(minLength: 4)
-
-            Button {
-                showingRecapOptions = false
-                store.send(.recapButtonTapped)
-            } label: {
-                Label("리캡 만들기", systemImage: "square.and.arrow.up")
-                    .labelStyle(.titleAndIcon)
-            }
-            .buttonStyle(
-                KitschFilledButtonStyle(
-                    fullWidth: false,
-                    verticalPadding: 10
-                )
-            )
-        }
-        .padding(12)
-        .background(Color.appCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.appPinkInk.opacity(0.25), lineWidth: 1.5)
-        }
-        .softShadow()
-    }
-
-    /// The scrolling canvas. Full-bleed, and tall enough to fill the screen even
-    /// when there is almost nothing on it.
     /// One screen, no scrolling: a desktop does not scroll, and the drawer holds
     /// whatever does not fit.
     private var canvas: some View {
@@ -425,7 +338,7 @@ public struct CollectionView: View {
                 }
 
                 headerButton(systemImage: "square.and.arrow.up", color: .appChocolate) {
-                    showingRecapOptions = true
+                    store.send(.recapButtonTapped(boardCutouts))
                 }
                 .accessibilityLabel(Text("리캡 만들기"))
             }
@@ -701,87 +614,54 @@ public struct CollectionView: View {
         }
     }
 
+    /// Four backgrounds, nothing else. The sheet already says what it is, so a
+    /// second title and a card around a single row were just noise.
     private var boardStylePicker: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("보드 꾸미기")
-                    .font(.appSection)
-                    .foregroundStyle(.appInk)
-                Spacer()
-                Text("선택한 꾸미기는 인스타 카드에도 적용돼요")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.appMuted)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
-
-            Text("배경 무늬")
-                .font(.appCaption)
-                .foregroundStyle(.appPinkInk)
-
-            ScrollView(.horizontal) {
-                HStack(spacing: 10) {
-                    ForEach(StickerBoardTheme.allCases) { theme in
-                        let selected = selectedTheme == theme
-                        Button {
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
-                                selectedThemeRaw = theme.rawValue
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 150), spacing: 12)],
+            spacing: 12
+        ) {
+            ForEach(StickerBoardTheme.allCases) { theme in
+                let selected = selectedTheme == theme
+                Button {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                        selectedThemeRaw = theme.rawValue
+                    }
+                } label: {
+                    VStack(spacing: 8) {
+                        StickerBoardThemeBackground(theme: theme)
+                            .frame(height: 92)
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .overlay(alignment: .bottomTrailing) {
+                                if selected {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 11, weight: .black))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 24, height: 24)
+                                        .background(theme.accent, in: Circle())
+                                        .overlay(Circle().stroke(Color.appCard, lineWidth: 2))
+                                        .padding(7)
+                                }
                             }
-                        } label: {
-                            VStack(spacing: 6) {
-                                StickerBoardThemeBackground(theme: theme)
-                                    .frame(width: 74, height: 52)
-                                    .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 15, style: .continuous)
-                                            .stroke(
-                                                selected ? theme.accent : Color.appCard,
-                                                lineWidth: selected ? 3 : 2
-                                            )
-                                    }
-                                    .overlay(alignment: .bottomTrailing) {
-                                        if selected {
-                                            Image(systemName: "checkmark")
-                                                .font(.system(size: 9, weight: .black))
-                                                .foregroundStyle(.white)
-                                                .frame(width: 20, height: 20)
-                                                .background(theme.accent, in: Circle())
-                                                .overlay(Circle().stroke(Color.appCard, lineWidth: 2))
-                                                .offset(x: 4, y: 4)
-                                        }
-                                    }
 
-                                Text(L10n.text(theme.titleKey))
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(selected ? theme.accent : Color.appInk)
-                                    .lineLimit(1)
-                            }
-                            .padding(7)
-                            .background(Color.appCard, in: RoundedRectangle(cornerRadius: 18))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 18)
-                                    .stroke(
-                                        selected
-                                            ? theme.accent.opacity(0.65)
-                                            : Color.appChocolate.opacity(0.10),
-                                        lineWidth: selected ? 2 : 1
-                                    )
-                            }
-                        }
-                        .buttonStyle(KitschPressStyle())
-                        .accessibilityAddTraits(selected ? .isSelected : [])
+                        Text(L10n.text(theme.titleKey))
+                            .font(.appCaption)
+                            .foregroundStyle(selected ? theme.accent : Color.appInk)
+                            .lineLimit(1)
+                    }
+                    .padding(8)
+                    .background(Color.appCard, in: RoundedRectangle(cornerRadius: 22))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 22)
+                            .stroke(
+                                selected ? theme.accent : Color.appChocolate.opacity(0.10),
+                                lineWidth: selected ? 2 : 1
+                            )
                     }
                 }
-                .padding(.horizontal, 2)
-                .padding(.bottom, 5)
+                .buttonStyle(KitschPressStyle())
+                .accessibilityAddTraits(selected ? .isSelected : [])
             }
-            .scrollIndicators(.hidden)
-        }
-        .padding(14)
-        .background(Color.appCard.opacity(0.72), in: RoundedRectangle(cornerRadius: 24))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(Color.appChocolate.opacity(0.08), lineWidth: 1)
         }
     }
 
@@ -995,100 +875,6 @@ public struct CollectionView: View {
     }
 }
 
-private struct RecapDateRangePicker: View {
-    @Binding var startDate: Date
-    @Binding var endDate: Date
-    let onApply: () -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    private let calendar = Calendar.current
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(spacing: 8) {
-                    presetButton("오늘") {
-                        let today = calendar.startOfDay(for: Date())
-                        startDate = today
-                        endDate = today
-                    }
-                    presetButton("최근 7일") {
-                        let today = calendar.startOfDay(for: Date())
-                        startDate = calendar.date(byAdding: .day, value: -6, to: today) ?? today
-                        endDate = today
-                    }
-                    presetButton("이번 달") {
-                        let today = calendar.startOfDay(for: Date())
-                        startDate = calendar.dateInterval(of: .month, for: today)?.start ?? today
-                        endDate = today
-                    }
-                }
-
-                VStack(spacing: 12) {
-                    dateRow(
-                        "시작일",
-                        selection: $startDate,
-                        range: Date.distantPast...endDate
-                    )
-                    dateRow("종료일", selection: $endDate, range: startDate...Date())
-                }
-                .padding(16)
-                .background(Color.appCard, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(Color.appPinkInk.opacity(0.22), lineWidth: 1.5)
-                }
-
-                PillButton("이 기간으로 만들기", action: onApply)
-                Spacer(minLength: 0)
-            }
-            .padding(20)
-            .background(PaperBackground())
-            .navigationTitle("기간 설정")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("닫기") { dismiss() }
-                }
-            }
-        }
-    }
-
-    private func presetButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(LocalizedStringKey(title))
-        }
-        .buttonStyle(
-            KitschOutlineButtonStyle(
-                color: .appPinkInk,
-                fullWidth: true,
-                verticalPadding: 9
-            )
-        )
-    }
-
-    private func dateRow(
-        _ title: String,
-        selection: Binding<Date>,
-        range: ClosedRange<Date>
-    ) -> some View {
-        HStack {
-            Text(LocalizedStringKey(title))
-                .font(.appSection)
-                .foregroundStyle(.appInk)
-            Spacer()
-            DatePicker(
-                LocalizedStringKey(title),
-                selection: selection,
-                in: range,
-                displayedComponents: .date
-            )
-            .labelsHidden()
-            .tint(.appCherry)
-        }
-    }
-}
-
 private struct StickerRatingBadge: View {
     let rating: Int
 
@@ -1107,11 +893,14 @@ private struct StickerRatingBadge: View {
     }
 }
 
+private extension Optional where Wrapped == String {
+    var orEmpty: String { self ?? "" }
+}
+
 private struct StickerDetailSheet: View {
     let cutout: FoodEntrySnapshot
     let info: CutoutMealInfo?
     let theme: StickerBoardTheme
-    let onClose: () -> Void
 
     private var tags: [String] {
         info?.tags ?? []
@@ -1150,15 +939,6 @@ private struct StickerDetailSheet: View {
                                 .foregroundStyle(.appMuted)
                         }
                         Spacer()
-                        Button(action: onClose) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 13, weight: .black))
-                                .foregroundStyle(theme.accent)
-                                .frame(width: 34, height: 34)
-                                .background(Color.appCard, in: Circle())
-                                .overlay(Circle().stroke(theme.accent.opacity(0.4), lineWidth: 2))
-                        }
-                        .buttonStyle(KitschPressStyle())
                     }
 
                     ZStack {
@@ -1242,8 +1022,6 @@ private struct StickerDetailSheet: View {
                         RoundedRectangle(cornerRadius: 20)
                             .stroke(theme.accent.opacity(0.28), lineWidth: 1.5)
                     }
-
-                    PillButton("닫기", action: onClose)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
@@ -1262,10 +1040,6 @@ private struct StickerDetailSheet: View {
             PastelChip(cutout.label.orEmpty, tone: .blue)
         }
     }
-}
-
-private extension Optional where Wrapped == String {
-    var orEmpty: String { self ?? "" }
 }
 
 private struct StickerTransformPreview: Equatable {

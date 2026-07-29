@@ -15,12 +15,10 @@ public struct RecapExport: Transferable {
 public struct RecapCardView: View {
     let images: [UIImage]
     let mealCount: Int
-    let rangeText: String
 
-    public init(images: [UIImage], mealCount: Int, rangeText: String) {
+    public init(images: [UIImage], mealCount: Int) {
         self.images = images
         self.mealCount = mealCount
-        self.rangeText = rangeText
     }
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
@@ -31,7 +29,7 @@ public struct RecapCardView: View {
                 Text("나의 맛있는 기록")
                     .font(.appTitle)
                     .foregroundStyle(.appInk)
-                Text(L10n.format("recap.meals", mealCount, rangeText))
+                Text(L10n.format("recap.meals.count", mealCount))
                     .font(.appBody)
                     .foregroundStyle(.appMuted)
             }
@@ -91,19 +89,11 @@ public struct RecapView: View {
             ZStack {
                 PaperBackground()
                 VStack(spacing: 0) {
-                    if store.isLoading {
-                        Spacer()
-                        KitschLoadingView(
-                            "리캡 카드를 만드는 중",
-                            messages: ["선택한 기간의 맛있는 순간을 모으고 있어요"]
-                        )
-                        .padding(24)
-                        Spacer()
-                    } else if store.weekCutouts.isEmpty {
+                    if store.cutouts.isEmpty {
                         EmptyState(
                             systemImage: "film.stack",
-                            title: "선택한 기간에 기록이 없어요",
-                            subtitle: "메인에서 다른 기간을 골라보세요!"
+                            title: "보드가 비어 있어요",
+                            subtitle: "서랍에서 누끼를 올린 뒤 리캡을 만들어보세요!"
                         )
                         .padding(.horizontal, 22)
                         Spacer()
@@ -143,10 +133,10 @@ public struct RecapView: View {
             guard !images.isEmpty else { return }
             await renderExport()
         }
-        .task(id: store.weekCutouts) {
+        .task(id: store.cutouts) {
             var loadedImages: [UIImage] = []
             var loadedIDs: [UUID] = []
-            for cutout in store.weekCutouts {
+            for cutout in store.cutouts {
                 if let image = await CutoutImageLoader.shared.image(
                     fileName: cutout.fileName,
                     cacheKey: cutout.fileName,
@@ -183,7 +173,6 @@ public struct RecapView: View {
         return RecapStoryCard(
             images: images,
             mealCount: store.mealCount,
-            rangeText: store.rangeText,
             caption: store.caption,
             theme: selectedTheme,
             boardPlacements: storyBoardPlacements
@@ -258,7 +247,6 @@ public struct RecapView: View {
             RecapStoryCard(
                 images: images,
                 mealCount: store.mealCount,
-                rangeText: store.rangeText,
                 caption: store.caption,
                 theme: selectedTheme,
                     boardPlacements: storyBoardPlacements

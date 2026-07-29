@@ -6,7 +6,6 @@ import SwiftUI
 struct RecapStoryCard: View {
     let images: [UIImage]
     let mealCount: Int
-    let rangeText: String
     var caption: String?
     var theme: StickerBoardTheme = .strawberryCheck
     var boardPlacements: [StickerBoardPlacement?] = []
@@ -61,10 +60,6 @@ struct RecapStoryCard: View {
                     .font(.system(size: 10, weight: .black, design: .rounded))
                     .tracking(1.7)
                     .foregroundStyle(theme.accent)
-                Spacer()
-                Text(rangeText)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.appMuted)
             }
 
             HStack(alignment: .lastTextBaseline, spacing: 8) {
