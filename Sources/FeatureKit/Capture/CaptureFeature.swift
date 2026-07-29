@@ -42,6 +42,9 @@ public struct CaptureFeature {
         public var processingTotal = 0
         public var isSaving = false
         public var isSaveErrorPresented = false
+        public var isCameraPresented = false
+        /// Shown when iOS has already been told no: it will not ask again.
+        public var isCameraDeniedPresented = false
         /// The food whose information is being filled in, if that sheet is open.
         public var editingCandidateID: UUID?
         /// Every tag the user has ever made, so they can be reused.
@@ -84,6 +87,10 @@ public struct CaptureFeature {
         case cycleDecoration(UUID)
         case rotateCandidate(UUID)
         case rotationFinished(id: UUID, pngData: Data?)
+        case cameraTapped
+        case cameraAccessResolved(CameraAccess)
+        case cameraDismissed
+        case dismissCameraDenied
         case editCandidateTapped(UUID)
         case dismissCandidateEditor
         case tagsOnAppear
@@ -108,6 +115,7 @@ public struct CaptureFeature {
     @Dependency(\.foodCutout) var foodCutout
     @Dependency(\.photoLocation) var photoLocation
     @Dependency(\.persistence) var persistence
+    @Dependency(\.cameraAccess) var cameraAccess
 
     public init() {}
 
@@ -178,6 +186,26 @@ public struct CaptureFeature {
 
             case let .tagCatalogLoaded(tags):
                 state.tagCatalog = tags
+                return .none
+
+            case .cameraTapped:
+                return .run { send in
+                    await send(.cameraAccessResolved(await cameraAccess.request()))
+                }
+
+            case let .cameraAccessResolved(access):
+                switch access {
+                case .granted: state.isCameraPresented = true
+                case .denied: state.isCameraDeniedPresented = true
+                }
+                return .none
+
+            case .cameraDismissed:
+                state.isCameraPresented = false
+                return .none
+
+            case .dismissCameraDenied:
+                state.isCameraDeniedPresented = false
                 return .none
 
             case let .editCandidateTapped(id):

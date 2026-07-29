@@ -6,7 +6,6 @@ public struct CollectionView: View {
     @Bindable var store: StoreOf<CollectionFeature>
     @State private var confirmingDeletion = false
     @State private var pendingSingleDeleteID: UUID?
-    @State private var isSpilling = false
     @State private var activeStickerID: UUID?
     @State private var stickerPlacements: [String: StickerBoardPlacement] = [:]
     @State private var showingRecapDatePicker = false
@@ -37,6 +36,9 @@ public struct CollectionView: View {
     private var selectedTheme: StickerBoardTheme {
         StickerBoardTheme(rawValue: selectedThemeRaw) ?? .strawberryCheck
     }
+
+    /// Space the floating tab bar takes at the bottom of the board.
+    private static let tabBarInset: CGFloat = 96
 
     /// What is actually out on the board.
     private var boardCutouts: [FoodEntrySnapshot] {
@@ -273,39 +275,37 @@ public struct CollectionView: View {
 
     /// The scrolling canvas. Full-bleed, and tall enough to fill the screen even
     /// when there is almost nothing on it.
+    /// One screen, no scrolling: a desktop does not scroll, and the drawer holds
+    /// whatever does not fit.
     private var canvas: some View {
-        ScrollView {
+        ZStack(alignment: .bottom) {
             if boardCutouts.isEmpty {
                 emptyBoard
                     .padding(.horizontal, 18)
                     .padding(.top, controlsHeight + 28)
-                    .padding(.bottom, 96)
+                    .frame(maxHeight: .infinity, alignment: .top)
             } else {
-                VStack(spacing: 14) {
-                    freeStickerBoard
+                freeStickerBoard
+            }
 
-                    if store.isEditing {
-                        PillButton(
-                            store.isDeleting
-                                ? "삭제하는 중"
-                                : L10n.format(
-                                    "collection.delete.count",
-                                    store.selectedCutoutIDs.count
-                                ),
-                            enabled: !store.selectedCutoutIDs.isEmpty && !store.isDeleting
-                        ) {
-                            pendingSingleDeleteID = nil
-                            confirmingDeletion = true
-                        }
-                        .padding(.horizontal, 18)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
+            if store.isEditing, !boardCutouts.isEmpty {
+                PillButton(
+                    store.isDeleting
+                        ? "삭제하는 중"
+                        : L10n.format(
+                            "collection.delete.count",
+                            store.selectedCutoutIDs.count
+                        ),
+                    enabled: !store.selectedCutoutIDs.isEmpty && !store.isDeleting
+                ) {
+                    pendingSingleDeleteID = nil
+                    confirmingDeletion = true
                 }
-                .padding(.bottom, 96)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 100)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .scrollIndicators(.hidden)
-        .refreshable { await refreshBoard() }
     }
 
     /// Every cutout ever saved. The board shows a chosen few; this is the drawer
@@ -451,16 +451,9 @@ public struct CollectionView: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let cutouts = boardCutouts
-            let placements = cutouts.compactMap {
-                stickerPlacements[$0.id.uuidString]
-            }
-            let height = FreeStickerBoardLayout.boardHeight(
-                count: cutouts.count,
-                width: width,
-                placements: placements,
-                topInset: controlsHeight,
-                minimum: canvasMinimumHeight
-            )
+            // Exactly the space on screen: with no scrolling there is nowhere
+            // for the board to grow to.
+            let height = proxy.size.height
             let side = FreeStickerBoardLayout.itemSide(width: width)
 
             ZStack {
@@ -479,7 +472,7 @@ public struct CollectionView: View {
                     )
                     // A sticker under a finger, or mid-spill, already has motion
                     // of its own — leaning it as well just fights that.
-                    let isBusy = activeStickerID == cutout.id || isSpilling
+                    let isBusy = activeStickerID == cutout.id
                     let lean = isBusy
                         ? CGSize.zero
                         : StickerBoardMotion.lean(
@@ -538,24 +531,9 @@ public struct CollectionView: View {
                             revealedPlaceChip(for: cutout, visible: isRevealed)
                         }
                         .opacity(
-                            isSpilling
-                                ? 0.05
-                                : store.isEditing && !store.selectedCutoutIDs.contains(cutout.id)
+                            store.isEditing && !store.selectedCutoutIDs.contains(cutout.id)
                                 ? 0.62
                                 : 1
-                        )
-                        .offset(
-                            y: isSpilling
-                                ? 720 + CGFloat(index / FreeStickerBoardLayout.columns) * 18
-                                : 0
-                        )
-                        .animation(
-                            isSpilling
-                                ? .easeIn(duration: 0.3).delay(
-                                    StickerBoardMotion.spillDelay(index: index)
-                                )
-                                : .spring(response: 0.48, dampingFraction: 0.72),
-                            value: isSpilling
                         )
                         // Tilt response goes on last and unanimated: the sensor
                         // stream is already smoothed, and a spring here would
@@ -721,7 +699,6 @@ public struct CollectionView: View {
             .frame(width: width, height: height)
             .coordinateSpace(.named("board"))
         }
-        .frame(height: boardHeightForCurrentWidth)
     }
 
     private var boardStylePicker: some View {
@@ -808,27 +785,6 @@ public struct CollectionView: View {
         }
     }
 
-    /// A canvas shorter than the screen would leave the styled page cut off part
-    /// way down, so it never goes below one screenful.
-    private var canvasMinimumHeight: CGFloat {
-        max(UIScreen.main.bounds.height, FreeStickerBoardLayout.minimumHeight)
-    }
-
-    private var boardHeightForCurrentWidth: CGFloat {
-        // Full-bleed now: the canvas runs edge to edge.
-        let width = max(UIScreen.main.bounds.width, 284)
-        let cutouts = boardCutouts
-        return FreeStickerBoardLayout.boardHeight(
-            count: cutouts.count,
-            width: width,
-            placements: cutouts.compactMap {
-                stickerPlacements[$0.id.uuidString]
-            },
-            topInset: controlsHeight,
-            minimum: canvasMinimumHeight
-        )
-    }
-
     private func loadStickerPlacements() {
         guard let data = savedStickerPlacements.data(using: .utf8),
               let decoded = try? JSONDecoder().decode(
@@ -903,8 +859,9 @@ public struct CollectionView: View {
 
     /// Puts a sticker back out, in the first slot nothing else is sitting in.
     private func addToBoard(_ cutout: FoodEntrySnapshot) {
+        // The board is exactly the screen now, minus the floating tab bar.
         let width = max(UIScreen.main.bounds.width, 284)
-        let height = boardHeightForCurrentWidth
+        let height = max(UIScreen.main.bounds.height - Self.tabBarInset, 320)
         let occupied = boardCutouts.map {
             FreeStickerBoardLayout.point(
                 for: stickerPlacements[$0.id.uuidString],
@@ -974,15 +931,6 @@ public struct CollectionView: View {
                 .offset(y: -11)
                 .transition(.scale(scale: 0.6).combined(with: .opacity))
         }
-    }
-
-    @MainActor
-    private func refreshBoard() async {
-        guard !isSpilling else { return }
-        isSpilling = true
-        try? await Task.sleep(for: .milliseconds(760))
-        await store.send(.onAppear).finish()
-        isSpilling = false
     }
 
     private var selectionToolbar: some View {

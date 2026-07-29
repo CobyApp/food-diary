@@ -3,35 +3,21 @@ import SwiftUI
 public struct ScreenScaffold<Content: View>: View {
     private let title: String
     private let doodle: String?
-    private let onRefresh: (@Sendable () async -> Void)?
     private let content: Content
 
     public init(
         title: String,
         doodle: String? = nil,
-        onRefresh: (@Sendable () async -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.doodle = doodle
-        self.onRefresh = onRefresh
         self.content = content()
     }
 
     public var body: some View {
         ZStack {
             PaperBackground()
-            refreshableScroll
-        }
-    }
-
-    @ViewBuilder
-    private var refreshableScroll: some View {
-        if let onRefresh {
-            scrollContent.refreshable {
-                await onRefresh()
-            }
-        } else {
             scrollContent
         }
     }

@@ -43,7 +43,20 @@ public struct RootFeature {
             switch action {
             case let .tabChanged(tab):
                 state.tab = tab
-                return .none
+                // Arriving on a tab is what reloads it; there is no pull gesture.
+                switch tab {
+                case .collection:
+                    return .merge(
+                        .send(.collection(.onAppear)),
+                        .send(.collection(.streakOnAppear))
+                    )
+                case .map:
+                    return .send(.foodMap(.onAppear))
+                case .game:
+                    return .send(.gameHub(.onAppear))
+                case .capture:
+                    return .send(.capture(.tagsOnAppear))
+                }
 
             case let .collection(.cutoutsDeleted(ids)):
                 return .merge(

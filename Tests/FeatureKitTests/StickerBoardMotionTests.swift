@@ -117,23 +117,6 @@ final class StickerBoardMotionTests: XCTestCase {
         XCTAssertLessThanOrEqual(v, StickerBoardMotion.maxReleaseVelocity)
     }
 
-    // MARK: - Spill
-
-    func test_spillDelayGrowsWithIndexThenSaturates() {
-        XCTAssertEqual(StickerBoardMotion.spillDelay(index: 0), 0, accuracy: 0.0001)
-        XCTAssertGreaterThan(
-            StickerBoardMotion.spillDelay(index: 5),
-            StickerBoardMotion.spillDelay(index: 2)
-        )
-        // A hundred stickers must not stretch the pull-to-refresh into a wait.
-        XCTAssertEqual(
-            StickerBoardMotion.spillDelay(index: 400),
-            StickerBoardMotion.spillDelay(index: 100),
-            accuracy: 0.0001
-        )
-        XCTAssertLessThanOrEqual(StickerBoardMotion.spillDelay(index: 400), 0.5)
-    }
-
     // MARK: - Tilt to browse
 
     func test_noColumnRevealedBelowThreshold() {

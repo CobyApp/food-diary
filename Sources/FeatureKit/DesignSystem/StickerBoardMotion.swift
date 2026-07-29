@@ -76,14 +76,6 @@ enum StickerBoardMotion {
         return min(Double(speed / distance), maxReleaseVelocity)
     }
 
-    // MARK: - Spill
-
-    /// Stagger for the pull-to-spill animation, in seconds. Capped so a large
-    /// collection does not stretch a refresh into a wait.
-    static func spillDelay(index: Int, step: Double = 0.03, cap: Double = 0.42) -> Double {
-        min(Double(max(0, index)) * step, cap)
-    }
-
     // MARK: - Tilt normalisation
 
     /// Normalises a raw CoreMotion attitude angle to -1...1.

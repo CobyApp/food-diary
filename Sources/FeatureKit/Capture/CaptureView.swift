@@ -7,7 +7,6 @@ public struct CaptureView: View {
     @Bindable var store: StoreOf<CaptureFeature>
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showingPhotoLibrary = false
-    @State private var showingCamera = false
     @State private var isLoadingPhotoData = false
     public init(store: StoreOf<CaptureFeature>) { self.store = store }
 
@@ -31,7 +30,7 @@ public struct CaptureView: View {
                                 && !store.isProcessing
                                 && !isLoadingPhotoData
                         ) {
-                            showingCamera = true
+                            store.send(.cameraTapped)
                         }
                         sourceButton(
                             title: "사진 보관함",
@@ -104,15 +103,38 @@ public struct CaptureView: View {
                 matching: .images,
                 preferredItemEncoding: .automatic
             )
-            .fullScreenCover(isPresented: $showingCamera) {
+            .fullScreenCover(
+                isPresented: Binding(
+                    get: { store.isCameraPresented },
+                    set: { if !$0 { store.send(.cameraDismissed) } }
+                )
+            ) {
                 CameraPicker(
                     onImagePicked: { data in
-                        showingCamera = false
+                        store.send(.cameraDismissed)
                         store.send(.photoPicked(data))
                     },
-                    onCancel: { showingCamera = false }
+                    onCancel: { store.send(.cameraDismissed) }
                 )
                 .ignoresSafeArea()
+            }
+            .alert(
+                "카메라를 쓸 수 없어요",
+                isPresented: Binding(
+                    get: { store.isCameraDeniedPresented },
+                    set: { if !$0 { store.send(.dismissCameraDenied) } }
+                )
+            ) {
+                // iOS only ever asks once, so Settings is the only way back.
+                Button("설정 열기") {
+                    store.send(.dismissCameraDenied)
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                Button("취소", role: .cancel) { store.send(.dismissCameraDenied) }
+            } message: {
+                Text("설정 > Yumkie에서 카메라를 켜주세요. 사진 보관함에서 고르는 것은 그대로 됩니다.")
             }
             .onChange(of: pickerItems) { _, items in
                 guard !items.isEmpty else { return }
@@ -160,62 +182,90 @@ public struct CaptureView: View {
             Button("바꾸기") { store.send(.renameConfirmed) }
             Button("취소", role: .cancel) { store.send(.renameCancelled) }
         }
-        .sheet(
+        .fullScreenCover(
             isPresented: Binding(
                 get: { store.editingCandidateID != nil },
                 set: { if !$0 { store.send(.dismissCandidateEditor) } }
             )
         ) {
-            NavigationStack {
-                foodEditor
-                    .background(PaperBackground())
-                    .navigationTitle("이 음식 정보")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("완료") { store.send(.dismissCandidateEditor) }
-                        }
-                    }
-            }
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-            .presentationBackground(Color.appMilk)
+            foodEditor
         }
     }
 
-    /// One food's own tags and rating. Several dishes photographed together each
-    /// get their own record, so each is described on its own.
+    /// One food's own tags and rating, one card per food, swiped through on a
+    /// full screen. A sheet cropped the cutout down to a thumbnail and left the
+    /// tag list fighting for the little room underneath.
     @ViewBuilder
     private var foodEditor: some View {
-        if let candidate = store.editingCandidate {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    StickerTile(tint: .pink) {
-                        CutoutImage(
-                            data: candidate.pngData,
-                            cacheKey: candidate.id.uuidString
+        ZStack {
+            PaperBackground()
+
+            VStack(spacing: 0) {
+                HStack {
+                    Text(
+                        L10n.format(
+                            "capture.food.position",
+                            (store.editingIndex ?? 0) + 1,
+                            store.candidates.count
                         )
-                    }
-                    .frame(maxWidth: 180)
-                    .frame(maxWidth: .infinity, alignment: .center)
+                    )
+                    .font(.appSection)
+                    .foregroundStyle(.appMuted)
+                    Spacer()
+                    Button("완료") { store.send(.dismissCandidateEditor) }
+                        .font(.appSection)
+                        .foregroundStyle(.appPinkInk)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
 
-                    SoftCard { tagSection }
-
-                    SoftCard {
-                        HStack {
-                            Text("별점").font(.appSection).foregroundStyle(.appInk)
-                            Spacer()
-                            StarRating(
-                                rating: candidate.rating,
-                                onChange: { store.send(.ratingChanged($0)) }
-                            )
-                        }
+                TabView(
+                    selection: Binding(
+                        get: { store.editingCandidateID ?? store.candidates.first?.id ?? UUID() },
+                        set: { store.send(.editCandidateTapped($0)) }
+                    )
+                ) {
+                    ForEach(Array(store.candidates.enumerated()), id: \.element.id) { index, candidate in
+                        foodEditorPage(index: index, candidate: candidate)
+                            .tag(candidate.id)
                     }
                 }
-                .padding(18)
+                .tabViewStyle(.page(indexDisplayMode: store.candidates.count > 1 ? .always : .never))
             }
-            .scrollIndicators(.hidden)
         }
+    }
+
+    private func foodEditorPage(
+        index: Int,
+        candidate: CaptureFeature.CutoutCandidate
+    ) -> some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                // Big and centred: this is the thing being described.
+                StickerTile(tint: .rotating(index)) {
+                    CutoutImage(data: candidate.pngData, cacheKey: candidate.id.uuidString)
+                }
+                .frame(maxWidth: 280)
+                .frame(maxWidth: .infinity)
+
+                SoftCard { tagSection }
+
+                SoftCard {
+                    HStack {
+                        Text("별점").font(.appSection).foregroundStyle(.appInk)
+                        Spacer()
+                        StarRating(
+                            rating: candidate.rating,
+                            onChange: { store.send(.ratingChanged($0)) }
+                        )
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 40)
+        }
+        .scrollIndicators(.hidden)
     }
 
     private func candidateCard(index: Int, candidate: CaptureFeature.CutoutCandidate) -> some View {
