@@ -135,7 +135,6 @@ public struct CollectionView: View {
                         info: store.cutoutMealInfo[selectedCutoutID],
                         theme: selectedTheme
                     )
-                    .navigationTitle("기록")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {

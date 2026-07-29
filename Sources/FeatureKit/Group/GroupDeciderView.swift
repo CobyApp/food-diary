@@ -28,7 +28,12 @@ public struct GroupDeciderView: View {
             case .champion:
                 championScreen
             }
-            closeButton
+
+            VStack(spacing: 0) {
+                CoverBar("함께 월드컵") { store.send(.leave) }
+                Spacer(minLength: 0)
+            }
+            .zIndex(10)
         }
         .task { store.send(.onAppear) }
     }
@@ -207,21 +212,9 @@ public struct GroupDeciderView: View {
                         TagChipRow(w.tags, limit: 3, size: .regular)
                     }
                 }
-                PillButton("나가기") { store.send(.leave) }.padding(.horizontal, 60)
             }
             .padding(24)
         }
     }
 
-    // MARK: - Shared
-
-    private var closeButton: some View {
-        Button { store.send(.leave) } label: {
-            Image(systemName: "xmark.circle.fill").font(.title2).foregroundStyle(.appMuted)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(L10n.text("닫기"))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-        .padding(20)
-    }
 }

@@ -5,7 +5,6 @@ struct ResultCard: View {
     let cutout: FoodEntrySnapshot
     let info: GameResultInfo?
     let onAgain: () -> Void
-    let onClose: () -> Void
 
     @State private var stamped = false
 
@@ -43,7 +42,6 @@ struct ResultCard: View {
                 }
                 HStack(spacing: 12) {
                     PillButton("한 번 더") { onAgain() }
-                    OutlineButton("닫기") { onClose() }
                 }
             }
             .padding(24)

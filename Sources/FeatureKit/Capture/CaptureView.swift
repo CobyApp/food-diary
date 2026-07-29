@@ -214,10 +214,9 @@ public struct CaptureView: View {
     // MARK: - Step 1: where the photo comes from
 
     private var sourceStep: some View {
-        VStack(spacing: 16) {
-            Spacer(minLength: 0)
-
+        VStack(spacing: 18) {
             if store.isProcessing || isLoadingPhotoData {
+                Spacer(minLength: 0)
                 KitschLoadingView(
                     isLoadingPhotoData ? "선택한 사진을 불러오는 중" : processingTitle,
                     messages: [
@@ -229,45 +228,73 @@ public struct CaptureView: View {
                 )
                 .padding(.horizontal, 24)
                 .transition(.scale(scale: 0.94).combined(with: .opacity))
+                Spacer(minLength: 0)
             } else {
-                VStack(spacing: 14) {
-                    sourceCard(
-                        title: "카메라",
-                        subtitle: "지금 먹는 걸 바로 찍기",
-                        systemImage: "camera.fill",
-                        color: .appPink,
-                        enabled: UIImagePickerController.isSourceTypeAvailable(.camera)
-                    ) {
-                        store.send(.cameraTapped)
-                    }
-                    sourceCard(
-                        title: "사진 보관함",
-                        subtitle: "찍어둔 사진에서 최대 10장",
-                        systemImage: "photo.on.rectangle.angled",
-                        color: .appBlue,
-                        enabled: true
-                    ) {
-                        showingPhotoLibrary = true
-                    }
+                // Fills the screen instead of floating in the middle: the two
+                // choices share the room, with the how-it-works note under them.
+                sourceCard(
+                    title: "카메라",
+                    subtitle: "지금 먹는 걸 바로 찍기",
+                    systemImage: "camera.fill",
+                    color: .appPink,
+                    enabled: UIImagePickerController.isSourceTypeAvailable(.camera)
+                ) {
+                    store.send(.cameraTapped)
                 }
-                .padding(.horizontal, 18)
-            }
-
-            Spacer(minLength: 0)
-
-            if !store.candidates.isEmpty, !store.isProcessing {
-                Button { store.send(.nextStep) } label: {
-                    Label(
-                        L10n.format("capture.continue.count", store.candidates.count),
-                        systemImage: "arrow.right"
-                    )
+                sourceCard(
+                    title: "사진 보관함",
+                    subtitle: "찍어둔 사진에서 최대 10장",
+                    systemImage: "photo.on.rectangle.angled",
+                    color: .appBlue,
+                    enabled: true
+                ) {
+                    showingPhotoLibrary = true
                 }
-                .buttonStyle(KitschFilledButtonStyle(fullWidth: true, verticalPadding: 14))
-                .padding(.horizontal, 18)
-                .padding(.bottom, 26)
+
+                howItWorks
+
+                if !store.candidates.isEmpty {
+                    Button { store.send(.nextStep) } label: {
+                        Label(
+                            L10n.format("capture.continue.count", store.candidates.count),
+                            systemImage: "arrow.right"
+                        )
+                    }
+                    .buttonStyle(KitschFilledButtonStyle(fullWidth: true, verticalPadding: 14))
+                }
             }
         }
+        .padding(.horizontal, 18)
+        .padding(.bottom, 26)
     }
+
+    /// Three short lines so the empty first screen still says something useful.
+    private var howItWorks: some View {
+        SoftCard {
+            VStack(alignment: .leading, spacing: 11) {
+                ForEach(Array(Self.howItWorksSteps.enumerated()), id: \.offset) { index, text in
+                    HStack(spacing: 10) {
+                        Text(verbatim: "\(index + 1)")
+                            .font(.system(size: 11, weight: .black, design: .rounded))
+                            .foregroundStyle(.appPinkInk)
+                            .frame(width: 22, height: 22)
+                            .background(Color.appPink, in: Circle())
+                        Text(L10n.text(text))
+                            .font(.appCaption)
+                            .foregroundStyle(.appInk)
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private static let howItWorksSteps = [
+        "사진을 가져오면 음식만 오려내요",
+        "담고 싶은 음식만 골라요",
+        "음식마다 태그와 별점을 남겨요",
+    ]
 
     /// A wide row rather than a square tile: it reads as a choice, and there is
     /// room to say what each one is for.
@@ -281,7 +308,7 @@ public struct CaptureView: View {
     ) -> some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                KitschIcon(systemImage, tint: .appChocolate, background: color, size: 58)
+                KitschIcon(systemImage, tint: .appChocolate, background: color, size: 62)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(LocalizedStringKey(title))
                         .font(.appTitle)
@@ -297,8 +324,8 @@ public struct CaptureView: View {
                     .font(.system(size: 13, weight: .black))
                     .foregroundStyle(.appMuted)
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+            .frame(maxWidth: .infinity, minHeight: 104, alignment: .leading)
             .background(Color.appCard, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 26, style: .continuous)

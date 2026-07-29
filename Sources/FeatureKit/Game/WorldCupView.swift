@@ -13,6 +13,12 @@ public struct WorldCupView: View {
     public var body: some View {
         ZStack {
             PaperBackground()
+
+            VStack(spacing: 0) {
+                CoverBar("음식 월드컵") { store.send(.close) }
+                Spacer(minLength: 0)
+            }
+            .zIndex(10)
             if let champion = store.champion {
                 ResultCard(
                     cutout: champion,
@@ -20,8 +26,7 @@ public struct WorldCupView: View {
                     onAgain: {
                         selectedID = nil
                         store.send(.playAgain)
-                    },
-                    onClose: { store.send(.close) }
+                    }
                 )
             } else if let pair = store.currentPair {
                 VStack(spacing: 18) {
@@ -55,7 +60,6 @@ public struct WorldCupView: View {
 
                     Text("더 먹고 싶은 쪽을 탭하세요")
                         .font(.appCaption).foregroundStyle(.appMuted)
-                    OutlineButton("게임 나가기") { store.send(.close) }
                 }
                 .padding(20)
             } else {
