@@ -275,6 +275,46 @@ enum FreeStickerBoardLayout {
         )
     }
 
+    /// Where the corner handle sits for a sticker at this scale and rotation.
+    ///
+    /// The handle lives at the sticker's bottom-trailing corner, which is 45° out
+    /// from centre in the sticker's own unrotated frame.
+    static func handlePosition(
+        center: CGPoint,
+        side: CGFloat,
+        scale: CGFloat,
+        rotationDegrees: Double
+    ) -> CGPoint {
+        let radians = rotationDegrees * .pi / 180
+        let half = side * scale / 2
+        return CGPoint(
+            x: center.x + half * CGFloat(cos(radians)) - half * CGFloat(sin(radians)),
+            y: center.y + half * CGFloat(sin(radians)) + half * CGFloat(cos(radians))
+        )
+    }
+
+    /// Scale and rotation implied by having dragged the corner handle to `handle`.
+    ///
+    /// One finger does both, the way a sticker editor works: how far the corner is
+    /// from the centre sets the size, and which way it points sets the angle. A
+    /// pinch needs two fingers inside a ~110pt sticker, which in practice cannot
+    /// be done.
+    static func handleTransform(
+        handle: CGPoint,
+        center: CGPoint,
+        side: CGFloat
+    ) -> (scale: Double, rotation: Double) {
+        let halfDiagonal = side * CGFloat(2.0.squareRoot()) / 2
+        guard halfDiagonal > 0 else { return (1, 0) }
+        let dx = handle.x - center.x
+        let dy = handle.y - center.y
+        let distance = hypot(dx, dy)
+        let scale = clampedScale(Double(distance / halfDiagonal))
+        // The handle starts 45° out, so that offset is not part of the rotation.
+        let angle = atan2(Double(dy), Double(dx)) * 180 / .pi - 45
+        return (scale, normalizedRotation(angle))
+    }
+
     /// Where to drop a sticker being put back on the board from the drawer.
     ///
     /// Walks the default grid slots and takes the first one that is not already

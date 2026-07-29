@@ -16,6 +16,9 @@ public struct CollectionView: View {
     @State private var draftRecapStartDate = Date()
     @State private var draftRecapEndDate = Date()
     @State private var transformPreview: StickerTransformPreview?
+    /// The sticker showing its corner handle. Adjusting is deliberate rather than
+    /// something a stray pinch triggers.
+    @State private var transformingStickerID: UUID?
     @State private var motion = ParallaxMotion()
     /// Measured height of the floating chrome, used as the board's top inset.
     @State private var controlsHeight: CGFloat = 0
@@ -51,19 +54,7 @@ public struct CollectionView: View {
 
             floatingControls
 
-            // Screen-anchored, not board-anchored: inside the canvas it scrolled
-            // away with the stickers and sat behind the floating chrome.
-            if let transformPreview {
-                StickerTransformHUD(preview: transformPreview)
-                    .padding(.top, controlsHeight + 12)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(1_000)
-            }
         }
-        .animation(
-            .spring(response: 0.25, dampingFraction: 0.82),
-            value: transformPreview != nil
-        )
         .toolbar(.hidden, for: .navigationBar)
         .task {
             loadStickerPlacements()
@@ -655,6 +646,11 @@ public struct CollectionView: View {
                             Label("자리 원래대로", systemImage: "arrow.counterclockwise")
                         }
                         Button {
+                            transformingStickerID = cutout.id
+                        } label: {
+                            Label("크기·회전 조절", systemImage: "arrow.up.left.and.arrow.down.right")
+                        }
+                        Button {
                             removeFromBoard(cutout)
                         } label: {
                             Label("보드에서 내리기", systemImage: "tray.and.arrow.down")
@@ -679,8 +675,51 @@ public struct CollectionView: View {
                     }
                 }
 
+                if let id = transformingStickerID,
+                   let index = cutouts.firstIndex(where: { $0.id == id }) {
+                    let placement = stickerPlacements[id.uuidString]
+                    let center = FreeStickerBoardLayout.point(
+                        for: placement,
+                        index: index,
+                        width: width,
+                        height: height,
+                        topInset: controlsHeight
+                    )
+                    let scale = placement?.displayScale ?? 1
+                    let rotation = placement?.rotation
+                        ?? FreeStickerBoardLayout.defaultRotation(index: index)
+
+                    StickerTransformHandle(
+                        center: center,
+                        side: side,
+                        scale: scale,
+                        rotationDegrees: rotation,
+                        onDrag: { location in
+                            applyHandleTransform(
+                                for: id,
+                                handle: location,
+                                center: center,
+                                side: side,
+                                width: width,
+                                height: height
+                            )
+                        },
+                        onDone: { transformingStickerID = nil }
+                    )
+                    .zIndex(2_000)
+
+                    if let transformPreview, transformPreview.id == id {
+                        StickerTransformBadge(preview: transformPreview)
+                            .position(
+                                x: center.x,
+                                y: max(14, center.y - side * scale / 2 - 16)
+                            )
+                            .zIndex(2_001)
+                    }
+                }
             }
             .frame(width: width, height: height)
+            .coordinateSpace(.named("board"))
         }
         .frame(height: boardHeightForCurrentWidth)
     }
@@ -810,6 +849,48 @@ public struct CollectionView: View {
         guard let data = try? JSONEncoder().encode(offBoardIDs),
               let encoded = String(data: data, encoding: .utf8) else { return }
         savedOffBoardIDs = encoded
+    }
+
+    /// Reads a corner-handle drag back into the sticker's saved scale and angle.
+    private func applyHandleTransform(
+        for id: UUID,
+        handle: CGPoint,
+        center: CGPoint,
+        side: CGFloat,
+        width: CGFloat,
+        height: CGFloat
+    ) {
+        let key = id.uuidString
+        let result = FreeStickerBoardLayout.handleTransform(
+            handle: handle,
+            center: center,
+            side: side
+        )
+        var updated = stickerPlacements[key] ?? FreeStickerBoardLayout.placement(
+            for: center,
+            width: width,
+            height: height
+        )
+        updated.scale = result.scale
+        updated.rotation = result.rotation
+        // A sticker grown near an edge has to stay reachable.
+        let clampedPoint = FreeStickerBoardLayout.clamped(
+            CGPoint(x: width * CGFloat(updated.xFraction), y: CGFloat(updated.y)),
+            width: width,
+            height: height,
+            scale: updated.displayScale,
+            rotationDegrees: updated.rotation ?? 0
+        )
+        updated.xFraction = Double(clampedPoint.x / width)
+        updated.y = Double(clampedPoint.y)
+        stickerPlacements[key] = updated
+        transformPreview = StickerTransformPreview(
+            id: id,
+            scale: updated.displayScale,
+            rotation: updated.rotation ?? 0,
+            isScaling: true,
+            isRotating: true
+        )
     }
 
     /// Takes a sticker off the board. The food itself stays in the drawer.
@@ -1417,56 +1498,88 @@ private struct StickerSelectionBoundary: View {
     }
 }
 
-private struct StickerTransformHUD: View {
+/// The scale and angle readout, sized to sit on a sticker rather than banner
+/// across the screen. Two short numbers is all this needs to say.
+private struct StickerTransformBadge: View {
     let preview: StickerTransformPreview
 
     var body: some View {
-        HStack(spacing: 4) {
-            metric(
-                systemImage: "arrow.up.left.and.arrow.down.right",
-                value: "\(Int((preview.scale * 100).rounded()))%",
-                active: preview.isScaling
-            )
-
-            Rectangle()
-                .fill(Color.appChocolate.opacity(0.12))
-                .frame(width: 1, height: 22)
-                .padding(.horizontal, 3)
-
-            metric(
-                systemImage: "rotate.right",
-                value: "\(Int(preview.rotation.rounded()))°",
-                active: preview.isRotating
-            )
+        HStack(spacing: 5) {
+            Text(verbatim: "\(Int((preview.scale * 100).rounded()))%")
+            Text(verbatim: "\(Int(preview.rotation.rounded()))°")
         }
-        .padding(5)
-        .background(.ultraThinMaterial, in: Capsule())
-        .background(Color.appCard.opacity(0.90), in: Capsule())
-        .overlay(Capsule().stroke(Color.appCard, lineWidth: 2))
-        .overlay(Capsule().stroke(Color.appCherry.opacity(0.24), lineWidth: 1))
-        .shadow(color: Color.appChocolate.opacity(0.17), radius: 8, y: 4)
+        .font(.system(size: 10, weight: .black, design: .rounded))
+        .monospacedDigit()
+        .foregroundStyle(.appInk)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(Color.appCard.opacity(0.95), in: Capsule())
+        .overlay(Capsule().stroke(Color.appCherry.opacity(0.3), lineWidth: 1))
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
+}
 
-    private func metric(
-        systemImage: String,
-        value: String,
-        active: Bool
-    ) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: systemImage)
-            Text(verbatim: value)
-                .monospacedDigit()
-                .contentTransition(.numericText())
-        }
-        .font(.system(size: 12, weight: .black, design: .rounded))
-        .foregroundStyle(active ? Color.white : Color.appInk)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .background(
-            active ? Color.appPinkInk : Color.clear,
-            in: Capsule()
+/// The corner handle. One finger sets both size and angle: how far it is from the
+/// centre is the size, which way it points is the angle. A pinch would need two
+/// fingers inside a sticker barely wider than a thumb.
+private struct StickerTransformHandle: View {
+    let center: CGPoint
+    let side: CGFloat
+    let scale: CGFloat
+    let rotationDegrees: Double
+    let onDrag: (CGPoint) -> Void
+    let onDone: () -> Void
+
+    private var handlePoint: CGPoint {
+        FreeStickerBoardLayout.handlePosition(
+            center: center,
+            side: side,
+            scale: scale,
+            rotationDegrees: rotationDegrees
         )
+    }
+
+    private var donePoint: CGPoint {
+        FreeStickerBoardLayout.handlePosition(
+            center: center,
+            side: side,
+            scale: scale,
+            rotationDegrees: rotationDegrees + 180
+        )
+    }
+
+    var body: some View {
+        ZStack {
+            // Outline of what is being adjusted.
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.appCherry.opacity(0.9), style: StrokeStyle(lineWidth: 2, dash: [6, 5]))
+                .frame(width: side * scale, height: side * scale)
+                .rotationEffect(.degrees(rotationDegrees))
+                .position(center)
+                .allowsHitTesting(false)
+
+            Image(systemName: "checkmark")
+                .font(.system(size: 12, weight: .black))
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(Color.appInk.opacity(0.82), in: Circle())
+                .overlay(Circle().stroke(Color.appCard, lineWidth: 2))
+                .position(donePoint)
+                .onTapGesture { onDone() }
+
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                .font(.system(size: 13, weight: .black))
+                .foregroundStyle(.appPinkInk)
+                .frame(width: 38, height: 38)   // a comfortable target, not a dot
+                .background(Color.appCard, in: Circle())
+                .overlay(Circle().stroke(Color.appCherry, lineWidth: 2))
+                .softShadow()
+                .position(handlePoint)
+                .gesture(
+                    DragGesture(minimumDistance: 0, coordinateSpace: .named("board"))
+                        .onChanged { onDrag($0.location) }
+                )
+        }
     }
 }
