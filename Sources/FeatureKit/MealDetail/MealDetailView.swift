@@ -23,9 +23,9 @@ public struct MealDetailView: View {
                             if meal.rating != nil { StarRating(rating: meal.rating) }
                         }
 
-                        if !meal.memo.isEmpty {
+                        if !meal.tags.isEmpty {
                             SoftCard {
-                                Text(meal.memo).font(.appBody).foregroundStyle(.appInk)
+                                TagFlow(meal.tags) { TagChip($0) }
                             }
                         }
 

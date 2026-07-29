@@ -212,8 +212,8 @@ public struct FoodMapView: View {
                         }
                     }
                 }
-                if !meal.memo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text(meal.memo)
+                if !meal.tags.isEmpty {
+                    TagChipRow(meal.tags, limit: 3)
                         .font(.appBody)
                         .foregroundStyle(.appInk)
                         .lineLimit(3)

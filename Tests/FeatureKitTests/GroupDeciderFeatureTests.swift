@@ -7,7 +7,7 @@ import ClientKit
 final class GroupDeciderFeatureTests: XCTestCase {
     private func pick(_ id: String) -> MenuPick {
         MenuPick(playerID: id, playerName: id, thumbnail: Data([1]),
-                 memo: "m\(id)", placeName: "p\(id)", address: "a\(id)")
+                 tags: ["m\(id)"], placeName: "p\(id)", address: "a\(id)")
     }
 
     /// Host with two submitted menus: bracket + first pair are broadcast.

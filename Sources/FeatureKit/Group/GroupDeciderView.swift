@@ -143,8 +143,8 @@ public struct GroupDeciderView: View {
         VStack(spacing: 2) {
             Text(candidate.placeName.isEmpty ? candidate.playerName : candidate.placeName)
                 .font(.appSection).foregroundStyle(.appInk).lineLimit(1)
-            if !candidate.memo.isEmpty {
-                Text(candidate.memo).font(.appCaption).foregroundStyle(.appMuted).lineLimit(1)
+            if !candidate.tags.isEmpty {
+                TagChipRow(candidate.tags, limit: 2)
             }
         }
     }
@@ -203,8 +203,8 @@ public struct GroupDeciderView: View {
                         w.placeName.isEmpty ? L10n.text("이 메뉴") : w.placeName
                     ))
                     .font(.appDisplay).foregroundStyle(.appBlueInk).multilineTextAlignment(.center)
-                    if !w.memo.isEmpty {
-                        Text("\u{201C}\(w.memo)\u{201D}").font(.appBody).foregroundStyle(.appInk)
+                    if !w.tags.isEmpty {
+                        TagChipRow(w.tags, limit: 3, size: .regular)
                     }
                 }
                 PillButton("나가기") { store.send(.leave) }.padding(.horizontal, 60)

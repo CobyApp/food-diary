@@ -18,7 +18,7 @@ public struct MealSnapshot: Sendable, Identifiable, Equatable {
     public let id: UUID
     public let eatenAt: Date
     public let place: PlaceInfo?
-    public let memo: String
+    public let tags: [String]
     public let rating: Int?
     public let cutouts: [CutoutSnapshot]
 
@@ -26,14 +26,14 @@ public struct MealSnapshot: Sendable, Identifiable, Equatable {
         id: UUID,
         eatenAt: Date,
         place: PlaceInfo?,
-        memo: String,
+        tags: [String],
         rating: Int?,
         cutouts: [CutoutSnapshot]
     ) {
         self.id = id
         self.eatenAt = eatenAt
         self.place = place
-        self.memo = memo
+        self.tags = tags
         self.rating = rating
         self.cutouts = cutouts
     }

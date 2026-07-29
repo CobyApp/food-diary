@@ -13,7 +13,7 @@ final class FoodMapFeatureTests: XCTestCase {
         )
         return MealSnapshot(id: UUID(), eatenAt: Date(),
                             place: PlaceInfo(id: name, name: name, address: "", coordinate: coord),
-                            memo: "", rating: nil, cutouts: [cutout])
+                            tags: [], rating: nil, cutouts: [cutout])
     }
 
     @MainActor
@@ -50,12 +50,12 @@ final class FoodMapFeatureTests: XCTestCase {
         let firstMeal = MealSnapshot(
             id: UUID(), eatenAt: Date(),
             place: PlaceInfo(id: "a", name: "A", address: "", coordinate: coordinate),
-            memo: "", rating: nil, cutouts: [firstCutout]
+            tags: [], rating: nil, cutouts: [firstCutout]
         )
         let secondMeal = MealSnapshot(
             id: UUID(), eatenAt: Date(),
             place: PlaceInfo(id: "b", name: "B", address: "", coordinate: coordinate),
-            memo: "", rating: nil, cutouts: [secondCutout]
+            tags: [], rating: nil, cutouts: [secondCutout]
         )
         var state = FoodMapFeature.State()
         state.meals = [firstMeal, secondMeal]

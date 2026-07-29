@@ -20,7 +20,6 @@ enum AchievementMetric {
     case bestStreak
     case ratedMeals
     case fiveStarMeals
-    case memoMeals
     case decoratedCutouts
 }
 
@@ -31,7 +30,6 @@ public struct AchievementStats: Equatable, Sendable {
     public var bestStreak = 0
     public var ratedMeals = 0
     public var fiveStarMeals = 0
-    public var memoMeals = 0
     public var decoratedCutouts = 0
 
     public init() {}
@@ -107,13 +105,6 @@ private let achievementCatalog: [AchievementDef] =
         symbols: ["star.fill", "stars", "sparkles", "crown.fill"]
     )
     + achievementSeries(
-        prefix: "memo",
-        titleKey: "achievement.memos.title",
-        metric: .memoMeals,
-        targets: [1, 3, 5, 10, 20, 30, 50, 75, 100, 200, 300],
-        symbols: ["text.quote", "note.text", "note.text.badge.plus", "text.book.closed.fill"]
-    )
-    + achievementSeries(
         prefix: "decor",
         titleKey: "achievement.decorations.title",
         metric: .decoratedCutouts,
@@ -131,7 +122,6 @@ func makeAchievements(stats: AchievementStats) -> [Achievement] {
         case .bestStreak: current = stats.bestStreak
         case .ratedMeals: current = stats.ratedMeals
         case .fiveStarMeals: current = stats.fiveStarMeals
-        case .memoMeals: current = stats.memoMeals
         case .decoratedCutouts: current = stats.decoratedCutouts
         }
         return Achievement(id: def.id, title: L10n.format(def.titleKey, def.target), symbol: def.symbol,
@@ -177,9 +167,6 @@ public struct AchievementsFeature {
                     stats.bestStreak = MealStreak.calculate(meals: meals, now: now).best
                     stats.ratedMeals = meals.filter { $0.rating != nil }.count
                     stats.fiveStarMeals = meals.filter { $0.rating == 5 }.count
-                    stats.memoMeals = meals.filter {
-                        !$0.memo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    }.count
                     stats.decoratedCutouts = cutouts.filter {
                         guard let label = $0.label else { return false }
                         return !label.isEmpty && label != "none"

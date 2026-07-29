@@ -35,7 +35,14 @@ public struct CaptureFeature {
         public var processingTotal = 0
         public var isSaving = false
         public var isSaveErrorPresented = false
-        public var memo: String
+        /// Tags picked for this meal, in the order they were picked.
+        public var tags: [String]
+        /// Every tag the user has ever made, so they can be reused.
+        public var tagCatalog: [String] = []
+        public var newTagText = ""
+        /// The tag being renamed, if the rename sheet is up.
+        public var renamingTag: String?
+        public var renameText = ""
         public var rating: Int?
         @Presents public var placePicker: PlacePickerFeature.State?
         public var chosenPlace: PlaceInfo?
@@ -44,13 +51,13 @@ public struct CaptureFeature {
         public init(
             coordinate: Coordinate? = nil,
             candidates: [CutoutCandidate] = [],
-            memo: String = "",
+            tags: [String] = [],
             rating: Int? = nil,
             chosenPlace: PlaceInfo? = nil
         ) {
             self.coordinate = coordinate
             self.candidates = candidates
-            self.memo = memo
+            self.tags = tags
             self.rating = rating
             self.chosenPlace = chosenPlace
         }
@@ -65,7 +72,16 @@ public struct CaptureFeature {
         case cycleDecoration(UUID)
         case rotateCandidate(UUID)
         case rotationFinished(id: UUID, pngData: Data?)
-        case memoChanged(String)
+        case tagsOnAppear
+        case tagCatalogLoaded([String])
+        case tagToggled(String)
+        case newTagTextChanged(String)
+        case newTagSubmitted
+        case renameTagRequested(String)
+        case renameTextChanged(String)
+        case renameConfirmed
+        case renameCancelled
+        case deleteTagRequested(String)
         case ratingChanged(Int?)
         case choosePlaceTapped
         case placePicker(PresentationAction<PlacePickerFeature.Action>)
@@ -141,9 +157,79 @@ public struct CaptureFeature {
                 }
                 return .none
 
-            case let .memoChanged(memo):
-                state.memo = memo
+            case .tagsOnAppear:
+                return .run { send in
+                    await send(.tagCatalogLoaded((try? await persistence.allTags()) ?? []))
+                }
+
+            case let .tagCatalogLoaded(tags):
+                state.tagCatalog = tags
                 return .none
+
+            case let .tagToggled(name):
+                guard let name = TagName.normalize(name) else { return .none }
+                if let index = state.tags.firstIndex(where: { TagName.isSame($0, name) }) {
+                    state.tags.remove(at: index)
+                } else {
+                    state.tags.append(name)
+                }
+                return .none
+
+            case let .newTagTextChanged(text):
+                state.newTagText = text
+                return .none
+
+            case .newTagSubmitted:
+                guard let name = TagName.normalize(state.newTagText) else {
+                    state.newTagText = ""
+                    return .none
+                }
+                state.newTagText = ""
+                // Picked straight away: typing a tag out is how you say you want it.
+                if !state.tags.contains(where: { TagName.isSame($0, name) }) {
+                    state.tags.append(name)
+                }
+                return .run { send in
+                    try? await persistence.createTag(name)
+                    await send(.tagCatalogLoaded((try? await persistence.allTags()) ?? []))
+                }
+
+            case let .renameTagRequested(name):
+                state.renamingTag = name
+                state.renameText = name
+                return .none
+
+            case let .renameTextChanged(text):
+                state.renameText = text
+                return .none
+
+            case .renameConfirmed:
+                guard let old = state.renamingTag,
+                      let new = TagName.normalize(state.renameText),
+                      !TagName.isSame(old, new) else {
+                    state.renamingTag = nil
+                    return .none
+                }
+                state.renamingTag = nil
+                // Keep this meal's picks in step with the catalog.
+                state.tags = TagName.cleaned(
+                    state.tags.map { TagName.isSame($0, old) ? new : $0 }
+                )
+                return .run { send in
+                    try? await persistence.renameTag(old, new)
+                    await send(.tagCatalogLoaded((try? await persistence.allTags()) ?? []))
+                }
+
+            case .renameCancelled:
+                state.renamingTag = nil
+                return .none
+
+            case let .deleteTagRequested(name):
+                state.tags.removeAll { TagName.isSame($0, name) }
+                return .run { send in
+                    try? await persistence.deleteTag(name)
+                    await send(.tagCatalogLoaded((try? await persistence.allTags()) ?? []))
+                }
 
             case let .ratingChanged(rating):
                 state.rating = rating
@@ -167,20 +253,23 @@ public struct CaptureFeature {
                 }
                 state.isSaving = true
                 let place = state.chosenPlace
-                let memo = state.memo
+                let tags = state.tags
                 let rating = state.rating
                 let selected = state.candidates
                     .filter(\.isSelected)
                     .map { NewCutout(pngData: $0.pngData, label: $0.decoration.label) }
                 return .run { send in
-                    let meal = try await persistence.saveMeal(place, memo, rating, selected)
+                    let meal = try await persistence.saveMeal(place, tags, rating, selected)
                     await send(.saved(meal))
                 } catch: { _, send in
                     await send(.saveFailed)
                 }
 
             case let .saved(meal):
+                // The catalog outlives one meal, so it survives the reset.
+                let catalog = state.tagCatalog
                 state = State()
+                state.tagCatalog = catalog
                 state.savedMeal = meal
                 return .none
 

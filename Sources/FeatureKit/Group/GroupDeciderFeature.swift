@@ -8,7 +8,7 @@ import UIKit
 ///
 /// Phases flow idle → authenticating → matchmaking → lobby → voting → reveal →
 /// champion. This reducer consumes `MultiplayerClient` events, builds a
-/// `MenuPick` from a chosen cutout (thumbnail + memo + place via
+/// `MenuPick` from a chosen cutout (thumbnail + tags + place via
 /// `persistence.mealByCutout`), and — once every known player has submitted
 /// and this device is host (lexicographically-smallest player id) — broadcasts
 /// a bracket (`order = menus.keys.sorted()`) and runs it as a timed voting
@@ -216,7 +216,7 @@ public struct GroupDeciderFeature {
                     let thumb = await GroupDeciderFeature.thumbnail(from: data)
                     let pick = MenuPick(
                         playerID: me.id, playerName: me.displayName, thumbnail: thumb,
-                        memo: meal?.memo ?? "", placeName: meal?.place?.name ?? "",
+                        tags: meal?.tags ?? [], placeName: meal?.place?.name ?? "",
                         address: meal?.place?.address ?? ""
                     )
                     await send(.menuBuilt(pick))

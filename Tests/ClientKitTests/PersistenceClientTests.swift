@@ -8,7 +8,7 @@ final class PersistenceClientTests: XCTestCase {
     // mutable state in the stub (Swift 6 @Sendable-safe).
     private func makeClient() throws -> PersistenceClient {
         let container = try ModelContainer(
-            for: Meal.self, FoodCutout.self,
+            for: Meal.self, FoodCutout.self, FoodTag.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let store = ImageStore(
@@ -24,7 +24,7 @@ final class PersistenceClientTests: XCTestCase {
 
         let place = PlaceInfo(id: "p1", name: "라멘집", address: "후쿠오카")
         let snap = try await client.saveMeal(
-            place, "맛있다", 5,
+            place, ["맛있다"], 5,
             [NewCutout(pngData: Data([1]), label: "라멘"),
              NewCutout(pngData: Data([2]), label: nil)]
         )
@@ -36,7 +36,7 @@ final class PersistenceClientTests: XCTestCase {
         XCTAssertEqual(all.count, 2)
 
         let fetched = try await client.meal(snap.id)
-        XCTAssertEqual(fetched?.memo, "맛있다")
+        XCTAssertEqual(fetched?.tags, ["맛있다"])
     }
 
     func test_allCutouts_areNewestFirst() async throws {
@@ -44,8 +44,8 @@ final class PersistenceClientTests: XCTestCase {
 
         // Two sequential (awaited) saves guarantee distinct createdAt values,
         // so the reverse sort is exercised deterministically.
-        _ = try await client.saveMeal(nil, "older", nil, [NewCutout(pngData: Data([1]), label: "old")])
-        _ = try await client.saveMeal(nil, "newer", nil, [NewCutout(pngData: Data([2]), label: "new")])
+        _ = try await client.saveMeal(nil, ["older"], nil, [NewCutout(pngData: Data([1]), label: "old")])
+        _ = try await client.saveMeal(nil, ["newer"], nil, [NewCutout(pngData: Data([2]), label: "new")])
 
         let all = try await client.allCutouts()
         XCTAssertEqual(all.count, 2)
@@ -55,12 +55,12 @@ final class PersistenceClientTests: XCTestCase {
 
     func test_mealByCutout_returnsOwningMeal() async throws {
         let container = try ModelContainer(
-            for: Meal.self, FoodCutout.self,
+            for: Meal.self, FoodCutout.self, FoodTag.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let store = ImageStore(save: { _ in "n.png" }, load: { _ in nil }, delete: { _ in })
         let client = PersistenceClient.live(container: container, imageStore: store)
-        let snap = try await client.saveMeal(nil, "m", nil, [NewCutout(pngData: Data([1]), label: nil)])
+        let snap = try await client.saveMeal(nil, ["m"], nil, [NewCutout(pngData: Data([1]), label: nil)])
         let cutoutID = snap.cutouts[0].id
         let owning = try await client.mealByCutout(cutoutID)
         XCTAssertEqual(owning?.id, snap.id)
@@ -68,13 +68,13 @@ final class PersistenceClientTests: XCTestCase {
 
     func test_allMeals_returnsSavedMealsNewestFirst() async throws {
         let client = try makeClient()
-        _ = try await client.saveMeal(PlaceInfo(id: "a", name: "A", address: ""), "older", nil,
+        _ = try await client.saveMeal(PlaceInfo(id: "a", name: "A", address: ""), ["older"], nil,
                                       [NewCutout(pngData: Data([1]), label: nil)])
-        _ = try await client.saveMeal(PlaceInfo(id: "b", name: "B", address: ""), "newer", nil,
+        _ = try await client.saveMeal(PlaceInfo(id: "b", name: "B", address: ""), ["newer"], nil,
                                       [NewCutout(pngData: Data([2]), label: nil)])
         let meals = try await client.allMeals()
         XCTAssertEqual(meals.count, 2)
-        XCTAssertEqual(meals.first?.memo, "newer")
+        XCTAssertEqual(meals.first?.tags, ["newer"])
         XCTAssertEqual(meals.first?.place?.name, "B")
     }
 
@@ -82,7 +82,7 @@ final class PersistenceClientTests: XCTestCase {
         let client = try makeClient()
 
         let snap = try await client.saveMeal(
-            nil, "to delete", nil,
+            nil, ["to delete"], nil,
             [NewCutout(pngData: Data([1]), label: nil),
              NewCutout(pngData: Data([2]), label: nil)]
         )
@@ -98,7 +98,7 @@ final class PersistenceClientTests: XCTestCase {
     func test_deleteCutouts_removesOnlySelectedImages() async throws {
         let client = try makeClient()
         let meal = try await client.saveMeal(
-            nil, "keep meal", nil,
+            nil, ["keep meal"], nil,
             [
                 NewCutout(pngData: Data([1]), label: "first"),
                 NewCutout(pngData: Data([2]), label: "second"),
@@ -111,14 +111,14 @@ final class PersistenceClientTests: XCTestCase {
         let remainingMeal = try await client.meal(meal.id)
         XCTAssertEqual(remaining.count, 1)
         XCTAssertEqual(remaining.first?.id, meal.cutouts[1].id)
-        XCTAssertEqual(remainingMeal?.memo, "keep meal")
+        XCTAssertEqual(remainingMeal?.tags, ["keep meal"])
     }
 
     func test_deleteLastCutout_removesEmptyMealAndMapResidue() async throws {
         let client = try makeClient()
         let meal = try await client.saveMeal(
             PlaceInfo(id: "p1", name: "remove me", address: ""),
-            "last cutout",
+            ["last cutout"],
             nil,
             [NewCutout(pngData: Data([1]), label: nil)]
         )
@@ -134,7 +134,7 @@ final class PersistenceClientTests: XCTestCase {
     func test_saveMeal_whenAnImageWriteFails_rollsBackWrittenImages() async throws {
         struct WriteFailure: Error {}
         let container = try ModelContainer(
-            for: Meal.self, FoodCutout.self,
+            for: Meal.self, FoodCutout.self, FoodTag.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         // Fails on the SECOND write; records every delete so we can assert rollback.
@@ -153,7 +153,7 @@ final class PersistenceClientTests: XCTestCase {
 
         do {
             _ = try await client.saveMeal(
-                nil, "rollback", nil,
+                nil, ["rollback"], nil,
                 [NewCutout(pngData: Data([1]), label: nil),
                  NewCutout(pngData: Data([2]), label: nil)]
             )

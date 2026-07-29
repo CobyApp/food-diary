@@ -31,7 +31,7 @@ final class CollectionFeatureTests: XCTestCase {
         let cutout = CutoutSnapshot(id: cutoutID, fileName: "a.png", createdAt: eatenAt, label: nil)
         let place = PlaceInfo(id: "place-1", name: "스시야", address: "서울")
         let meal = MealSnapshot(
-            id: UUID(), eatenAt: eatenAt, place: place, memo: "맛있었다", rating: 5, cutouts: [cutout]
+            id: UUID(), eatenAt: eatenAt, place: place, tags: ["맛있었다"], rating: 5, cutouts: [cutout]
         )
         let store = TestStore(initialState: CollectionFeature.State()) {
             CollectionFeature()
@@ -51,7 +51,7 @@ final class CollectionFeatureTests: XCTestCase {
                 cutoutID: CutoutMealInfo(
                     placeName: "스시야",
                     dateText: expectedDateText,
-                    memo: "맛있었다",
+                    tags: ["맛있었다"],
                     rating: 5
                 ),
             ]

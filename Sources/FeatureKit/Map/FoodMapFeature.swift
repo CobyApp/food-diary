@@ -70,7 +70,7 @@ public struct FoodMapFeature {
                         id: meal.id,
                         eatenAt: meal.eatenAt,
                         place: meal.place,
-                        memo: meal.memo,
+                        tags: meal.tags,
                         rating: meal.rating,
                         cutouts: remaining
                     )

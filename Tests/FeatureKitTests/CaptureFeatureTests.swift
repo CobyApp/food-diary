@@ -140,23 +140,23 @@ final class CaptureFeatureTests: XCTestCase {
     @MainActor
     func test_saveTapped_persistsSelectedCutouts() async {
         let savedMeal = MealSnapshot(id: UUID(), eatenAt: Date(), place: nil,
-                                     memo: "맛있다", rating: 5, cutouts: [])
+                                     tags: ["맛있다"], rating: 5, cutouts: [])
         let store = TestStore(
             initialState: CaptureFeature.State(
                 candidates: [
                     .init(id: UUID(), pngData: Data([1]), isSelected: true),
                     .init(id: UUID(), pngData: Data([2]), isSelected: false),
                 ],
-                memo: "맛있다",
+                tags: ["맛있다"],
                 rating: 5
             )
         ) {
             CaptureFeature()
         } withDependencies: {
-            $0.persistence.saveMeal = { _, memo, rating, cutouts in
+            $0.persistence.saveMeal = { _, tags, rating, cutouts in
                 XCTAssertEqual(cutouts.count, 1) // only the selected one
                 XCTAssertEqual(cutouts.first?.label, "heart")
-                XCTAssertEqual(memo, "맛있다")
+                XCTAssertEqual(tags, ["맛있다"])
                 XCTAssertEqual(rating, 5)
                 return savedMeal
             }
@@ -181,7 +181,7 @@ final class CaptureFeatureTests: XCTestCase {
     func test_placeSelected_dismissesPickerAndKeepsChosenPlace() async {
         let place = PlaceInfo(id: "1", name: "라멘집", address: "후쿠오카")
         let savedMeal = MealSnapshot(id: UUID(), eatenAt: Date(), place: place,
-                                     memo: "", rating: nil, cutouts: [])
+                                     tags: [], rating: nil, cutouts: [])
         let store = TestStore(initialState: CaptureFeature.State()) {
             CaptureFeature()
         } withDependencies: {

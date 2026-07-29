@@ -112,8 +112,8 @@ public struct WorldCupView: View {
                     Text(info?.placeName.isEmpty == false ? info!.placeName : L10n.text("이 메뉴"))
                         .font(.appCaption).foregroundStyle(.appChocolate)
                         .lineLimit(1)
-                    if let memo = info?.memo, !memo.isEmpty {
-                        Text(memo).font(.system(size: 10, weight: .semibold, design: .rounded))
+                    if let tags = info?.tags, !tags.isEmpty {
+                        TagChipRow(tags, limit: 2)
                             .foregroundStyle(.appMuted).lineLimit(1)
                     }
                 }

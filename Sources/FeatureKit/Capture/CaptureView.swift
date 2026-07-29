@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import ComposableArchitecture
+import Models
 
 public struct CaptureView: View {
     @Bindable var store: StoreOf<CaptureFeature>
@@ -133,16 +134,7 @@ public struct CaptureView: View {
                                 }
                                 .buttonStyle(.plain)
                                 Divider()
-                                HStack {
-                                    Text("한 줄 평").font(.appSection).foregroundStyle(.appInk)
-                                    Spacer()
-                                    TextField("한 줄 남기기", text: Binding(
-                                        get: { store.memo },
-                                        set: { store.send(.memoChanged($0)) }
-                                    ))
-                                    .font(.appBody)
-                                    .multilineTextAlignment(.trailing)
-                                }
+                                tagSection
                                 Divider()
                                 HStack {
                                     Text("별점").font(.appSection).foregroundStyle(.appInk)
@@ -218,6 +210,94 @@ public struct CaptureView: View {
         }
         .animation(.spring(response: 0.48, dampingFraction: 0.78), value: store.candidates)
         .sensoryFeedback(.selection, trigger: store.candidates.map(\.isSelected))
+        .task { store.send(.tagsOnAppear) }
+        .alert(
+            "태그 이름 바꾸기",
+            isPresented: Binding(
+                get: { store.renamingTag != nil },
+                set: { if !$0 { store.send(.renameCancelled) } }
+            )
+        ) {
+            TextField("태그 이름", text: Binding(
+                get: { store.renameText },
+                set: { store.send(.renameTextChanged($0)) }
+            ))
+            Button("바꾸기") { store.send(.renameConfirmed) }
+            Button("취소", role: .cancel) { store.send(.renameCancelled) }
+        }
+    }
+
+    /// Pick tags, make new ones, and manage the catalog — all in place, so saving
+    /// a meal never sends you off to a separate screen.
+    private var tagSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Text("태그").font(.appSection).foregroundStyle(.appInk)
+                Spacer()
+                if !store.tags.isEmpty {
+                    Text(L10n.format("capture.tags.picked", store.tags.count))
+                        .font(.appCaption)
+                        .foregroundStyle(.appMuted)
+                }
+            }
+
+            if store.tagCatalog.isEmpty {
+                Text("태그를 만들어 음식을 분류해보세요")
+                    .font(.appCaption)
+                    .foregroundStyle(.appMuted)
+            } else {
+                TagFlow(store.tagCatalog) { name in
+                    let picked = store.tags.contains { TagName.isSame($0, name) }
+                    Button {
+                        store.send(.tagToggled(name))
+                    } label: {
+                        TagChip(name)
+                            .opacity(picked ? 1 : 0.45)
+                            .overlay {
+                                if picked {
+                                    Capsule().stroke(Color.appInk.opacity(0.55), lineWidth: 1.5)
+                                }
+                            }
+                    }
+                    .buttonStyle(KitschPressStyle())
+                    .contextMenu {
+                        Button {
+                            store.send(.renameTagRequested(name))
+                        } label: {
+                            Label("이름 바꾸기", systemImage: "pencil")
+                        }
+                        Button(role: .destructive) {
+                            store.send(.deleteTagRequested(name))
+                        } label: {
+                            Label("태그 삭제", systemImage: "trash")
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField("새 태그 추가", text: Binding(
+                    get: { store.newTagText },
+                    set: { store.send(.newTagTextChanged($0)) }
+                ))
+                .font(.appBody)
+                .submitLabel(.done)
+                .onSubmit { store.send(.newTagSubmitted) }
+
+                Button {
+                    store.send(.newTagSubmitted)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundStyle(.appPinkInk)
+                        .frame(width: 30, height: 30)
+                        .background(Color.appPink, in: Circle())
+                }
+                .buttonStyle(KitschPressStyle())
+                .disabled(TagName.normalize(store.newTagText) == nil)
+                .opacity(TagName.normalize(store.newTagText) == nil ? 0.4 : 1)
+            }
+        }
     }
 
     private var processingTitle: String {

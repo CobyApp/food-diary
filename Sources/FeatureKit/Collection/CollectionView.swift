@@ -899,8 +899,8 @@ private struct StickerDetailSheet: View {
     let theme: StickerBoardTheme
     let onClose: () -> Void
 
-    private var review: String {
-        info?.memo.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    private var tags: [String] {
+        info?.tags ?? []
     }
 
     var body: some View {
@@ -1007,14 +1007,19 @@ private struct StickerDetailSheet: View {
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("나의 한 줄평")
+                        Text("태그")
                             .font(.appSection)
                             .foregroundStyle(.appInk)
-                        Text(review.isEmpty ? L10n.text("아직 한 줄평이 없어요") : "“\(review)”")
-                            .font(.system(size: 17, weight: .bold, design: .rounded))
-                            .foregroundStyle(review.isEmpty ? Color.appMuted : Color.appInk)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 4)
+                        if tags.isEmpty {
+                            Text("아직 태그가 없어요")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                .foregroundStyle(.appMuted)
+                                .padding(.vertical, 4)
+                        } else {
+                            TagFlow(tags) { TagChip($0) }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 2)
+                        }
                     }
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)

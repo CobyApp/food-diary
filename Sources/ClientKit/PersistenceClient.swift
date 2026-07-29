@@ -16,7 +16,7 @@ public struct NewCutout: Sendable {
 @DependencyClient
 public struct PersistenceClient: Sendable {
     public var saveMeal: @Sendable (
-        _ place: PlaceInfo?, _ memo: String, _ rating: Int?, _ cutouts: [NewCutout]
+        _ place: PlaceInfo?, _ tags: [String], _ rating: Int?, _ cutouts: [NewCutout]
     ) async throws -> MealSnapshot
     public var allCutouts: @Sendable () async throws -> [CutoutSnapshot]
     public var allMeals: @Sendable () async throws -> [MealSnapshot]
@@ -24,6 +24,14 @@ public struct PersistenceClient: Sendable {
     public var mealByCutout: @Sendable (_ cutoutID: UUID) async throws -> MealSnapshot?
     public var deleteCutouts: @Sendable (_ ids: Set<UUID>) async throws -> Void
     public var deleteMeal: @Sendable (_ id: UUID) async throws -> Void
+    /// The tag catalog, alphabetical.
+    public var allTags: @Sendable () async throws -> [String]
+    /// Adds a tag to the catalog; a tag that already exists is left alone.
+    public var createTag: @Sendable (_ name: String) async throws -> Void
+    /// Renames the catalog entry and rewrites the name on every meal using it.
+    public var renameTag: @Sendable (_ from: String, _ to: String) async throws -> Void
+    /// Removes the catalog entry and strips it from every meal.
+    public var deleteTag: @Sendable (_ name: String) async throws -> Void
 }
 
 @ModelActor
@@ -31,10 +39,11 @@ actor PersistenceActor {
     // ImageStore (Sendable) is passed per call rather than stored, so live()
     // needs no async setter and there is no window where it is unset.
     func save(
-        place: PlaceInfo?, memo: String, rating: Int?, cutouts: [NewCutout],
+        place: PlaceInfo?, tags: [String], rating: Int?, cutouts: [NewCutout],
         imageStore: ImageStore
     ) throws -> MealSnapshot {
-        let meal = Meal(memo: memo, rating: rating)
+        let tags = TagName.cleaned(tags)
+        let meal = Meal(tags: tags, rating: rating)
         meal.place = place
         // Track what we wrote so a later failure doesn't leave orphaned PNGs.
         var written: [String] = []
@@ -110,6 +119,54 @@ actor PersistenceActor {
         try modelContext.save()
     }
 
+    func allTags() throws -> [String] {
+        let descriptor = FetchDescriptor<FoodTag>(
+            sortBy: [SortDescriptor(\.name, order: .forward)]
+        )
+        return try modelContext.fetch(descriptor).map(\.name)
+    }
+
+    func createTag(name: String) throws {
+        guard let name = TagName.normalize(name) else { return }
+        let existing = try modelContext.fetch(FetchDescriptor<FoodTag>()).map(\.name)
+        guard !existing.contains(where: { TagName.isSame($0, name) }) else { return }
+        modelContext.insert(FoodTag(name: name))
+        try modelContext.save()
+    }
+
+    func renameTag(from old: String, to new: String) throws {
+        guard let new = TagName.normalize(new) else { return }
+        let tags = try modelContext.fetch(FetchDescriptor<FoodTag>())
+        guard let tag = tags.first(where: { TagName.isSame($0.name, old) }) else { return }
+        // A rename onto a name that already exists would collapse two tags into
+        // one; merge instead of writing a duplicate.
+        if let clash = tags.first(where: { TagName.isSame($0.name, new) }), clash !== tag {
+            modelContext.delete(tag)
+        } else {
+            tag.name = new
+        }
+        // Meals hold names, so every one carrying the old name has to be rewritten.
+        for meal in try modelContext.fetch(FetchDescriptor<Meal>()) {
+            guard meal.tags.contains(where: { TagName.isSame($0, old) }) else { continue }
+            meal.tags = TagName.cleaned(
+                meal.tags.map { TagName.isSame($0, old) ? new : $0 }
+            )
+        }
+        try modelContext.save()
+    }
+
+    func deleteTag(name: String) throws {
+        let tags = try modelContext.fetch(FetchDescriptor<FoodTag>())
+        for tag in tags where TagName.isSame(tag.name, name) {
+            modelContext.delete(tag)
+        }
+        for meal in try modelContext.fetch(FetchDescriptor<Meal>()) {
+            let kept = meal.tags.filter { !TagName.isSame($0, name) }
+            if kept.count != meal.tags.count { meal.tags = kept }
+        }
+        try modelContext.save()
+    }
+
     func delete(id: UUID, imageStore: ImageStore) throws {
         let descriptor = FetchDescriptor<Meal>(predicate: #Predicate { $0.id == id })
         guard let meal = try modelContext.fetch(descriptor).first else { return }
@@ -123,9 +180,9 @@ public extension PersistenceClient {
     static func live(container: ModelContainer, imageStore: ImageStore) -> PersistenceClient {
         let actor = PersistenceActor(modelContainer: container)
         return PersistenceClient(
-            saveMeal: { place, memo, rating, cutouts in
+            saveMeal: { place, tags, rating, cutouts in
                 try await actor.save(
-                    place: place, memo: memo, rating: rating, cutouts: cutouts,
+                    place: place, tags: tags, rating: rating, cutouts: cutouts,
                     imageStore: imageStore
                 )
             },
@@ -136,7 +193,11 @@ public extension PersistenceClient {
             deleteCutouts: { ids in
                 try await actor.deleteCutouts(ids: ids, imageStore: imageStore)
             },
-            deleteMeal: { id in try await actor.delete(id: id, imageStore: imageStore) }
+            deleteMeal: { id in try await actor.delete(id: id, imageStore: imageStore) },
+            allTags: { try await actor.allTags() },
+            createTag: { name in try await actor.createTag(name: name) },
+            renameTag: { from, to in try await actor.renameTag(from: from, to: to) },
+            deleteTag: { name in try await actor.deleteTag(name: name) }
         )
     }
 }
@@ -144,8 +205,8 @@ public extension PersistenceClient {
 extension PersistenceClient: TestDependencyKey {
     public static let testValue = PersistenceClient()
     public static let previewValue = PersistenceClient(
-        saveMeal: { place, memo, rating, cutouts in
-            MealSnapshot(id: UUID(), eatenAt: Date(), place: place, memo: memo, rating: rating,
+        saveMeal: { place, tags, rating, cutouts in
+            MealSnapshot(id: UUID(), eatenAt: Date(), place: place, tags: tags, rating: rating,
                          cutouts: cutouts.enumerated().map {
                              CutoutSnapshot(id: UUID(), fileName: "\($0.offset).png",
                                             createdAt: Date(), label: $0.element.label)
@@ -156,7 +217,11 @@ extension PersistenceClient: TestDependencyKey {
         meal: { _ in nil },
         mealByCutout: { _ in nil },
         deleteCutouts: { _ in },
-        deleteMeal: { _ in }
+        deleteMeal: { _ in },
+        allTags: { ["라멘", "카페"] },
+        createTag: { _ in },
+        renameTag: { _, _ in },
+        deleteTag: { _ in }
     )
 }
 

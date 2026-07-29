@@ -9,7 +9,7 @@ final class RecapCaptionTests: XCTestCase {
         let meal = MealSnapshot(
             id: UUID(), eatenAt: Date(timeIntervalSince1970: 1_000_000),
             place: PlaceInfo(id: "p1", name: "라멘집", address: ""),
-            memo: "", rating: nil, cutouts: []
+            tags: [], rating: nil, cutouts: []
         )
         let requested = LockBox()
         let store = TestStore(initialState: RecapFeature.State()) {
@@ -35,7 +35,7 @@ final class RecapCaptionTests: XCTestCase {
     func test_captionStaysNilWhenAppleIntelligenceIsUnavailable() async {
         let meal = MealSnapshot(
             id: UUID(), eatenAt: Date(timeIntervalSince1970: 1_000_000),
-            place: nil, memo: "", rating: nil, cutouts: []
+            place: nil, tags: [], rating: nil, cutouts: []
         )
         let store = TestStore(initialState: RecapFeature.State()) {
             RecapFeature()

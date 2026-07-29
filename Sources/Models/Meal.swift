@@ -6,7 +6,7 @@ public final class Meal {
     public var id: UUID
     public var eatenAt: Date
     public var placeData: Data?
-    public var memo: String
+    public var tags: [String]
     public var rating: Int?
     @Relationship(deleteRule: .cascade, inverse: \FoodCutout.meal)
     public var cutouts: [FoodCutout]
@@ -14,12 +14,12 @@ public final class Meal {
     public init(
         id: UUID = UUID(),
         eatenAt: Date = Date(),
-        memo: String = "",
+        tags: [String] = [],
         rating: Int? = nil
     ) {
         self.id = id
         self.eatenAt = eatenAt
-        self.memo = memo
+        self.tags = tags
         self.rating = rating
         self.cutouts = []
     }
@@ -35,7 +35,7 @@ public final class Meal {
             id: id,
             eatenAt: eatenAt,
             place: place,
-            memo: memo,
+            tags: tags,
             rating: rating,
             cutouts: cutouts
                 .sorted { $0.createdAt < $1.createdAt }

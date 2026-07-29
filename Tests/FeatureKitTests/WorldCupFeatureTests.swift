@@ -35,7 +35,7 @@ final class WorldCupFeatureTests: XCTestCase {
         let meal = MealSnapshot(
             id: UUID(), eatenAt: Date(),
             place: PlaceInfo(id: "p", name: "라멘집", address: ""),
-            memo: "존맛", rating: 5, cutouts: items
+            tags: ["존맛"], rating: 5, cutouts: items
         )
         let store = TestStore(initialState: WorldCupFeature.State(cutouts: items)) {
             WorldCupFeature()
@@ -49,6 +49,6 @@ final class WorldCupFeatureTests: XCTestCase {
         await store.send(.start)
         await store.receive(\.infoTableLoaded)
         XCTAssertEqual(store.state.info[items[0].id]?.placeName, "라멘집")
-        XCTAssertEqual(store.state.info[items[0].id]?.memo, "존맛")
+        XCTAssertEqual(store.state.info[items[0].id]?.tags, ["존맛"])
     }
 }

@@ -23,7 +23,6 @@
 "식당" = "Restaurant";
 "선택 안 함" = "None";
 "메모" = "Note";
-"한 줄 남기기" = "Leave a little note";
 "별점" = "Rating";
 "다이어리에 저장" = "Save to Diary";
 "저장하는 중" = "Saving your tasty moment";
@@ -70,7 +69,6 @@
 "여러 개 선택" = "Select Multiple";
 "기록 보기" = "View Entry";
 "이 음식 삭제" = "Delete This Food";
-"한 줄 평" = "Quick Note";
 "전체 선택" = "Select All";
 "선택 해제" = "Deselect All";
 "완료" = "Done";
@@ -140,7 +138,6 @@
 "achievement.streak.title" = "Daily Foodie · %d days";
 "achievement.ratings.title" = "Taste Critic · %d";
 "achievement.fiveStars.title" = "Perfect Bites · %d";
-"achievement.memos.title" = "Flavor Writer · %d";
 "achievement.decorations.title" = "Sticker Artist · %d";
 "achievement.collected" = "COLLECTED";
 "game.minimum" = "%d stickers needed";
@@ -201,7 +198,17 @@
 "한 끼 기록" = "Meal Memory";
 "별점" = "Rating";
 "아직 별점이 없어요" = "No rating yet";
-"나의 한 줄평" = "My One-Line Review";
-"아직 한 줄평이 없어요" = "No review yet";
 "리캡 만들기" = "Make Recap";
 "메인에서 다른 기간을 골라보세요!" = "Choose another date range on the main screen!";
+
+// Tags
+"태그" = "Tags";
+"새 태그 추가" = "Add a tag";
+"태그를 만들어 음식을 분류해보세요" = "Make tags to sort your food";
+"태그 이름 바꾸기" = "Rename tag";
+"태그 이름" = "Tag name";
+"바꾸기" = "Rename";
+"이름 바꾸기" = "Rename";
+"태그 삭제" = "Delete tag";
+"아직 태그가 없어요" = "No tags yet";
+"capture.tags.picked" = "%d picked";

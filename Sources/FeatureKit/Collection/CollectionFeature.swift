@@ -6,12 +6,12 @@ import ClientKit
 public struct CutoutMealInfo: Equatable, Sendable {
     public let placeName: String
     public let dateText: String
-    public let memo: String
+    public let tags: [String]
     public let rating: Int?
-    public init(placeName: String, dateText: String, memo: String, rating: Int?) {
+    public init(placeName: String, dateText: String, tags: [String], rating: Int?) {
         self.placeName = placeName
         self.dateText = dateText
-        self.memo = memo
+        self.tags = tags
         self.rating = rating
     }
 }
@@ -99,7 +99,7 @@ public struct CollectionFeature {
                             info[c.id] = CutoutMealInfo(
                                 placeName: meal.place?.name ?? "",
                                 dateText: dateText,
-                                memo: meal.memo,
+                                tags: meal.tags,
                                 rating: meal.rating
                             )
                         }

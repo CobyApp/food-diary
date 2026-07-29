@@ -20,13 +20,13 @@ public struct MenuPick: Equatable, Sendable, Codable, Identifiable {
     public let playerID: String
     public let playerName: String
     public let thumbnail: Data
-    public let memo: String
+    public let tags: [String]
     public let placeName: String
     public let address: String
     public init(playerID: String, playerName: String, thumbnail: Data,
-                memo: String, placeName: String, address: String) {
+                tags: [String], placeName: String, address: String) {
         self.playerID = playerID; self.playerName = playerName; self.thumbnail = thumbnail
-        self.memo = memo; self.placeName = placeName; self.address = address
+        self.tags = tags; self.placeName = placeName; self.address = address
     }
 }
 

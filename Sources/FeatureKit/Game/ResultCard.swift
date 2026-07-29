@@ -32,8 +32,8 @@ struct ResultCard: View {
                     if !info.dateText.isEmpty {
                         PastelChip(info.dateText, symbol: "calendar", tone: .pink)
                     }
-                    if !info.memo.isEmpty {
-                        Text("\u{201C}\(info.memo)\u{201D}")
+                    if !info.tags.isEmpty {
+                        TagChipRow(info.tags, limit: 3, size: .regular)
                             .font(.appBody).foregroundStyle(.appInk)
                             .multilineTextAlignment(.center)
                     }

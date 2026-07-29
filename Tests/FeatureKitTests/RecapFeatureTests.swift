@@ -16,11 +16,11 @@ final class RecapFeatureTests: XCTestCase {
         let meals = [
             MealSnapshot(
                 id: UUID(), eatenAt: now.addingTimeInterval(-60),
-                place: nil, memo: "", rating: nil, cutouts: [todayCutout]
+                place: nil, tags: [], rating: nil, cutouts: [todayCutout]
             ),
             MealSnapshot(
                 id: UUID(), eatenAt: now.addingTimeInterval(-86_400),
-                place: nil, memo: "", rating: nil, cutouts: [yesterdayCutout]
+                place: nil, tags: [], rating: nil, cutouts: [yesterdayCutout]
             ),
         ]
         let store = TestStore(initialState: RecapFeature.State()) {

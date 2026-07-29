@@ -13,7 +13,7 @@ final class MealStreakTests: XCTestCase {
             MealSnapshot(
                 id: UUID(),
                 eatenAt: calendar.date(byAdding: .day, value: offset, to: today)!,
-                place: nil, memo: "", rating: nil, cutouts: []
+                place: nil, tags: [], rating: nil, cutouts: []
             )
         }
 
