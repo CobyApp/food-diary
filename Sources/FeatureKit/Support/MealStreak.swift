@@ -11,11 +11,11 @@ public struct MealStreak: Equatable, Sendable {
     }
 
     public static func calculate(
-        meals: [MealSnapshot],
+        entries: [FoodEntrySnapshot],
         now: Date,
         calendar: Calendar = .current
     ) -> MealStreak {
-        let days = Set(meals.map { calendar.startOfDay(for: $0.eatenAt) })
+        let days = Set(entries.map { calendar.startOfDay(for: $0.eatenAt) })
         guard !days.isEmpty else { return MealStreak() }
 
         let ordered = days.sorted()

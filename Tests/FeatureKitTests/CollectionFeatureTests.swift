@@ -7,13 +7,12 @@ final class CollectionFeatureTests: XCTestCase {
     @MainActor
     func test_onAppear_loadsCutouts() async {
         let sample = [
-            CutoutSnapshot(id: UUID(), fileName: "a.png", createdAt: Date(), label: "라멘"),
+            FoodEntrySnapshot(id: UUID(), fileName: "a.png", eatenAt: Date(), label: "라멘"),
         ]
         let store = TestStore(initialState: CollectionFeature.State()) {
             CollectionFeature()
         } withDependencies: {
-            $0.persistence.allCutouts = { sample }
-            $0.persistence.allMeals = { [] }
+            $0.persistence.allEntries = { sample }
         }
 
         await store.send(.onAppear) { $0.isLoading = true }
@@ -21,23 +20,34 @@ final class CollectionFeatureTests: XCTestCase {
             $0.isLoading = false
             $0.cutouts = sample
         }
-        await store.receive(\.mealInfoLoaded)
+        // The index is built from the foods themselves, so it is never empty when
+        // there are foods.
+        await store.receive(\.mealInfoLoaded) {
+            $0.cutoutMealInfo = [
+                sample[0].id: CutoutMealInfo(
+                    placeName: "",
+                    dateText: sample[0].eatenAt.formatted(.dateTime.month().day()),
+                    tags: [],
+                    rating: nil
+                ),
+            ]
+        }
     }
 
     @MainActor
     func test_onAppear_loadsMealInfoForCutouts() async {
         let cutoutID = UUID()
         let eatenAt = Date()
-        let cutout = CutoutSnapshot(id: cutoutID, fileName: "a.png", createdAt: eatenAt, label: nil)
         let place = PlaceInfo(id: "place-1", name: "스시야", address: "서울")
-        let meal = MealSnapshot(
-            id: UUID(), eatenAt: eatenAt, place: place, tags: ["맛있었다"], rating: 5, cutouts: [cutout]
+        // The food's information lives on the food itself now.
+        let cutout = FoodEntrySnapshot(
+            id: cutoutID, fileName: "a.png", eatenAt: eatenAt,
+            place: place, tags: ["맛있었다"], rating: 5
         )
         let store = TestStore(initialState: CollectionFeature.State()) {
             CollectionFeature()
         } withDependencies: {
-            $0.persistence.allCutouts = { [cutout] }
-            $0.persistence.allMeals = { [meal] }
+            $0.persistence.allEntries = { [cutout] }
         }
         let expectedDateText = eatenAt.formatted(.dateTime.month().day())
 
@@ -60,18 +70,18 @@ final class CollectionFeatureTests: XCTestCase {
 
     @MainActor
     func test_multiSelect_thenDelete_removesOnlySelectedCutouts() async {
-        let first = CutoutSnapshot(
-            id: UUID(), fileName: "first.png", createdAt: Date(), label: nil
+        let first = FoodEntrySnapshot(
+            id: UUID(), fileName: "first.png", eatenAt: Date(), label: nil
         )
-        let second = CutoutSnapshot(
-            id: UUID(), fileName: "second.png", createdAt: Date(), label: nil
+        let second = FoodEntrySnapshot(
+            id: UUID(), fileName: "second.png", eatenAt: Date(), label: nil
         )
         var initialState = CollectionFeature.State()
         initialState.cutouts = [first, second]
         let store = TestStore(initialState: initialState) {
             CollectionFeature()
         } withDependencies: {
-            $0.persistence.deleteCutouts = { ids in
+            $0.persistence.deleteEntries = { ids in
                 XCTAssertEqual(ids, [first.id])
             }
         }
@@ -96,8 +106,8 @@ final class CollectionFeatureTests: XCTestCase {
     @MainActor
     func test_selectAll_togglesEveryCutout() async {
         let cutouts = [
-            CutoutSnapshot(id: UUID(), fileName: "a.png", createdAt: Date(), label: nil),
-            CutoutSnapshot(id: UUID(), fileName: "b.png", createdAt: Date(), label: nil),
+            FoodEntrySnapshot(id: UUID(), fileName: "a.png", eatenAt: Date(), label: nil),
+            FoodEntrySnapshot(id: UUID(), fileName: "b.png", eatenAt: Date(), label: nil),
         ]
         var initialState = CollectionFeature.State()
         initialState.cutouts = cutouts
@@ -116,8 +126,8 @@ final class CollectionFeatureTests: XCTestCase {
 
     @MainActor
     func test_longPressSelection_startsWithPressedCutoutSelected() async {
-        let cutout = CutoutSnapshot(
-            id: UUID(), fileName: "pressed.png", createdAt: Date(), label: nil
+        let cutout = FoodEntrySnapshot(
+            id: UUID(), fileName: "pressed.png", eatenAt: Date(), label: nil
         )
         var initialState = CollectionFeature.State()
         initialState.cutouts = [cutout]
@@ -135,7 +145,7 @@ final class CollectionFeatureTests: XCTestCase {
         let store = TestStore(initialState: CollectionFeature.State()) {
             CollectionFeature()
         } withDependencies: {
-            $0.persistence.allCutouts = { throw LoadError() }
+            $0.persistence.allEntries = { throw LoadError() }
         }
 
         await store.send(.onAppear) { $0.isLoading = true }

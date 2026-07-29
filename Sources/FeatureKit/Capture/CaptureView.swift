@@ -63,86 +63,21 @@ public struct CaptureView: View {
                         Text("담을 누끼 고르기").font(.appSection).foregroundStyle(.appInk)
                         LazyVGrid(columns: candidateColumns, spacing: 12) {
                             ForEach(Array(store.candidates.enumerated()), id: \.element.id) { index, candidate in
-                                Button { store.send(.toggleCandidate(candidate.id)) } label: {
-                                    StickerTile(tint: .rotating(index)) {
-                                        CutoutImage(
-                                            data: candidate.pngData,
-                                            cacheKey: candidate.id.uuidString
-                                        )
-                                    }
-                                    .overlay(alignment: .topTrailing) {
-                                        Image(systemName: candidate.isSelected ? "checkmark.circle.fill" : "circle")
-                                            .foregroundStyle(candidate.isSelected ? Color.appBlue : Color.appMuted)
-                                            .padding(6)
-                                    }
-                                    .overlay(alignment: .bottomTrailing) {
-                                        if let symbol = candidate.decoration.symbol {
-                                            KitschIcon(symbol, tint: .appPinkInk, background: .appPink, size: 34)
-                                                .padding(5)
-                                        }
-                                    }
-                                    .opacity(candidate.isSelected ? 1 : 0.5)
-                                }
-                                .buttonStyle(KitschPressStyle())
-                                .overlay(alignment: .bottomLeading) {
-                                    Button {
-                                        store.send(.cycleDecoration(candidate.id))
-                                    } label: {
-                                        Image(systemName: "paintbrush.pointed.fill")
-                                            .font(.caption)
-                                            .foregroundStyle(Color.appInk)
-                                            .padding(8)
-                                            .background(Color.appCard, in: Circle())
-                                    }
-                                    .buttonStyle(KitschPressStyle())
-                                    .padding(5)
-                                }
-                                .overlay(alignment: .bottomTrailing) {
-                                    Button {
-                                        store.send(.rotateCandidate(candidate.id))
-                                    } label: {
-                                        Image(systemName: "rotate.right.fill")
-                                            .font(.caption.bold())
-                                            .foregroundStyle(Color.appInk)
-                                            .padding(8)
-                                            .background(Color.appCard, in: Circle())
-                                            .rotationEffect(.degrees(candidate.isRotating ? 360 : 0))
-                                            .animation(
-                                                candidate.isRotating
-                                                    ? .linear(duration: 0.7).repeatForever(autoreverses: false)
-                                                    : .default,
-                                                value: candidate.isRotating
-                                            )
-                                    }
-                                    .buttonStyle(KitschPressStyle())
-                                    .disabled(candidate.isRotating)
-                                    .accessibilityLabel("오른쪽으로 회전")
-                                    .padding(5)
-                                }
+                                candidateCard(index: index, candidate: candidate)
                             }
                         }
 
                         SoftCard {
-                            VStack(spacing: 12) {
-                                Button { store.send(.choosePlaceTapped) } label: {
-                                    HStack {
-                                        Text("식당").font(.appSection).foregroundStyle(.appInk)
-                                        Spacer()
-                                        PastelChip(store.chosenPlace?.name ?? L10n.text("선택 안 함"),
-                                                   symbol: "mappin.and.ellipse", tone: .blue)
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                                Divider()
-                                tagSection
-                                Divider()
+                            // Shared by the batch: one sitting, one restaurant.
+                            Button { store.send(.choosePlaceTapped) } label: {
                                 HStack {
-                                    Text("별점").font(.appSection).foregroundStyle(.appInk)
+                                    Text("식당").font(.appSection).foregroundStyle(.appInk)
                                     Spacer()
-                                    StarRating(rating: store.rating,
-                                               onChange: { store.send(.ratingChanged($0)) })
+                                    PastelChip(store.chosenPlace?.name ?? L10n.text("선택 안 함"),
+                                               symbol: "mappin.and.ellipse", tone: .blue)
                                 }
                             }
+                            .buttonStyle(.plain)
                         }
 
                         PillButton(
@@ -225,6 +160,139 @@ public struct CaptureView: View {
             Button("바꾸기") { store.send(.renameConfirmed) }
             Button("취소", role: .cancel) { store.send(.renameCancelled) }
         }
+        .sheet(
+            isPresented: Binding(
+                get: { store.editingCandidateID != nil },
+                set: { if !$0 { store.send(.dismissCandidateEditor) } }
+            )
+        ) {
+            NavigationStack {
+                foodEditor
+                    .background(PaperBackground())
+                    .navigationTitle("이 음식 정보")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("완료") { store.send(.dismissCandidateEditor) }
+                        }
+                    }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Color.appMilk)
+        }
+    }
+
+    /// One food's own tags and rating. Several dishes photographed together each
+    /// get their own record, so each is described on its own.
+    @ViewBuilder
+    private var foodEditor: some View {
+        if let candidate = store.editingCandidate {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    StickerTile(tint: .pink) {
+                        CutoutImage(
+                            data: candidate.pngData,
+                            cacheKey: candidate.id.uuidString
+                        )
+                    }
+                    .frame(maxWidth: 180)
+                    .frame(maxWidth: .infinity, alignment: .center)
+
+                    SoftCard { tagSection }
+
+                    SoftCard {
+                        HStack {
+                            Text("별점").font(.appSection).foregroundStyle(.appInk)
+                            Spacer()
+                            StarRating(
+                                rating: candidate.rating,
+                                onChange: { store.send(.ratingChanged($0)) }
+                            )
+                        }
+                    }
+                }
+                .padding(18)
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private func candidateCard(index: Int, candidate: CaptureFeature.CutoutCandidate) -> some View {
+        VStack(spacing: 7) {
+            Button { store.send(.toggleCandidate(candidate.id)) } label: {
+                StickerTile(tint: .rotating(index)) {
+                    CutoutImage(data: candidate.pngData, cacheKey: candidate.id.uuidString)
+                }
+                .overlay(alignment: .topTrailing) {
+                    Image(systemName: candidate.isSelected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(candidate.isSelected ? Color.appBlue : Color.appMuted)
+                        .padding(6)
+                }
+                .overlay(alignment: .bottomLeading) { decorationButton(candidate) }
+                .overlay(alignment: .bottomTrailing) { rotateButton(candidate) }
+                .opacity(candidate.isSelected ? 1 : 0.5)
+            }
+            .buttonStyle(KitschPressStyle())
+
+            Button { store.send(.editCandidateTapped(candidate.id)) } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "tag.fill").font(.system(size: 10, weight: .black))
+                    if candidate.tags.isEmpty, candidate.rating == nil {
+                        Text("정보 넣기")
+                    } else {
+                        Text(candidate.tags.first ?? L10n.text("별점만"))
+                            .lineLimit(1)
+                        if candidate.tags.count > 1 {
+                            Text(verbatim: "+\(candidate.tags.count - 1)")
+                        }
+                    }
+                }
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(.appBlueInk)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.appBlue.opacity(0.5), in: Capsule())
+            }
+            .buttonStyle(KitschPressStyle())
+        }
+    }
+
+    private func decorationButton(_ candidate: CaptureFeature.CutoutCandidate) -> some View {
+        Button {
+            store.send(.cycleDecoration(candidate.id))
+        } label: {
+            Image(systemName: "paintbrush.pointed.fill")
+                .font(.caption)
+                .foregroundStyle(Color.appInk)
+                .padding(8)
+                .background(Color.appCard, in: Circle())
+        }
+        .buttonStyle(KitschPressStyle())
+        .padding(5)
+    }
+
+    private func rotateButton(_ candidate: CaptureFeature.CutoutCandidate) -> some View {
+        Button {
+            store.send(.rotateCandidate(candidate.id))
+        } label: {
+            Image(systemName: "rotate.right.fill")
+                .font(.caption.bold())
+                .foregroundStyle(Color.appInk)
+                .padding(8)
+                .background(Color.appCard, in: Circle())
+                .rotationEffect(.degrees(candidate.isRotating ? 360 : 0))
+                .animation(
+                    candidate.isRotating
+                        ? .linear(duration: 0.7).repeatForever(autoreverses: false)
+                        : .default,
+                    value: candidate.isRotating
+                )
+        }
+        .buttonStyle(KitschPressStyle())
+        .disabled(candidate.isRotating)
+        .accessibilityLabel("오른쪽으로 회전")
+        .padding(5)
     }
 
     /// Pick tags, make new ones, and manage the catalog — all in place, so saving
@@ -234,8 +302,9 @@ public struct CaptureView: View {
             HStack {
                 Text("태그").font(.appSection).foregroundStyle(.appInk)
                 Spacer()
-                if !store.tags.isEmpty {
-                    Text(L10n.format("capture.tags.picked", store.tags.count))
+                let picked = store.editingCandidate?.tags ?? []
+                if !picked.isEmpty {
+                    Text(L10n.format("capture.tags.picked", picked.count))
                         .font(.appCaption)
                         .foregroundStyle(.appMuted)
                 }
@@ -247,14 +316,14 @@ public struct CaptureView: View {
                     .foregroundStyle(.appMuted)
             } else {
                 TagFlow(store.tagCatalog) { name in
-                    let picked = store.tags.contains { TagName.isSame($0, name) }
+                    let isOn = (store.editingCandidate?.tags ?? []).contains { TagName.isSame($0, name) }
                     Button {
                         store.send(.tagToggled(name))
                     } label: {
                         TagChip(name)
-                            .opacity(picked ? 1 : 0.45)
+                            .opacity(isOn ? 1 : 0.45)
                             .overlay {
-                                if picked {
+                                if isOn {
                                     Capsule().stroke(Color.appInk.opacity(0.55), lineWidth: 1.5)
                                 }
                             }

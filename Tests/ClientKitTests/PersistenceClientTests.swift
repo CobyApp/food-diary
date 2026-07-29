@@ -8,7 +8,7 @@ final class PersistenceClientTests: XCTestCase {
     // mutable state in the stub (Swift 6 @Sendable-safe).
     private func makeClient() throws -> PersistenceClient {
         let container = try ModelContainer(
-            for: Meal.self, FoodCutout.self, FoodTag.self,
+            for: FoodEntry.self, FoodTag.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let store = ImageStore(
@@ -19,132 +19,102 @@ final class PersistenceClientTests: XCTestCase {
         return PersistenceClient.live(container: container, imageStore: store)
     }
 
-    func test_saveMeal_thenAllCutouts_roundTrips() async throws {
+    func test_saveEntries_thenAllEntries_roundTrips() async throws {
         let client = try makeClient()
-
         let place = PlaceInfo(id: "p1", name: "라멘집", address: "후쿠오카")
-        let snap = try await client.saveMeal(
-            place, ["맛있다"], 5,
-            [NewCutout(pngData: Data([1]), label: "라멘"),
-             NewCutout(pngData: Data([2]), label: nil)]
-        )
 
-        XCTAssertEqual(snap.cutouts.count, 2)
-        XCTAssertEqual(snap.place?.name, "라멘집")
-
-        let all = try await client.allCutouts()
-        XCTAssertEqual(all.count, 2)
-
-        let fetched = try await client.meal(snap.id)
-        XCTAssertEqual(fetched?.tags, ["맛있다"])
-    }
-
-    func test_allCutouts_areNewestFirst() async throws {
-        let client = try makeClient()
-
-        // Two sequential (awaited) saves guarantee distinct createdAt values,
-        // so the reverse sort is exercised deterministically.
-        _ = try await client.saveMeal(nil, ["older"], nil, [NewCutout(pngData: Data([1]), label: "old")])
-        _ = try await client.saveMeal(nil, ["newer"], nil, [NewCutout(pngData: Data([2]), label: "new")])
-
-        let all = try await client.allCutouts()
-        XCTAssertEqual(all.count, 2)
-        XCTAssertEqual(all.first?.label, "new", "newest cutout should come first")
-        XCTAssertEqual(all.last?.label, "old")
-    }
-
-    func test_mealByCutout_returnsOwningMeal() async throws {
-        let container = try ModelContainer(
-            for: Meal.self, FoodCutout.self, FoodTag.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-        )
-        let store = ImageStore(save: { _ in "n.png" }, load: { _ in nil }, delete: { _ in })
-        let client = PersistenceClient.live(container: container, imageStore: store)
-        let snap = try await client.saveMeal(nil, ["m"], nil, [NewCutout(pngData: Data([1]), label: nil)])
-        let cutoutID = snap.cutouts[0].id
-        let owning = try await client.mealByCutout(cutoutID)
-        XCTAssertEqual(owning?.id, snap.id)
-    }
-
-    func test_allMeals_returnsSavedMealsNewestFirst() async throws {
-        let client = try makeClient()
-        _ = try await client.saveMeal(PlaceInfo(id: "a", name: "A", address: ""), ["older"], nil,
-                                      [NewCutout(pngData: Data([1]), label: nil)])
-        _ = try await client.saveMeal(PlaceInfo(id: "b", name: "B", address: ""), ["newer"], nil,
-                                      [NewCutout(pngData: Data([2]), label: nil)])
-        let meals = try await client.allMeals()
-        XCTAssertEqual(meals.count, 2)
-        XCTAssertEqual(meals.first?.tags, ["newer"])
-        XCTAssertEqual(meals.first?.place?.name, "B")
-    }
-
-    func test_deleteMeal_removesMealAndItsCutouts() async throws {
-        let client = try makeClient()
-
-        let snap = try await client.saveMeal(
-            nil, ["to delete"], nil,
-            [NewCutout(pngData: Data([1]), label: nil),
-             NewCutout(pngData: Data([2]), label: nil)]
-        )
-
-        try await client.deleteMeal(snap.id)
-
-        let fetched = try await client.meal(snap.id)
-        XCTAssertNil(fetched)
-        let all = try await client.allCutouts()
-        XCTAssertTrue(all.isEmpty, "cascade delete should remove the meal's cutouts")
-    }
-
-    func test_deleteCutouts_removesOnlySelectedImages() async throws {
-        let client = try makeClient()
-        let meal = try await client.saveMeal(
-            nil, ["keep meal"], nil,
+        let saved = try await client.saveEntries(
+            place,
             [
-                NewCutout(pngData: Data([1]), label: "first"),
-                NewCutout(pngData: Data([2]), label: "second"),
+                NewEntry(pngData: Data([1]), label: "라멘", tags: ["맛있다"], rating: 5),
+                NewEntry(pngData: Data([2]), label: "교자", tags: ["바삭"], rating: 4),
             ]
         )
 
-        try await client.deleteCutouts([meal.cutouts[0].id])
-
-        let remaining = try await client.allCutouts()
-        let remainingMeal = try await client.meal(meal.id)
-        XCTAssertEqual(remaining.count, 1)
-        XCTAssertEqual(remaining.first?.id, meal.cutouts[1].id)
-        XCTAssertEqual(remainingMeal?.tags, ["keep meal"])
+        XCTAssertEqual(saved.count, 2)
+        let all = try await client.allEntries()
+        XCTAssertEqual(all.count, 2)
+        let ramen = all.first { $0.label == "라멘" }
+        XCTAssertEqual(ramen?.tags, ["맛있다"])
+        XCTAssertEqual(ramen?.rating, 5)
+        XCTAssertEqual(ramen?.place?.name, "라멘집")
     }
 
-    func test_deleteLastCutout_removesEmptyMealAndMapResidue() async throws {
+    func test_allEntries_returnsNewestFirst() async throws {
         let client = try makeClient()
-        let meal = try await client.saveMeal(
-            PlaceInfo(id: "p1", name: "remove me", address: ""),
-            ["last cutout"],
-            nil,
-            [NewCutout(pngData: Data([1]), label: nil)]
-        )
+        // Two sequential (awaited) saves guarantee distinct timestamps.
+        _ = try await client.saveEntries(nil, [NewEntry(pngData: Data([1]), label: "older")])
+        _ = try await client.saveEntries(nil, [NewEntry(pngData: Data([2]), label: "newer")])
 
-        try await client.deleteCutouts([meal.cutouts[0].id])
-
-        let deletedMeal = try await client.meal(meal.id)
-        let remainingMeals = try await client.allMeals()
-        XCTAssertNil(deletedMeal)
-        XCTAssertTrue(remainingMeals.isEmpty)
+        let all = try await client.allEntries()
+        XCTAssertEqual(all.first?.label, "newer")
     }
 
-    func test_saveMeal_whenAnImageWriteFails_rollsBackWrittenImages() async throws {
-        struct WriteFailure: Error {}
+    func test_entry_findsASavedFoodByID() async throws {
+        let client = try makeClient()
+        let saved = try await client.saveEntries(nil, [NewEntry(pngData: Data([1]), label: "라멘")])
+        let id = try XCTUnwrap(saved.first?.id)
+
+        let found = try await client.entry(id)
+        XCTAssertEqual(found?.label, "라멘")
+    }
+
+    func test_entry_isNilForAnUnknownID() async throws {
+        let client = try makeClient()
+        let found = try await client.entry(UUID())
+        XCTAssertNil(found)
+    }
+
+    func test_deleteEntries_removesOnlyWhatWasAsked() async throws {
+        let client = try makeClient()
+        let saved = try await client.saveEntries(
+            nil,
+            [
+                NewEntry(pngData: Data([1]), label: "keep"),
+                NewEntry(pngData: Data([2]), label: "drop"),
+            ]
+        )
+        let doomed = try XCTUnwrap(saved.first { $0.label == "drop" })
+
+        try await client.deleteEntries([doomed.id])
+
+        let all = try await client.allEntries()
+        XCTAssertEqual(all.map(\.label), ["keep"])
+    }
+
+    func test_deleteEntries_alsoRemovesTheImageFile() async throws {
         let container = try ModelContainer(
-            for: Meal.self, FoodCutout.self, FoodTag.self,
+            for: FoodEntry.self, FoodTag.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
-        // Fails on the SECOND write; records every delete so we can assert rollback.
-        let writes = CounterBox()
-        let deleted = StringListBox()
+        let deleted = LockBox<[String]>([])
+        let store = ImageStore(
+            save: { _ in "image.png" },
+            load: { _ in nil },
+            delete: { name in deleted.append(name) }
+        )
+        let client = PersistenceClient.live(container: container, imageStore: store)
+        let saved = try await client.saveEntries(nil, [NewEntry(pngData: Data([1]))])
+
+        try await client.deleteEntries([try XCTUnwrap(saved.first?.id)])
+
+        XCTAssertEqual(deleted.value, ["image.png"])
+    }
+
+    /// A failure partway through a batch must not leave written PNGs behind.
+    func test_saveEntries_whenAnImageWriteFails_rollsBackWrittenImages() async throws {
+        struct WriteFailure: Error {}
+        let container = try ModelContainer(
+            for: FoodEntry.self, FoodTag.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let deleted = LockBox<[String]>([])
+        let attempt = Counter()
         let store = ImageStore(
             save: { _ in
-                let index = writes.increment()
-                if index == 2 { throw WriteFailure() }
-                return "written-\(index).png"
+                let current = attempt.next()
+                if current == 2 { throw WriteFailure() }
+                return "written-\(current).png"
             },
             load: { _ in nil },
             delete: { name in deleted.append(name) }
@@ -152,47 +122,49 @@ final class PersistenceClientTests: XCTestCase {
         let client = PersistenceClient.live(container: container, imageStore: store)
 
         do {
-            _ = try await client.saveMeal(
-                nil, ["rollback"], nil,
-                [NewCutout(pngData: Data([1]), label: nil),
-                 NewCutout(pngData: Data([2]), label: nil)]
+            _ = try await client.saveEntries(
+                nil,
+                [NewEntry(pngData: Data([1])), NewEntry(pngData: Data([2]))]
             )
             XCTFail("save should have thrown")
         } catch {
             // expected
         }
 
-        XCTAssertEqual(deleted.currentValues, ["written-1.png"], "the first written PNG must be cleaned up")
-        let meals = try await client.allMeals()
-        XCTAssertTrue(meals.isEmpty, "no meal should be persisted when the save fails")
+        XCTAssertEqual(deleted.value, ["written-1.png"])
+        let all = try await client.allEntries()
+        XCTAssertTrue(all.isEmpty)
     }
 }
 
-// `LockIsolated` (ConcurrencyExtras) isn't linked into this test target, so
-// these tiny lock-backed boxes stand in for it to safely share mutable state
-// across the `@Sendable` ImageStore closures used above.
-private final class CounterBox: @unchecked Sendable {
-    private var value = 0
+/// ConcurrencyExtras' LockIsolated isn't linked into this target.
+private final class LockBox<Value>: @unchecked Sendable {
     private let lock = NSLock()
-    func increment() -> Int {
+    private var stored: Value
+
+    init(_ value: Value) { stored = value }
+
+    var value: Value {
         lock.lock()
         defer { lock.unlock() }
-        value += 1
-        return value
+        return stored
+    }
+
+    func append(_ element: Value.Element) where Value: RangeReplaceableCollection {
+        lock.lock()
+        defer { lock.unlock() }
+        stored.append(element)
     }
 }
 
-private final class StringListBox: @unchecked Sendable {
-    private var values: [String] = []
+private final class Counter: @unchecked Sendable {
     private let lock = NSLock()
-    func append(_ value: String) {
+    private var count = 0
+
+    func next() -> Int {
         lock.lock()
         defer { lock.unlock() }
-        values.append(value)
-    }
-    var currentValues: [String] {
-        lock.lock()
-        defer { lock.unlock() }
-        return values
+        count += 1
+        return count
     }
 }

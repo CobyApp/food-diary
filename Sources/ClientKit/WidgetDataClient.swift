@@ -12,12 +12,12 @@ public enum FoodDiaryShared {
 
 @DependencyClient
 public struct WidgetDataClient: Sendable {
-    public var update: @Sendable (_ meal: MealSnapshot, _ streak: Int) async -> Void
+    public var update: @Sendable (_ entry: FoodEntrySnapshot, _ streak: Int) async -> Void
     public var clear: @Sendable () async -> Void
 }
 
 private actor WidgetDataStore {
-    func update(meal: MealSnapshot, streak: Int) {
+    func update(entry: FoodEntrySnapshot, streak: Int) {
         guard
             let defaults = UserDefaults(suiteName: FoodDiaryShared.appGroup),
             let directory = FileManager.default.containerURL(
@@ -25,10 +25,9 @@ private actor WidgetDataStore {
             )
         else { return }
 
-        let latest = meal.cutouts.first
         var sharedImageName: String?
-        if let latest,
-           let data = ImageStore.disk(directory: ImageStore.cutoutsDirectory).load(latest.fileName) {
+        if let data = ImageStore.disk(directory: ImageStore.cutoutsDirectory)
+            .load(entry.fileName) {
             let url = directory.appendingPathComponent(FoodDiaryShared.imageFileName)
             if (try? data.write(to: url, options: .atomic)) != nil {
                 sharedImageName = FoodDiaryShared.imageFileName
@@ -36,12 +35,12 @@ private actor WidgetDataStore {
         }
 
         let snapshot = WidgetSnapshot(
-            updatedAt: meal.eatenAt,
-            title: meal.place?.name ?? NSLocalizedString(
+            updatedAt: entry.eatenAt,
+            title: entry.place?.name ?? NSLocalizedString(
                 "오늘의 한 끼", bundle: .main, comment: ""
             ),
-            subtitle: meal.tags.isEmpty ? "Yumkie" : meal.tags.joined(separator: " · "),
-            decoration: latest?.label,
+            subtitle: entry.tags.isEmpty ? "Yumkie" : entry.tags.joined(separator: " · "),
+            decoration: entry.label,
             streak: streak,
             imageFileName: sharedImageName
         )
@@ -67,8 +66,8 @@ private actor WidgetDataStore {
 public extension WidgetDataClient {
     static func live() -> WidgetDataClient {
         let store = WidgetDataStore()
-        return WidgetDataClient(update: { meal, streak in
-            await store.update(meal: meal, streak: streak)
+        return WidgetDataClient(update: { entry, streak in
+            await store.update(entry: entry, streak: streak)
         }, clear: {
             await store.clear()
         })

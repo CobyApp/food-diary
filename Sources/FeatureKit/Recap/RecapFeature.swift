@@ -7,7 +7,7 @@ import Models
 public struct RecapFeature {
     @ObservableState
     public struct State: Equatable {
-        public var weekCutouts: [CutoutSnapshot] = []
+        public var weekCutouts: [FoodEntrySnapshot] = []
         public var mealCount = 0
         public var rangeText = ""
         public var startDate: Date?
@@ -26,7 +26,7 @@ public struct RecapFeature {
 
     public enum Action: Equatable {
         case onAppear
-        case loaded(cutouts: [CutoutSnapshot], mealCount: Int, rangeText: String)
+        case loaded(cutouts: [FoodEntrySnapshot], mealCount: Int, rangeText: String)
         case dateRangeChanged(start: Date, end: Date)
         case captionGenerated(String?)
         case captionChanged(String)
@@ -95,12 +95,12 @@ public struct RecapFeature {
         let endExclusive = Calendar.current.date(byAdding: .day, value: 1, to: end) ?? end
         let range = Self.rangeText(start: start, end: end)
         return .run { send in
-            let meals = try await persistence.allMeals()
-            let selected = meals.filter {
+            let entries = try await persistence.allEntries()
+            let selected = entries.filter {
                 $0.eatenAt >= start && $0.eatenAt < endExclusive
             }
             await send(.loaded(
-                cutouts: selected.flatMap(\.cutouts),
+                cutouts: selected,
                 mealCount: selected.count,
                 rangeText: range
             ))

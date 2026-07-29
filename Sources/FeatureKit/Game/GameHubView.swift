@@ -114,7 +114,7 @@ public struct GameHubView: View {
     }
 
     @ViewBuilder
-    private func previewTile(_ cutout: CutoutSnapshot?, tint: StickerTint) -> some View {
+    private func previewTile(_ cutout: FoodEntrySnapshot?, tint: StickerTint) -> some View {
         StickerTile(tint: tint) {
             if let cutout {
                 CutoutImage(fileName: cutout.fileName)

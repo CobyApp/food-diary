@@ -14,14 +14,14 @@ public struct GameResultInfo: Equatable, Sendable {
         self.rating = rating
     }
 
-    /// Builds the richer result payload from a meal snapshot (nil when unknown).
-    public static func from(_ meal: MealSnapshot?) -> GameResultInfo? {
-        guard let meal else { return nil }
+    /// Builds the richer result payload from a food's record (nil when unknown).
+    public static func from(_ entry: FoodEntrySnapshot?) -> GameResultInfo? {
+        guard let entry else { return nil }
         return GameResultInfo(
-            placeName: meal.place?.name ?? "",
-            dateText: meal.eatenAt.formatted(.dateTime.month().day().weekday()),
-            tags: meal.tags,
-            rating: meal.rating
+            placeName: entry.place?.name ?? "",
+            dateText: entry.eatenAt.formatted(.dateTime.month().day().weekday()),
+            tags: entry.tags,
+            rating: entry.rating
         )
     }
 }

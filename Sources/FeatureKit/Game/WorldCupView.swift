@@ -98,7 +98,7 @@ public struct WorldCupView: View {
         }
     }
 
-    private func contender(_ cutout: CutoutSnapshot, index: Int) -> some View {
+    private func contender(_ cutout: FoodEntrySnapshot, index: Int) -> some View {
         let info = store.info[cutout.id]
         return Button {
             selectedID = cutout.id

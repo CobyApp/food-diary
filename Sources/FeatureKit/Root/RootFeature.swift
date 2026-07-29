@@ -49,30 +49,31 @@ public struct RootFeature {
                 return .merge(
                     .send(.foodMap(.cutoutsDeleted(ids))),
                     .run { _ in
-                        let meals = (try? await persistence.allMeals()) ?? []
-                        guard let latest = meals.first else {
+                        let entries = (try? await persistence.allEntries()) ?? []
+                        guard let latest = entries.first else {
                             await widgetData.clear()
                             return
                         }
-                        let streak = MealStreak.calculate(meals: meals, now: Date()).current
+                        let streak = MealStreak.calculate(entries: entries, now: Date()).current
                         await widgetData.update(latest, streak)
                     }
                 )
 
-            case let .pushDetail(mealID):
-                state.path.append(MealDetailFeature.State(mealID: mealID))
+            case let .pushDetail(entryID):
+                state.path.append(MealDetailFeature.State(entryID: entryID))
                 return .none
 
             // When a save finishes on the capture tab, refresh the collection and switch to it.
-            case let .capture(.saved(meal)):
+            case let .capture(.saved(entries)):
                 state.tab = .collection
                 return .merge(
                     .send(.collection(.onAppear)),
                     .send(.collection(.streakOnAppear)),
-                    .run { send in
-                        let meals = (try? await persistence.allMeals()) ?? [meal]
-                        let streak = MealStreak.calculate(meals: meals, now: Date()).current
-                        await widgetData.update(meal, streak)
+                    .run { _ in
+                        let all = (try? await persistence.allEntries()) ?? entries
+                        guard let latest = all.first ?? entries.first else { return }
+                        let streak = MealStreak.calculate(entries: all, now: Date()).current
+                        await widgetData.update(latest, streak)
                     }
                 )
 
@@ -84,12 +85,12 @@ public struct RootFeature {
                     .send(.collection(.streakOnAppear)),
                     .send(.foodMap(.onAppear)),
                     .run { _ in
-                        let meals = (try? await persistence.allMeals()) ?? []
-                        guard let latest = meals.first else {
+                        let entries = (try? await persistence.allEntries()) ?? []
+                        guard let latest = entries.first else {
                             await widgetData.clear()
                             return
                         }
-                        let streak = MealStreak.calculate(meals: meals, now: Date()).current
+                        let streak = MealStreak.calculate(entries: entries, now: Date()).current
                         await widgetData.update(latest, streak)
                     }
                 )

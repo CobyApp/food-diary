@@ -4,8 +4,8 @@ import Models
 
 @DependencyClient
 public struct RandomClient: Sendable {
-    public var shuffled: @Sendable (_ items: [CutoutSnapshot]) -> [CutoutSnapshot] = { $0 }
-    public var pick: @Sendable (_ items: [CutoutSnapshot]) -> CutoutSnapshot?
+    public var shuffled: @Sendable (_ items: [FoodEntrySnapshot]) -> [FoodEntrySnapshot] = { $0 }
+    public var pick: @Sendable (_ items: [FoodEntrySnapshot]) -> FoodEntrySnapshot?
 }
 
 extension RandomClient: DependencyKey {

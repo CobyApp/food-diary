@@ -4,16 +4,13 @@ import Models
 @testable import FeatureKit
 
 final class FoodMapFeatureTests: XCTestCase {
-    private func meal(_ name: String, coord: Coordinate?) -> MealSnapshot {
-        let cutout = CutoutSnapshot(
+    private func meal(_ name: String, coord: Coordinate?) -> FoodEntrySnapshot {
+        FoodEntrySnapshot(
             id: UUID(),
             fileName: "\(name).png",
-            createdAt: Date(),
-            label: nil
+            eatenAt: Date(),
+            place: PlaceInfo(id: name, name: name, address: "", coordinate: coord)
         )
-        return MealSnapshot(id: UUID(), eatenAt: Date(),
-                            place: PlaceInfo(id: name, name: name, address: "", coordinate: coord),
-                            tags: [], rating: nil, cutouts: [cutout])
     }
 
     @MainActor
@@ -23,7 +20,7 @@ final class FoodMapFeatureTests: XCTestCase {
         let store = TestStore(initialState: FoodMapFeature.State()) {
             FoodMapFeature()
         } withDependencies: {
-            $0.persistence.allMeals = { [withCoord, noCoord] }
+            $0.persistence.allEntries = { [withCoord, noCoord] }
         }
 
         await store.send(.onAppear) { $0.isLoading = true }
@@ -40,22 +37,20 @@ final class FoodMapFeatureTests: XCTestCase {
 
     @MainActor
     func test_deletedCutouts_removeEmptyPinsImmediately() async {
-        let firstCutout = CutoutSnapshot(
-            id: UUID(), fileName: "1.png", createdAt: Date(), label: nil
+        let firstCutout = FoodEntrySnapshot(
+            id: UUID(), fileName: "1.png", eatenAt: Date(), label: nil
         )
-        let secondCutout = CutoutSnapshot(
-            id: UUID(), fileName: "2.png", createdAt: Date(), label: nil
+        let secondCutout = FoodEntrySnapshot(
+            id: UUID(), fileName: "2.png", eatenAt: Date(), label: nil
         )
         let coordinate = Coordinate(latitude: 35.6, longitude: 139.7)
-        let firstMeal = MealSnapshot(
-            id: UUID(), eatenAt: Date(),
-            place: PlaceInfo(id: "a", name: "A", address: "", coordinate: coordinate),
-            tags: [], rating: nil, cutouts: [firstCutout]
+        let firstMeal = FoodEntrySnapshot(
+            id: firstCutout.id, fileName: firstCutout.fileName, eatenAt: Date(),
+            place: PlaceInfo(id: "a", name: "A", address: "", coordinate: coordinate)
         )
-        let secondMeal = MealSnapshot(
-            id: UUID(), eatenAt: Date(),
-            place: PlaceInfo(id: "b", name: "B", address: "", coordinate: coordinate),
-            tags: [], rating: nil, cutouts: [secondCutout]
+        let secondMeal = FoodEntrySnapshot(
+            id: secondCutout.id, fileName: secondCutout.fileName, eatenAt: Date(),
+            place: PlaceInfo(id: "b", name: "B", address: "", coordinate: coordinate)
         )
         var state = FoodMapFeature.State()
         state.meals = [firstMeal, secondMeal]

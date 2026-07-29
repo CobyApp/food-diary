@@ -10,7 +10,7 @@ struct FoodDiaryApp: App {
     let store: StoreOf<RootFeature>
 
     init() {
-        let container = try! ModelContainer(for: Meal.self, FoodCutout.self, FoodTag.self)
+        let container = try! ModelContainer(for: FoodEntry.self, FoodTag.self)
         let imageStore = ImageStore.disk(directory: ImageStore.cutoutsDirectory)
         store = Store(initialState: RootFeature.State()) {
             RootFeature()

@@ -6,36 +6,32 @@ public struct MealDetailView: View {
     @State private var confirmingDelete = false
     public init(store: StoreOf<MealDetailFeature>) { self.store = store }
 
-    private let columns = [GridItem(.adaptive(minimum: 100), spacing: 12)]
-
     public var body: some View {
         ZStack {
             PaperBackground()
             ScrollView {
-                if let meal = store.meal {
+                if let entry = store.entry {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text(meal.place?.name ?? L10n.text("한 끼 기록"))
+                        Text(entry.place?.name ?? L10n.text("한 끼 기록"))
                             .font(.appDisplay).foregroundStyle(.appInk)
 
                         HStack(spacing: 8) {
-                            PastelChip(meal.eatenAt.formatted(.dateTime.month().day().weekday()),
+                            PastelChip(entry.eatenAt.formatted(.dateTime.month().day().weekday()),
                                        symbol: "calendar", tone: .pink)
-                            if meal.rating != nil { StarRating(rating: meal.rating) }
+                            if entry.rating != nil { StarRating(rating: entry.rating) }
                         }
 
-                        if !meal.tags.isEmpty {
+                        if !entry.tags.isEmpty {
                             SoftCard {
-                                TagFlow(meal.tags) { TagChip($0) }
+                                TagFlow(entry.tags) { TagChip($0) }
                             }
                         }
 
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(Array(meal.cutouts.enumerated()), id: \.element.id) { index, cutout in
-                                StickerTile(tint: .rotating(index)) {
-                                    CutoutImage(fileName: cutout.fileName)
-                                }
-                            }
+                        // One record, one food.
+                        StickerTile(tint: .pink) {
+                            CutoutImage(fileName: entry.fileName)
                         }
+                        .frame(maxWidth: 260)
                     }
                     .padding(18)
                     .frame(maxWidth: .infinity, alignment: .leading)

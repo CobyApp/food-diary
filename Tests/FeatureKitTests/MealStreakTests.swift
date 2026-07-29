@@ -10,15 +10,15 @@ final class MealStreakTests: XCTestCase {
         let today = calendar.startOfDay(for: now)
         let offsets = [0, -1, -2, -6, -7]
         let meals = offsets.map { offset in
-            MealSnapshot(
+            FoodEntrySnapshot(
                 id: UUID(),
-                eatenAt: calendar.date(byAdding: .day, value: offset, to: today)!,
-                place: nil, tags: [], rating: nil, cutouts: []
+                fileName: "\(offset).png",
+                eatenAt: calendar.date(byAdding: .day, value: offset, to: today)!
             )
         }
 
         XCTAssertEqual(
-            MealStreak.calculate(meals: meals, now: now, calendar: calendar),
+            MealStreak.calculate(entries: meals, now: now, calendar: calendar),
             MealStreak(current: 3, best: 3)
         )
     }

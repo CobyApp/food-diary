@@ -3,13 +3,13 @@ import SwiftData
 import Models
 @testable import ClientKit
 
-/// The tag catalog and the tag names stored on meals have to stay in step:
-/// meals hold names, not references, so every rename and delete has to reach
+/// The tag catalog and the tag names stored on each food have to stay in step:
+/// foods hold names, not references, so every rename and delete has to reach
 /// into them.
 final class TagCatalogTests: XCTestCase {
     private func makeClient() throws -> PersistenceClient {
         let container = try ModelContainer(
-            for: Meal.self, FoodCutout.self, FoodTag.self,
+            for: FoodEntry.self, FoodTag.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let store = ImageStore(
@@ -20,8 +20,8 @@ final class TagCatalogTests: XCTestCase {
         return PersistenceClient.live(container: container, imageStore: store)
     }
 
-    private func cutout() -> NewCutout {
-        NewCutout(pngData: Data([1]), label: nil)
+    private func entry(_ tags: [String] = []) -> NewEntry {
+        NewEntry(pngData: Data([1]), label: nil, tags: tags)
     }
 
     // MARK: - Creating
@@ -46,7 +46,6 @@ final class TagCatalogTests: XCTestCase {
     func test_createTagIgnoresATagThatAlreadyExists() async throws {
         let client = try makeClient()
         try await client.createTag("라멘")
-        try await client.createTag("라멘")
         try await client.createTag(" 라멘 ")
 
         let tags = try await client.allTags()
@@ -62,48 +61,62 @@ final class TagCatalogTests: XCTestCase {
         XCTAssertEqual(tags, [])
     }
 
-    // MARK: - Saving a meal
+    // MARK: - Saving
 
-    func test_savedMealKeepsPickOrderAndDropsRepeats() async throws {
+    func test_savedFoodKeepsPickOrderAndDropsRepeats() async throws {
         let client = try makeClient()
-        let meal = try await client.saveMeal(nil, ["라멘", " 라멘 ", "우동"], nil, [cutout()])
+        let saved = try await client.saveEntries(nil, [entry(["라멘", " 라멘 ", "우동"])])
 
-        XCTAssertEqual(meal.tags, ["라멘", "우동"])
+        XCTAssertEqual(saved.first?.tags, ["라멘", "우동"])
+    }
+
+    /// The whole point of the rewrite: several foods saved together each keep
+    /// their own tags instead of sharing one set.
+    func test_eachFoodSavedTogetherKeepsItsOwnTags() async throws {
+        let client = try makeClient()
+        let saved = try await client.saveEntries(
+            PlaceInfo(id: "p", name: "라멘집", address: "후쿠오카"),
+            [entry(["라멘"]), entry(["교자"])]
+        )
+
+        XCTAssertEqual(saved.count, 2)
+        XCTAssertEqual(Set(saved.flatMap(\.tags)), ["라멘", "교자"])
+        // The place is shared: it describes the sitting, not the dish.
+        XCTAssertEqual(Set(saved.compactMap { $0.place?.name }), ["라멘집"])
     }
 
     // MARK: - Renaming
 
-    func test_renameUpdatesTheCatalogAndEveryMealUsingIt() async throws {
+    func test_renameUpdatesTheCatalogAndEveryFoodUsingIt() async throws {
         let client = try makeClient()
         try await client.createTag("라멘")
-        _ = try await client.saveMeal(nil, ["라멘", "우동"], nil, [cutout()])
-        _ = try await client.saveMeal(nil, ["우동"], nil, [cutout()])
+        _ = try await client.saveEntries(nil, [entry(["라멘", "우동"]), entry(["우동"])])
 
         try await client.renameTag("라멘", "돈코츠")
 
         let tags = try await client.allTags()
         XCTAssertEqual(tags, ["돈코츠"])
-        let meals = try await client.allMeals()
-        XCTAssertTrue(meals.contains { $0.tags.contains("돈코츠") })
-        XCTAssertFalse(meals.contains { $0.tags.contains("라멘") })
-        // The meal that never had the tag is untouched.
-        XCTAssertTrue(meals.contains { $0.tags == ["우동"] })
+        let entries = try await client.allEntries()
+        XCTAssertTrue(entries.contains { $0.tags.contains("돈코츠") })
+        XCTAssertFalse(entries.contains { $0.tags.contains("라멘") })
+        // The food that never had the tag is untouched.
+        XCTAssertTrue(entries.contains { $0.tags == ["우동"] })
     }
 
-    /// Renaming onto a name that already exists must not leave a meal carrying
+    /// Renaming onto a name that already exists must not leave a food carrying
     /// the same tag twice, or the catalog holding a duplicate.
     func test_renameOntoAnExistingTagMergesInsteadOfDuplicating() async throws {
         let client = try makeClient()
         try await client.createTag("라멘")
         try await client.createTag("우동")
-        _ = try await client.saveMeal(nil, ["라멘", "우동"], nil, [cutout()])
+        _ = try await client.saveEntries(nil, [entry(["라멘", "우동"])])
 
         try await client.renameTag("라멘", "우동")
 
         let tags = try await client.allTags()
         XCTAssertEqual(tags, ["우동"])
-        let meals = try await client.allMeals()
-        XCTAssertEqual(meals.first?.tags, ["우동"])
+        let entries = try await client.allEntries()
+        XCTAssertEqual(entries.first?.tags, ["우동"])
     }
 
     func test_renameIgnoresBlankNewNames() async throws {
@@ -128,42 +141,40 @@ final class TagCatalogTests: XCTestCase {
 
     // MARK: - Deleting
 
-    func test_deleteRemovesTheTagFromTheCatalogAndFromMeals() async throws {
+    func test_deleteRemovesTheTagFromTheCatalogAndFromFoods() async throws {
         let client = try makeClient()
         try await client.createTag("라멘")
         try await client.createTag("우동")
-        _ = try await client.saveMeal(nil, ["라멘", "우동"], nil, [cutout()])
+        _ = try await client.saveEntries(nil, [entry(["라멘", "우동"])])
 
         try await client.deleteTag("라멘")
 
         let tags = try await client.allTags()
         XCTAssertEqual(tags, ["우동"])
-        let meals = try await client.allMeals()
-        XCTAssertEqual(meals.first?.tags, ["우동"])
+        let entries = try await client.allEntries()
+        XCTAssertEqual(entries.first?.tags, ["우동"])
     }
 
     func test_deleteMatchesRegardlessOfCase() async throws {
         let client = try makeClient()
         try await client.createTag("Ramen")
-        _ = try await client.saveMeal(nil, ["Ramen"], nil, [cutout()])
+        _ = try await client.saveEntries(nil, [entry(["Ramen"])])
 
         try await client.deleteTag("ramen")
 
         let tags = try await client.allTags()
         XCTAssertEqual(tags, [])
-        let meals = try await client.allMeals()
-        XCTAssertEqual(meals.first?.tags, [])
+        let entries = try await client.allEntries()
+        XCTAssertEqual(entries.first?.tags, [])
     }
 
-    func test_deletingATagLeavesTheMealItself() async throws {
+    func test_deletingATagLeavesTheFoodItself() async throws {
         let client = try makeClient()
-        _ = try await client.saveMeal(nil, ["라멘"], nil, [cutout()])
+        _ = try await client.saveEntries(nil, [entry(["라멘"])])
 
         try await client.deleteTag("라멘")
 
-        let meals = try await client.allMeals()
-        let cutouts = try await client.allCutouts()
-        XCTAssertEqual(meals.count, 1)
-        XCTAssertEqual(cutouts.count, 1)
+        let entries = try await client.allEntries()
+        XCTAssertEqual(entries.count, 1)
     }
 }

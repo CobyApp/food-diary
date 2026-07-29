@@ -157,17 +157,16 @@ public struct AchievementsFeature {
             switch action {
             case .onAppear:
                 return .run { [now = Date()] send in
-                    async let loadedCutouts = persistence.allCutouts()
-                    async let loadedMeals = persistence.allMeals()
-                    let (cutouts, meals) = try await (loadedCutouts, loadedMeals)
+                    // One list now: a food and its record are the same row.
+                    let entries = try await persistence.allEntries()
                     var stats = AchievementStats()
-                    stats.cutouts = cutouts.count
-                    stats.meals = meals.count
-                    stats.places = Set(meals.compactMap { $0.place?.id }).count
-                    stats.bestStreak = MealStreak.calculate(meals: meals, now: now).best
-                    stats.ratedMeals = meals.filter { $0.rating != nil }.count
-                    stats.fiveStarMeals = meals.filter { $0.rating == 5 }.count
-                    stats.decoratedCutouts = cutouts.filter {
+                    stats.cutouts = entries.count
+                    stats.meals = entries.count
+                    stats.places = Set(entries.compactMap { $0.place?.id }).count
+                    stats.bestStreak = MealStreak.calculate(entries: entries, now: now).best
+                    stats.ratedMeals = entries.filter { $0.rating != nil }.count
+                    stats.fiveStarMeals = entries.filter { $0.rating == 5 }.count
+                    stats.decoratedCutouts = entries.filter {
                         guard let label = $0.label else { return false }
                         return !label.isEmpty && label != "none"
                     }.count

@@ -4,33 +4,39 @@ import Dependencies
 import DependenciesMacros
 import Models
 
-public struct NewCutout: Sendable {
+/// One food about to be saved, with the information that belongs to it alone.
+public struct NewEntry: Sendable {
     public var pngData: Data
     public var label: String?
-    public init(pngData: Data, label: String? = nil) {
+    public var tags: [String]
+    public var rating: Int?
+
+    public init(pngData: Data, label: String? = nil, tags: [String] = [], rating: Int? = nil) {
         self.pngData = pngData
         self.label = label
+        self.tags = tags
+        self.rating = rating
     }
 }
 
 @DependencyClient
 public struct PersistenceClient: Sendable {
-    public var saveMeal: @Sendable (
-        _ place: PlaceInfo?, _ tags: [String], _ rating: Int?, _ cutouts: [NewCutout]
-    ) async throws -> MealSnapshot
-    public var allCutouts: @Sendable () async throws -> [CutoutSnapshot]
-    public var allMeals: @Sendable () async throws -> [MealSnapshot]
-    public var meal: @Sendable (_ id: UUID) async throws -> MealSnapshot?
-    public var mealByCutout: @Sendable (_ cutoutID: UUID) async throws -> MealSnapshot?
-    public var deleteCutouts: @Sendable (_ ids: Set<UUID>) async throws -> Void
-    public var deleteMeal: @Sendable (_ id: UUID) async throws -> Void
+    /// Saves one record per food. `place` and the time are shared by the batch —
+    /// they describe the sitting — while tags and rating come from each entry.
+    public var saveEntries: @Sendable (
+        _ place: PlaceInfo?, _ entries: [NewEntry]
+    ) async throws -> [FoodEntrySnapshot]
+    /// Newest first.
+    public var allEntries: @Sendable () async throws -> [FoodEntrySnapshot]
+    public var entry: @Sendable (_ id: UUID) async throws -> FoodEntrySnapshot?
+    public var deleteEntries: @Sendable (_ ids: Set<UUID>) async throws -> Void
     /// The tag catalog, alphabetical.
     public var allTags: @Sendable () async throws -> [String]
     /// Adds a tag to the catalog; a tag that already exists is left alone.
     public var createTag: @Sendable (_ name: String) async throws -> Void
-    /// Renames the catalog entry and rewrites the name on every meal using it.
+    /// Renames the catalog entry and rewrites the name on every food using it.
     public var renameTag: @Sendable (_ from: String, _ to: String) async throws -> Void
-    /// Removes the catalog entry and strips it from every meal.
+    /// Removes the catalog entry and strips it from every food.
     public var deleteTag: @Sendable (_ name: String) async throws -> Void
 }
 
@@ -39,83 +45,57 @@ actor PersistenceActor {
     // ImageStore (Sendable) is passed per call rather than stored, so live()
     // needs no async setter and there is no window where it is unset.
     func save(
-        place: PlaceInfo?, tags: [String], rating: Int?, cutouts: [NewCutout],
+        place: PlaceInfo?,
+        entries: [NewEntry],
         imageStore: ImageStore
-    ) throws -> MealSnapshot {
-        let tags = TagName.cleaned(tags)
-        let meal = Meal(tags: tags, rating: rating)
-        meal.place = place
-        // Track what we wrote so a later failure doesn't leave orphaned PNGs.
+    ) throws -> [FoodEntrySnapshot] {
         var written: [String] = []
+        var inserted: [FoodEntry] = []
         do {
-            for new in cutouts {
+            // One shared timestamp: these were eaten at the same sitting.
+            let eatenAt = Date()
+            for new in entries {
                 let name = try imageStore.save(new.pngData)
                 written.append(name)
-                let cutout = FoodCutout(fileName: name, label: new.label)
-                cutout.meal = meal
-                meal.cutouts.append(cutout)
+                let entry = FoodEntry(
+                    fileName: name,
+                    eatenAt: eatenAt,
+                    label: new.label,
+                    tags: TagName.cleaned(new.tags),
+                    rating: new.rating
+                )
+                entry.place = place
+                modelContext.insert(entry)
+                inserted.append(entry)
             }
-            modelContext.insert(meal)
             try modelContext.save()
         } catch {
+            // Track what we wrote so a later failure doesn't leave orphaned PNGs.
             for name in written { try? imageStore.delete(name) }
             modelContext.rollback()
             throw error
         }
-        return meal.snapshot()
+        return inserted.map { $0.snapshot() }
     }
 
-    func allCutouts() throws -> [CutoutSnapshot] {
-        let descriptor = FetchDescriptor<FoodCutout>(
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+    func allEntries() throws -> [FoodEntrySnapshot] {
+        let descriptor = FetchDescriptor<FoodEntry>(
+            sortBy: [SortDescriptor(\.eatenAt, order: .reverse)]
         )
         return try modelContext.fetch(descriptor).map { $0.snapshot() }
     }
 
-    func allMeals() throws -> [MealSnapshot] {
-        let descriptor = FetchDescriptor<Meal>(
-            sortBy: [SortDescriptor(\.eatenAt, order: .reverse)]
-        )
-        let meals = try modelContext.fetch(descriptor)
-        let emptyMeals = meals.filter(\.cutouts.isEmpty)
-        let snapshots = meals.filter { !$0.cutouts.isEmpty }.map { $0.snapshot() }
-        if !emptyMeals.isEmpty {
-            emptyMeals.forEach(modelContext.delete)
-            try modelContext.save()
-        }
-        return snapshots
-    }
-
-    func meal(id: UUID) throws -> MealSnapshot? {
-        let descriptor = FetchDescriptor<Meal>(predicate: #Predicate { $0.id == id })
+    func entry(id: UUID) throws -> FoodEntrySnapshot? {
+        let descriptor = FetchDescriptor<FoodEntry>(predicate: #Predicate { $0.id == id })
         return try modelContext.fetch(descriptor).first?.snapshot()
     }
 
-    func mealByCutout(id: UUID) throws -> MealSnapshot? {
-        let descriptor = FetchDescriptor<FoodCutout>(predicate: #Predicate { $0.id == id })
-        return try modelContext.fetch(descriptor).first?.meal?.snapshot()
-    }
-
-    func deleteCutouts(ids: Set<UUID>, imageStore: ImageStore) throws {
-        guard !ids.isEmpty else { return }
-        let cutouts = try modelContext.fetch(FetchDescriptor<FoodCutout>())
-            .filter { ids.contains($0.id) }
-        let mealsToDelete = Dictionary(
-            cutouts.compactMap(\.meal)
-                .filter { meal in
-                    !meal.cutouts.isEmpty && meal.cutouts.allSatisfy { ids.contains($0.id) }
-                }
-                .map { ($0.id, $0) },
-            uniquingKeysWith: { first, _ in first }
-        )
-        for cutout in cutouts {
-            try? imageStore.delete(cutout.fileName)
-            if let mealID = cutout.meal?.id, mealsToDelete[mealID] != nil {
-                continue
-            }
-            modelContext.delete(cutout)
+    func deleteEntries(ids: Set<UUID>, imageStore: ImageStore) throws {
+        let all = try modelContext.fetch(FetchDescriptor<FoodEntry>())
+        for entry in all where ids.contains(entry.id) {
+            try? imageStore.delete(entry.fileName)
+            modelContext.delete(entry)
         }
-        mealsToDelete.values.forEach(modelContext.delete)
         try modelContext.save()
     }
 
@@ -145,33 +125,25 @@ actor PersistenceActor {
         } else {
             tag.name = new
         }
-        // Meals hold names, so every one carrying the old name has to be rewritten.
-        for meal in try modelContext.fetch(FetchDescriptor<Meal>()) {
-            guard meal.tags.contains(where: { TagName.isSame($0, old) }) else { continue }
-            meal.tags = TagName.cleaned(
-                meal.tags.map { TagName.isSame($0, old) ? new : $0 }
+        // Foods hold names, so every one carrying the old name has to be rewritten.
+        for entry in try modelContext.fetch(FetchDescriptor<FoodEntry>()) {
+            guard entry.tags.contains(where: { TagName.isSame($0, old) }) else { continue }
+            entry.tags = TagName.cleaned(
+                entry.tags.map { TagName.isSame($0, old) ? new : $0 }
             )
         }
         try modelContext.save()
     }
 
     func deleteTag(name: String) throws {
-        let tags = try modelContext.fetch(FetchDescriptor<FoodTag>())
-        for tag in tags where TagName.isSame(tag.name, name) {
+        for tag in try modelContext.fetch(FetchDescriptor<FoodTag>())
+        where TagName.isSame(tag.name, name) {
             modelContext.delete(tag)
         }
-        for meal in try modelContext.fetch(FetchDescriptor<Meal>()) {
-            let kept = meal.tags.filter { !TagName.isSame($0, name) }
-            if kept.count != meal.tags.count { meal.tags = kept }
+        for entry in try modelContext.fetch(FetchDescriptor<FoodEntry>()) {
+            let kept = entry.tags.filter { !TagName.isSame($0, name) }
+            if kept.count != entry.tags.count { entry.tags = kept }
         }
-        try modelContext.save()
-    }
-
-    func delete(id: UUID, imageStore: ImageStore) throws {
-        let descriptor = FetchDescriptor<Meal>(predicate: #Predicate { $0.id == id })
-        guard let meal = try modelContext.fetch(descriptor).first else { return }
-        for cutout in meal.cutouts { try? imageStore.delete(cutout.fileName) }
-        modelContext.delete(meal)
         try modelContext.save()
     }
 }
@@ -180,20 +152,14 @@ public extension PersistenceClient {
     static func live(container: ModelContainer, imageStore: ImageStore) -> PersistenceClient {
         let actor = PersistenceActor(modelContainer: container)
         return PersistenceClient(
-            saveMeal: { place, tags, rating, cutouts in
-                try await actor.save(
-                    place: place, tags: tags, rating: rating, cutouts: cutouts,
-                    imageStore: imageStore
-                )
+            saveEntries: { place, entries in
+                try await actor.save(place: place, entries: entries, imageStore: imageStore)
             },
-            allCutouts: { try await actor.allCutouts() },
-            allMeals: { try await actor.allMeals() },
-            meal: { id in try await actor.meal(id: id) },
-            mealByCutout: { id in try await actor.mealByCutout(id: id) },
-            deleteCutouts: { ids in
-                try await actor.deleteCutouts(ids: ids, imageStore: imageStore)
+            allEntries: { try await actor.allEntries() },
+            entry: { id in try await actor.entry(id: id) },
+            deleteEntries: { ids in
+                try await actor.deleteEntries(ids: ids, imageStore: imageStore)
             },
-            deleteMeal: { id in try await actor.delete(id: id, imageStore: imageStore) },
             allTags: { try await actor.allTags() },
             createTag: { name in try await actor.createTag(name: name) },
             renameTag: { from, to in try await actor.renameTag(from: from, to: to) },
@@ -205,19 +171,22 @@ public extension PersistenceClient {
 extension PersistenceClient: TestDependencyKey {
     public static let testValue = PersistenceClient()
     public static let previewValue = PersistenceClient(
-        saveMeal: { place, tags, rating, cutouts in
-            MealSnapshot(id: UUID(), eatenAt: Date(), place: place, tags: tags, rating: rating,
-                         cutouts: cutouts.enumerated().map {
-                             CutoutSnapshot(id: UUID(), fileName: "\($0.offset).png",
-                                            createdAt: Date(), label: $0.element.label)
-                         })
+        saveEntries: { place, entries in
+            entries.enumerated().map { offset, entry in
+                FoodEntrySnapshot(
+                    id: UUID(),
+                    fileName: "\(offset).png",
+                    eatenAt: Date(),
+                    label: entry.label,
+                    place: place,
+                    tags: entry.tags,
+                    rating: entry.rating
+                )
+            }
         },
-        allCutouts: { [] },
-        allMeals: { [] },
-        meal: { _ in nil },
-        mealByCutout: { _ in nil },
-        deleteCutouts: { _ in },
-        deleteMeal: { _ in },
+        allEntries: { [] },
+        entry: { _ in nil },
+        deleteEntries: { _ in },
         allTags: { ["라멘", "카페"] },
         createTag: { _ in },
         renameTag: { _, _ in },

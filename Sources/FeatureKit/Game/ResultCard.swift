@@ -2,7 +2,7 @@ import SwiftUI
 import Models
 
 struct ResultCard: View {
-    let cutout: CutoutSnapshot
+    let cutout: FoodEntrySnapshot
     let info: GameResultInfo?
     let onAgain: () -> Void
     let onClose: () -> Void

@@ -7,16 +7,16 @@ import ClientKit
 public struct WorldCupFeature {
     @ObservableState
     public struct State: Equatable {
-        public var cutouts: [CutoutSnapshot]
-        public var currentRound: [CutoutSnapshot] = []
-        public var nextRound: [CutoutSnapshot] = []
+        public var cutouts: [FoodEntrySnapshot]
+        public var currentRound: [FoodEntrySnapshot] = []
+        public var nextRound: [FoodEntrySnapshot] = []
         public var pairIndex = 0
-        public var champion: CutoutSnapshot?
+        public var champion: FoodEntrySnapshot?
         public var championInfo: GameResultInfo?
         public var info: [UUID: GameResultInfo] = [:]
-        public init(cutouts: [CutoutSnapshot]) { self.cutouts = cutouts }
+        public init(cutouts: [FoodEntrySnapshot]) { self.cutouts = cutouts }
 
-        public var currentPair: (CutoutSnapshot, CutoutSnapshot)? {
+        public var currentPair: (FoodEntrySnapshot, FoodEntrySnapshot)? {
             guard pairIndex + 1 < currentRound.count else { return nil }
             return (currentRound[pairIndex], currentRound[pairIndex + 1])
         }
@@ -31,7 +31,7 @@ public struct WorldCupFeature {
 
     public enum Action: Equatable {
         case start
-        case pick(CutoutSnapshot)
+        case pick(FoodEntrySnapshot)
         case infoLoaded(GameResultInfo?)
         case infoTableLoaded([UUID: GameResultInfo])
         case playAgain
@@ -63,11 +63,11 @@ public struct WorldCupFeature {
                 state.champion = nil
                 state.championInfo = nil
                 return .run { send in
-                    let meals = (try? await persistence.allMeals()) ?? []
+                    let entries = (try? await persistence.allEntries()) ?? []
                     var table: [UUID: GameResultInfo] = [:]
-                    for meal in meals {
-                        guard let info = GameResultInfo.from(meal) else { continue }
-                        for cutout in meal.cutouts { table[cutout.id] = info }
+                    for entry in entries {
+                        guard let info = GameResultInfo.from(entry) else { continue }
+                        table[entry.id] = info
                     }
                     await send(.infoTableLoaded(table))
                 }
@@ -80,10 +80,7 @@ public struct WorldCupFeature {
                     if state.nextRound.count == 1 {
                         let champ = state.nextRound[0]
                         state.champion = champ
-                        return .run { send in
-                            let meal = try? await persistence.mealByCutout(champ.id)
-                            await send(.infoLoaded(GameResultInfo.from(meal)))
-                        }
+                        return .send(.infoLoaded(GameResultInfo.from(champ)))
                     }
                     state.currentRound = state.nextRound
                     state.nextRound = []

@@ -3,9 +3,9 @@ import Models
 @testable import ClientKit
 
 final class RandomClientTests: XCTestCase {
-    private func snap(_ id: String) -> CutoutSnapshot {
-        CutoutSnapshot(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000\(id)")!,
-                       fileName: "\(id).png", createdAt: Date(timeIntervalSince1970: 0), label: nil)
+    private func snap(_ id: String) -> FoodEntrySnapshot {
+        FoodEntrySnapshot(id: UUID(uuidString: "00000000-0000-0000-0000-0000000000\(id)")!,
+                       fileName: "\(id).png", eatenAt: Date(timeIntervalSince1970: 0), label: nil)
     }
 
     func test_liveShuffled_preservesElements() {

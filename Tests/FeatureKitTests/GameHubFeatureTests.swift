@@ -4,8 +4,8 @@ import Models
 @testable import FeatureKit
 
 final class GameHubFeatureTests: XCTestCase {
-    private func snap(_ n: Int) -> CutoutSnapshot {
-        CutoutSnapshot(id: UUID(), fileName: "\(n).png", createdAt: Date(), label: "f\(n)")
+    private func snap(_ n: Int) -> FoodEntrySnapshot {
+        FoodEntrySnapshot(id: UUID(), fileName: "\(n).png", eatenAt: Date(), label: "f\(n)")
     }
 
     @MainActor
@@ -14,7 +14,7 @@ final class GameHubFeatureTests: XCTestCase {
         let store = TestStore(initialState: GameHubFeature.State()) {
             GameHubFeature()
         } withDependencies: {
-            $0.persistence.allCutouts = { items }
+            $0.persistence.allEntries = { items }
         }
         await store.send(.onAppear)
         await store.receive(\.cutoutsLoaded) { $0.cutouts = items }

@@ -39,7 +39,7 @@ public struct CollectionView: View {
     }
 
     /// What is actually out on the board.
-    private var boardCutouts: [CutoutSnapshot] {
+    private var boardCutouts: [FoodEntrySnapshot] {
         store.cutouts.filter { !offBoardIDs.contains($0.id.uuidString) }
     }
 
@@ -894,7 +894,7 @@ public struct CollectionView: View {
     }
 
     /// Takes a sticker off the board. The food itself stays in the drawer.
-    private func removeFromBoard(_ cutout: CutoutSnapshot) {
+    private func removeFromBoard(_ cutout: FoodEntrySnapshot) {
         offBoardIDs.insert(cutout.id.uuidString)
         stickerPlacements.removeValue(forKey: cutout.id.uuidString)
         persistOffBoardIDs()
@@ -902,7 +902,7 @@ public struct CollectionView: View {
     }
 
     /// Puts a sticker back out, in the first slot nothing else is sitting in.
-    private func addToBoard(_ cutout: CutoutSnapshot) {
+    private func addToBoard(_ cutout: FoodEntrySnapshot) {
         let width = max(UIScreen.main.bounds.width, 284)
         let height = boardHeightForCurrentWidth
         let occupied = boardCutouts.map {
@@ -959,7 +959,7 @@ public struct CollectionView: View {
     }
 
     @ViewBuilder
-    private func revealedPlaceChip(for cutout: CutoutSnapshot, visible: Bool) -> some View {
+    private func revealedPlaceChip(for cutout: FoodEntrySnapshot, visible: Bool) -> some View {
         let placeName = store.cutoutMealInfo[cutout.id]?.placeName ?? ""
         if visible, !placeName.isEmpty {
             Text(placeName)
@@ -1160,7 +1160,7 @@ private struct StickerRatingBadge: View {
 }
 
 private struct StickerDetailSheet: View {
-    let cutout: CutoutSnapshot
+    let cutout: FoodEntrySnapshot
     let info: CutoutMealInfo?
     let theme: StickerBoardTheme
     let onClose: () -> Void

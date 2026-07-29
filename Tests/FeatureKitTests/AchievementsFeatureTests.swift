@@ -6,25 +6,28 @@ import Models
 final class AchievementsFeatureTests: XCTestCase {
     @MainActor
     func test_onAppear_loadsStats_andComputesUnlocks() async {
-        let cutouts = (0..<10).map {
-            CutoutSnapshot(id: UUID(), fileName: "\($0).png", createdAt: Date(), label: nil)
+        // One list: a food and its record are the same row, so ten foods are ten
+        // records. Only the first carries a place and a rating.
+        let entries = (0..<10).map { index in
+            FoodEntrySnapshot(
+                id: UUID(),
+                fileName: "\(index).png",
+                eatenAt: Date(),
+                place: index == 0 ? PlaceInfo(id: "p1", name: "A", address: "") : nil,
+                tags: index == 0 ? ["다시 먹고 싶다"] : [],
+                rating: index == 0 ? 5 : nil
+            )
         }
-        let meals = [
-            MealSnapshot(id: UUID(), eatenAt: Date(),
-                         place: PlaceInfo(id: "p1", name: "A", address: ""),
-                         tags: ["다시 먹고 싶다"], rating: 5, cutouts: [])
-        ]
         let store = TestStore(initialState: AchievementsFeature.State()) {
             AchievementsFeature()
         } withDependencies: {
-            $0.persistence.allCutouts = { cutouts }
-            $0.persistence.allMeals = { meals }
+            $0.persistence.allEntries = { entries }
         }
 
         await store.send(.onAppear)
         await store.receive(\.statsLoaded) {
             $0.stats.cutouts = 10
-            $0.stats.meals = 1
+            $0.stats.meals = 10
             $0.stats.places = 1
             $0.stats.bestStreak = 1
             $0.stats.ratedMeals = 1

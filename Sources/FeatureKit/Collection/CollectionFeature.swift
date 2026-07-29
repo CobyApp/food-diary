@@ -20,7 +20,7 @@ public struct CutoutMealInfo: Equatable, Sendable {
 public struct CollectionFeature {
     @ObservableState
     public struct State: Equatable {
-        public var cutouts: [CutoutSnapshot] = []
+        public var cutouts: [FoodEntrySnapshot] = []
         public var isLoading = false
         public var isEditing = false
         public var isDeleting = false
@@ -57,7 +57,7 @@ public struct CollectionFeature {
 
     public enum Action: Equatable {
         case onAppear
-        case cutoutsLoaded([CutoutSnapshot])
+        case cutoutsLoaded([FoodEntrySnapshot])
         case mealInfoLoaded([UUID: CutoutMealInfo])
         case cutoutTapped(UUID)
         case dismissCutoutDetail
@@ -89,20 +89,18 @@ public struct CollectionFeature {
             case .onAppear:
                 state.isLoading = true
                 return .run { send in
-                    let cutouts = try await persistence.allCutouts()
-                    await send(.cutoutsLoaded(cutouts))
-                    let meals = (try? await persistence.allMeals()) ?? []
+                    let entries = try await persistence.allEntries()
+                    await send(.cutoutsLoaded(entries))
+                    // Each food carries its own information now, so this is just
+                    // an index for the views rather than a lookup across records.
                     var info: [UUID: CutoutMealInfo] = [:]
-                    for meal in meals {
-                        let dateText = meal.eatenAt.formatted(.dateTime.month().day())
-                        for c in meal.cutouts {
-                            info[c.id] = CutoutMealInfo(
-                                placeName: meal.place?.name ?? "",
-                                dateText: dateText,
-                                tags: meal.tags,
-                                rating: meal.rating
-                            )
-                        }
+                    for entry in entries {
+                        info[entry.id] = CutoutMealInfo(
+                            placeName: entry.place?.name ?? "",
+                            dateText: entry.eatenAt.formatted(.dateTime.month().day()),
+                            tags: entry.tags,
+                            rating: entry.rating
+                        )
                     }
                     await send(.mealInfoLoaded(info))
                 } catch: { _, send in
@@ -158,7 +156,7 @@ public struct CollectionFeature {
                 guard !ids.isEmpty, !state.isDeleting else { return .none }
                 state.isDeleting = true
                 return .run { send in
-                    try await persistence.deleteCutouts(ids)
+                    try await persistence.deleteEntries(ids)
                     await send(.cutoutsDeleted(ids))
                 } catch: { _, send in
                     await send(.cutoutDeletionFailed)
@@ -168,7 +166,7 @@ public struct CollectionFeature {
                 guard !validIDs.isEmpty, !state.isDeleting else { return .none }
                 state.isDeleting = true
                 return .run { send in
-                    try await persistence.deleteCutouts(validIDs)
+                    try await persistence.deleteEntries(validIDs)
                     await send(.cutoutsDeleted(validIDs))
                 } catch: { _, send in
                     await send(.cutoutDeletionFailed)
@@ -192,8 +190,8 @@ public struct CollectionFeature {
                 return .none
             case .streakOnAppear:
                 return .run { [now = Date()] send in
-                    let meals = try await persistence.allMeals()
-                    await send(.streakLoaded(.calculate(meals: meals, now: now)))
+                    let entries = try await persistence.allEntries()
+                    await send(.streakLoaded(.calculate(entries: entries, now: now)))
                 } catch: { _, send in
                     await send(.streakLoaded(MealStreak()))
                 }

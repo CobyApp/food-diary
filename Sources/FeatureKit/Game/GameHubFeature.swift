@@ -38,10 +38,10 @@ public enum GameKind: Equatable, CaseIterable {
 public struct GameHubFeature {
     @ObservableState
     public struct State: Equatable {
-        public var cutouts: [CutoutSnapshot]
+        public var cutouts: [FoodEntrySnapshot]
         @Presents public var game: GameDestination.State?
         @Presents public var groupDecider: GroupDeciderFeature.State?
-        public init(cutouts: [CutoutSnapshot] = [], game: GameDestination.State? = nil) {
+        public init(cutouts: [FoodEntrySnapshot] = [], game: GameDestination.State? = nil) {
             self.cutouts = cutouts
             self.game = game
         }
@@ -49,7 +49,7 @@ public struct GameHubFeature {
 
     public enum Action {
         case onAppear
-        case cutoutsLoaded([CutoutSnapshot])
+        case cutoutsLoaded([FoodEntrySnapshot])
         case gameTapped(GameKind)
         case game(PresentationAction<GameDestination.Action>)
         case groupTapped
@@ -65,7 +65,7 @@ public struct GameHubFeature {
             switch action {
             case .onAppear:
                 return .run { send in
-                    await send(.cutoutsLoaded(try await persistence.allCutouts()))
+                    await send(.cutoutsLoaded(try await persistence.allEntries()))
                 }
 
             case let .cutoutsLoaded(cutouts):

@@ -126,10 +126,10 @@ public struct FoodMapView: View {
         .task { store.send(.onAppear) }
     }
 
-    private func pin(_ meal: MealSnapshot, isSelected: Bool) -> some View {
+    private func pin(_ meal: FoodEntrySnapshot, isSelected: Bool) -> some View {
         FoodStickerMapPin(
-            fileName: meal.cutouts.first?.fileName,
-            extraCount: max(meal.cutouts.count - 1, 0),
+            fileName: meal.fileName,
+            extraCount: 0,
             isSelected: isSelected
         )
         .scaleEffect(isSelected ? 1.13 : 1)
@@ -137,17 +137,15 @@ public struct FoodMapView: View {
         .animation(.spring(response: 0.32, dampingFraction: 0.7), value: isSelected)
     }
 
-    private func selectedCard(_ meal: MealSnapshot) -> some View {
+    private func selectedCard(_ meal: FoodEntrySnapshot) -> some View {
         SoftCard {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 12) {
-                    if let first = meal.cutouts.first {
-                        StickerTile(tint: .pink) {
-                            CutoutImage(fileName: first.fileName, maxPixelDimension: 260)
-                        }
-                        .frame(width: 96, height: 96)
-                        .rotationEffect(.degrees(-2))
+                    StickerTile(tint: .pink) {
+                        CutoutImage(fileName: meal.fileName, maxPixelDimension: 260)
                     }
+                    .frame(width: 96, height: 96)
+                    .rotationEffect(.degrees(-2))
                     VStack(alignment: .leading, spacing: 6) {
                         Button {
                             openPlaceInMaps(meal)
@@ -202,16 +200,6 @@ public struct FoodMapView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                if meal.cutouts.count > 1 {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(meal.cutouts.dropFirst()) { cutout in
-                                CutoutImage(fileName: cutout.fileName, maxPixelDimension: 160)
-                                    .frame(width: 62, height: 62)
-                            }
-                        }
-                    }
-                }
                 if !meal.tags.isEmpty {
                     TagChipRow(meal.tags, limit: 3)
                         .font(.appBody)
@@ -241,7 +229,7 @@ public struct FoodMapView: View {
         }
     }
 
-    private func openPlaceInMaps(_ meal: MealSnapshot) {
+    private func openPlaceInMaps(_ meal: FoodEntrySnapshot) {
         guard let place = meal.place, let coordinate = place.coordinate else { return }
         var components = URLComponents(string: "https://maps.apple.com/")
         components?.queryItems = [

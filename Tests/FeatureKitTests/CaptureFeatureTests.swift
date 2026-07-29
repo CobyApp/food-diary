@@ -137,28 +137,31 @@ final class CaptureFeatureTests: XCTestCase {
         }
     }
 
+    /// Each selected food becomes its own record, carrying the information that
+    /// was filled in for it and nothing from its neighbour.
     @MainActor
-    func test_saveTapped_persistsSelectedCutouts() async {
-        let savedMeal = MealSnapshot(id: UUID(), eatenAt: Date(), place: nil,
-                                     tags: ["맛있다"], rating: 5, cutouts: [])
+    func test_saveTapped_writesOneRecordPerSelectedFood() async {
+        let saved = [
+            FoodEntrySnapshot(id: UUID(), fileName: "a.png", eatenAt: Date(), tags: ["맛있다"])
+        ]
         let store = TestStore(
             initialState: CaptureFeature.State(
                 candidates: [
-                    .init(id: UUID(), pngData: Data([1]), isSelected: true),
-                    .init(id: UUID(), pngData: Data([2]), isSelected: false),
-                ],
-                tags: ["맛있다"],
-                rating: 5
+                    .init(id: UUID(), pngData: Data([1]), isSelected: true,
+                          tags: ["맛있다"], rating: 5),
+                    .init(id: UUID(), pngData: Data([2]), isSelected: false,
+                          tags: ["안 고름"], rating: 1),
+                ]
             )
         ) {
             CaptureFeature()
         } withDependencies: {
-            $0.persistence.saveMeal = { _, tags, rating, cutouts in
-                XCTAssertEqual(cutouts.count, 1) // only the selected one
-                XCTAssertEqual(cutouts.first?.label, "heart")
-                XCTAssertEqual(tags, ["맛있다"])
-                XCTAssertEqual(rating, 5)
-                return savedMeal
+            $0.persistence.saveEntries = { _, entries in
+                XCTAssertEqual(entries.count, 1) // only the selected one
+                XCTAssertEqual(entries.first?.label, "heart")
+                XCTAssertEqual(entries.first?.tags, ["맛있다"])
+                XCTAssertEqual(entries.first?.rating, 5)
+                return saved
             }
         }
 
@@ -173,21 +176,24 @@ final class CaptureFeatureTests: XCTestCase {
         }
         await store.receive(\.saved) {
             $0 = CaptureFeature.State()
-            $0.savedMeal = savedMeal
+            $0.savedEntries = saved
         }
     }
 
     @MainActor
     func test_placeSelected_dismissesPickerAndKeepsChosenPlace() async {
         let place = PlaceInfo(id: "1", name: "라멘집", address: "후쿠오카")
-        let savedMeal = MealSnapshot(id: UUID(), eatenAt: Date(), place: place,
-                                     tags: [], rating: nil, cutouts: [])
-        let store = TestStore(initialState: CaptureFeature.State()) {
+        let saved = [FoodEntrySnapshot(id: UUID(), fileName: "a.png", eatenAt: Date())]
+        let store = TestStore(
+            initialState: CaptureFeature.State(
+                candidates: [.init(id: UUID(), pngData: Data([1]), isSelected: true)]
+            )
+        ) {
             CaptureFeature()
         } withDependencies: {
-            $0.persistence.saveMeal = { chosenPlace, _, _, _ in
+            $0.persistence.saveEntries = { chosenPlace, _ in
                 XCTAssertEqual(chosenPlace, place)
-                return savedMeal
+                return saved
             }
         }
 
@@ -206,7 +212,7 @@ final class CaptureFeatureTests: XCTestCase {
         }
         await store.receive(\.saved) {
             $0 = CaptureFeature.State()
-            $0.savedMeal = savedMeal
+            $0.savedEntries = saved
         }
     }
 
@@ -220,7 +226,7 @@ final class CaptureFeatureTests: XCTestCase {
         ) {
             CaptureFeature()
         } withDependencies: {
-            $0.persistence.saveMeal = { _, _, _, _ in throw SaveFailure() }
+            $0.persistence.saveEntries = { _, _ in throw SaveFailure() }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 

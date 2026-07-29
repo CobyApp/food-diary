@@ -4,8 +4,8 @@ import Models
 @testable import FeatureKit
 
 final class WorldCupFeatureTests: XCTestCase {
-    private func snap(_ n: Int) -> CutoutSnapshot {
-        CutoutSnapshot(id: UUID(), fileName: "\(n).png", createdAt: Date(), label: "f\(n)")
+    private func snap(_ n: Int) -> FoodEntrySnapshot {
+        FoodEntrySnapshot(id: UUID(), fileName: "\(n).png", eatenAt: Date(), label: "f\(n)")
     }
 
     @MainActor
@@ -15,8 +15,7 @@ final class WorldCupFeatureTests: XCTestCase {
             WorldCupFeature()
         } withDependencies: {
             $0.random.shuffled = { $0 } // deterministic order
-            $0.persistence.allMeals = { [] }
-            $0.persistence.mealByCutout = { _ in nil }
+            $0.persistence.allEntries = { [] }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 
@@ -32,17 +31,18 @@ final class WorldCupFeatureTests: XCTestCase {
     @MainActor
     func test_start_loadsContenderInfo() async {
         let items = [snap(1), snap(2)]
-        let meal = MealSnapshot(
-            id: UUID(), eatenAt: Date(),
-            place: PlaceInfo(id: "p", name: "라멘집", address: ""),
-            tags: ["존맛"], rating: 5, cutouts: items
-        )
+        let entries = items.map {
+            FoodEntrySnapshot(
+                id: $0.id, fileName: $0.fileName, eatenAt: Date(), label: $0.label,
+                place: PlaceInfo(id: "p", name: "라멘집", address: ""),
+                tags: ["존맛"], rating: 5
+            )
+        }
         let store = TestStore(initialState: WorldCupFeature.State(cutouts: items)) {
             WorldCupFeature()
         } withDependencies: {
             $0.random.shuffled = { $0 }
-            $0.persistence.allMeals = { [meal] }
-            $0.persistence.mealByCutout = { _ in nil }
+            $0.persistence.allEntries = { entries }
         }
         store.exhaustivity = .off(showSkippedAssertions: false)
 

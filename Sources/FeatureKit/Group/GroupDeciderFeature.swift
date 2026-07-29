@@ -9,7 +9,7 @@ import UIKit
 /// Phases flow idle → authenticating → matchmaking → lobby → voting → reveal →
 /// champion. This reducer consumes `MultiplayerClient` events, builds a
 /// `MenuPick` from a chosen cutout (thumbnail + tags + place via
-/// `persistence.mealByCutout`), and — once every known player has submitted
+/// the food's own record), and — once every known player has submitted
 /// and this device is host (lexicographically-smallest player id) — broadcasts
 /// a bracket (`order = menus.keys.sorted()`) and runs it as a timed voting
 /// World Cup: one match at a time, 5 s to vote, majority advances (ties go to
@@ -42,7 +42,7 @@ public struct GroupDeciderFeature {
         public var localPlayer: LocalPlayer?
         public var players: [RemotePlayer] = []
         public var menus: [String: MenuPick] = [:]
-        public var myCutouts: [CutoutSnapshot] = []
+        public var myCutouts: [FoodEntrySnapshot] = []
 
         // Bracket bookkeeping.
         public var order: [String] = []           // full candidate order (from the host), fixed for the tournament
@@ -62,7 +62,7 @@ public struct GroupDeciderFeature {
             localPlayer: LocalPlayer? = nil,
             players: [RemotePlayer] = [],
             menus: [String: MenuPick] = [:],
-            myCutouts: [CutoutSnapshot] = []
+            myCutouts: [FoodEntrySnapshot] = []
         ) {
             self.phase = phase
             self.localPlayer = localPlayer
@@ -102,12 +102,12 @@ public struct GroupDeciderFeature {
 
     public enum Action: Equatable {
         case onAppear
-        case cutoutsLoaded([CutoutSnapshot])
+        case cutoutsLoaded([FoodEntrySnapshot])
         case startTapped
         case authenticated(LocalPlayer)
         case matchStarted
         case eventReceived(MultiplayerEvent)
-        case cutoutPicked(CutoutSnapshot)
+        case cutoutPicked(FoodEntrySnapshot)
         case menuBuilt(MenuPick)
         case voteTapped(String)
         case tick
@@ -130,7 +130,7 @@ public struct GroupDeciderFeature {
             switch action {
             case .onAppear:
                 return .run { send in
-                    await send(.cutoutsLoaded((try? await persistence.allCutouts()) ?? []))
+                    await send(.cutoutsLoaded((try? await persistence.allEntries()) ?? []))
                 }
 
             case let .cutoutsLoaded(cutouts):
@@ -210,14 +210,14 @@ public struct GroupDeciderFeature {
             case let .cutoutPicked(cutout):
                 guard let me = state.localPlayer else { return .none }
                 return .run { send in
-                    let meal = try? await persistence.mealByCutout(cutout.id)
                     let data = ImageStore.disk(directory: ImageStore.cutoutsDirectory)
                         .load(cutout.fileName) ?? Data()
                     let thumb = await GroupDeciderFeature.thumbnail(from: data)
+                    // The picked food carries its own tags and place.
                     let pick = MenuPick(
                         playerID: me.id, playerName: me.displayName, thumbnail: thumb,
-                        tags: meal?.tags ?? [], placeName: meal?.place?.name ?? "",
-                        address: meal?.place?.address ?? ""
+                        tags: cutout.tags, placeName: cutout.place?.name ?? "",
+                        address: cutout.place?.address ?? ""
                     )
                     await send(.menuBuilt(pick))
                 }

@@ -11,18 +11,25 @@ public struct CaptureFeature {
         public var isSelected: Bool
         public var decoration: CutoutDecoration
         public var isRotating: Bool
+        /// This food's own tags and rating — not the batch's.
+        public var tags: [String]
+        public var rating: Int?
         public init(
             id: UUID = UUID(),
             pngData: Data,
             isSelected: Bool = true,
             decoration: CutoutDecoration = .none,
-            isRotating: Bool = false
+            isRotating: Bool = false,
+            tags: [String] = [],
+            rating: Int? = nil
         ) {
             self.id = id
             self.pngData = pngData
             self.isSelected = isSelected
             self.decoration = decoration
             self.isRotating = isRotating
+            self.tags = tags
+            self.rating = rating
         }
     }
 
@@ -35,30 +42,35 @@ public struct CaptureFeature {
         public var processingTotal = 0
         public var isSaving = false
         public var isSaveErrorPresented = false
-        /// Tags picked for this meal, in the order they were picked.
-        public var tags: [String]
+        /// The food whose information is being filled in, if that sheet is open.
+        public var editingCandidateID: UUID?
         /// Every tag the user has ever made, so they can be reused.
         public var tagCatalog: [String] = []
         public var newTagText = ""
         /// The tag being renamed, if the rename sheet is up.
         public var renamingTag: String?
         public var renameText = ""
-        public var rating: Int?
         @Presents public var placePicker: PlacePickerFeature.State?
         public var chosenPlace: PlaceInfo?
-        public var savedMeal: MealSnapshot?
+        public var savedEntries: [FoodEntrySnapshot] = []
+
+        var editingIndex: Int? {
+            guard let editingCandidateID else { return nil }
+            return candidates.firstIndex { $0.id == editingCandidateID }
+        }
+
+        /// The food currently being described.
+        public var editingCandidate: CutoutCandidate? {
+            editingIndex.map { candidates[$0] }
+        }
 
         public init(
             coordinate: Coordinate? = nil,
             candidates: [CutoutCandidate] = [],
-            tags: [String] = [],
-            rating: Int? = nil,
             chosenPlace: PlaceInfo? = nil
         ) {
             self.coordinate = coordinate
             self.candidates = candidates
-            self.tags = tags
-            self.rating = rating
             self.chosenPlace = chosenPlace
         }
     }
@@ -72,6 +84,8 @@ public struct CaptureFeature {
         case cycleDecoration(UUID)
         case rotateCandidate(UUID)
         case rotationFinished(id: UUID, pngData: Data?)
+        case editCandidateTapped(UUID)
+        case dismissCandidateEditor
         case tagsOnAppear
         case tagCatalogLoaded([String])
         case tagToggled(String)
@@ -86,7 +100,7 @@ public struct CaptureFeature {
         case choosePlaceTapped
         case placePicker(PresentationAction<PlacePickerFeature.Action>)
         case saveTapped
-        case saved(MealSnapshot)
+        case saved([FoodEntrySnapshot])
         case saveFailed
         case dismissSaveError
     }
@@ -166,12 +180,22 @@ public struct CaptureFeature {
                 state.tagCatalog = tags
                 return .none
 
+            case let .editCandidateTapped(id):
+                state.editingCandidateID = id
+                return .none
+
+            case .dismissCandidateEditor:
+                state.editingCandidateID = nil
+                return .none
+
             case let .tagToggled(name):
-                guard let name = TagName.normalize(name) else { return .none }
-                if let index = state.tags.firstIndex(where: { TagName.isSame($0, name) }) {
-                    state.tags.remove(at: index)
+                guard let name = TagName.normalize(name),
+                      let index = state.editingIndex else { return .none }
+                if let existing = state.candidates[index].tags
+                    .firstIndex(where: { TagName.isSame($0, name) }) {
+                    state.candidates[index].tags.remove(at: existing)
                 } else {
-                    state.tags.append(name)
+                    state.candidates[index].tags.append(name)
                 }
                 return .none
 
@@ -186,8 +210,9 @@ public struct CaptureFeature {
                 }
                 state.newTagText = ""
                 // Picked straight away: typing a tag out is how you say you want it.
-                if !state.tags.contains(where: { TagName.isSame($0, name) }) {
-                    state.tags.append(name)
+                if let index = state.editingIndex,
+                   !state.candidates[index].tags.contains(where: { TagName.isSame($0, name) }) {
+                    state.candidates[index].tags.append(name)
                 }
                 return .run { send in
                     try? await persistence.createTag(name)
@@ -211,10 +236,12 @@ public struct CaptureFeature {
                     return .none
                 }
                 state.renamingTag = nil
-                // Keep this meal's picks in step with the catalog.
-                state.tags = TagName.cleaned(
-                    state.tags.map { TagName.isSame($0, old) ? new : $0 }
-                )
+                // Keep every food's picks in step with the catalog.
+                for index in state.candidates.indices {
+                    state.candidates[index].tags = TagName.cleaned(
+                        state.candidates[index].tags.map { TagName.isSame($0, old) ? new : $0 }
+                    )
+                }
                 return .run { send in
                     try? await persistence.renameTag(old, new)
                     await send(.tagCatalogLoaded((try? await persistence.allTags()) ?? []))
@@ -225,14 +252,17 @@ public struct CaptureFeature {
                 return .none
 
             case let .deleteTagRequested(name):
-                state.tags.removeAll { TagName.isSame($0, name) }
+                for index in state.candidates.indices {
+                    state.candidates[index].tags.removeAll { TagName.isSame($0, name) }
+                }
                 return .run { send in
                     try? await persistence.deleteTag(name)
                     await send(.tagCatalogLoaded((try? await persistence.allTags()) ?? []))
                 }
 
             case let .ratingChanged(rating):
-                state.rating = rating
+                guard let index = state.editingIndex else { return .none }
+                state.candidates[index].rating = rating
                 return .none
 
             case .choosePlaceTapped:
@@ -253,24 +283,34 @@ public struct CaptureFeature {
                 }
                 state.isSaving = true
                 let place = state.chosenPlace
-                let tags = state.tags
-                let rating = state.rating
+                // One record per food, each with the information it was given.
                 let selected = state.candidates
                     .filter(\.isSelected)
-                    .map { NewCutout(pngData: $0.pngData, label: $0.decoration.label) }
+                    .map {
+                        NewEntry(
+                            pngData: $0.pngData,
+                            label: $0.decoration.label,
+                            tags: $0.tags,
+                            rating: $0.rating
+                        )
+                    }
+                guard !selected.isEmpty else {
+                    state.isSaving = false
+                    return .none
+                }
                 return .run { send in
-                    let meal = try await persistence.saveMeal(place, tags, rating, selected)
-                    await send(.saved(meal))
+                    let entries = try await persistence.saveEntries(place, selected)
+                    await send(.saved(entries))
                 } catch: { _, send in
                     await send(.saveFailed)
                 }
 
-            case let .saved(meal):
-                // The catalog outlives one meal, so it survives the reset.
+            case let .saved(entries):
+                // The catalog outlives one batch, so it survives the reset.
                 let catalog = state.tagCatalog
                 state = State()
                 state.tagCatalog = catalog
-                state.savedMeal = meal
+                state.savedEntries = entries
                 return .none
 
             case .saveFailed:

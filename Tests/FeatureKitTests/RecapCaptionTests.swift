@@ -6,10 +6,10 @@ import Models
 final class RecapCaptionTests: XCTestCase {
     @MainActor
     func test_onAppear_requestsCaptionInTheUILanguage() async {
-        let meal = MealSnapshot(
-            id: UUID(), eatenAt: Date(timeIntervalSince1970: 1_000_000),
-            place: PlaceInfo(id: "p1", name: "라멘집", address: ""),
-            tags: [], rating: nil, cutouts: []
+        let meal = FoodEntrySnapshot(
+            id: UUID(), fileName: "a.png",
+            eatenAt: Date(timeIntervalSince1970: 1_000_000),
+            place: PlaceInfo(id: "p1", name: "라멘집", address: "")
         )
         let requested = LockBox()
         let store = TestStore(initialState: RecapFeature.State()) {
@@ -17,7 +17,7 @@ final class RecapCaptionTests: XCTestCase {
         } withDependencies: {
             $0.date = .constant(Date(timeIntervalSince1970: 1_000_100))
             $0.locale = Locale(identifier: "ja_JP")
-            $0.persistence.allMeals = { [meal] }
+            $0.persistence.allEntries = { [meal] }
             $0.caption.weeklyCaption = { count, places, language in
                 requested.set("\(count)|\(places.joined(separator: ","))|\(language)")
                 return "おいしい一週間"
@@ -33,16 +33,16 @@ final class RecapCaptionTests: XCTestCase {
 
     @MainActor
     func test_captionStaysNilWhenAppleIntelligenceIsUnavailable() async {
-        let meal = MealSnapshot(
-            id: UUID(), eatenAt: Date(timeIntervalSince1970: 1_000_000),
-            place: nil, tags: [], rating: nil, cutouts: []
+        let meal = FoodEntrySnapshot(
+            id: UUID(), fileName: "a.png",
+            eatenAt: Date(timeIntervalSince1970: 1_000_000)
         )
         let store = TestStore(initialState: RecapFeature.State()) {
             RecapFeature()
         } withDependencies: {
             $0.date = .constant(Date(timeIntervalSince1970: 1_000_100))
             $0.locale = Locale(identifier: "ko_KR")
-            $0.persistence.allMeals = { [meal] }
+            $0.persistence.allEntries = { [meal] }
             $0.caption.weeklyCaption = { _, _, _ in nil }   // model unavailable
         }
         store.exhaustivity = .off(showSkippedAssertions: false)

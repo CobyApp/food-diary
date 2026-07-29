@@ -7,14 +7,14 @@ import ClientKit
 public struct MealDetailFeature {
     @ObservableState
     public struct State: Equatable {
-        public let mealID: UUID
-        public var meal: MealSnapshot?
-        public init(mealID: UUID) { self.mealID = mealID }
+        public let entryID: UUID
+        public var entry: FoodEntrySnapshot?
+        public init(entryID: UUID) { self.entryID = entryID }
     }
 
     public enum Action: Equatable {
         case task
-        case mealLoaded(MealSnapshot?)
+        case entryLoaded(FoodEntrySnapshot?)
         case deleteTapped
         case deleted
     }
@@ -27,15 +27,15 @@ public struct MealDetailFeature {
         Reduce { state, action in
             switch action {
             case .task:
-                let id = state.mealID
-                return .run { send in await send(.mealLoaded(try await persistence.meal(id))) }
-            case let .mealLoaded(meal):
-                state.meal = meal
+                let id = state.entryID
+                return .run { send in await send(.entryLoaded(try await persistence.entry(id))) }
+            case let .entryLoaded(entry):
+                state.entry = entry
                 return .none
             case .deleteTapped:
-                let id = state.mealID
+                let id = state.entryID
                 return .run { send in
-                    try await persistence.deleteMeal(id)
+                    try await persistence.deleteEntries([id])
                     await send(.deleted)
                 }
             case .deleted:

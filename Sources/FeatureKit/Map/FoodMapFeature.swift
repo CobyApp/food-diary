@@ -7,15 +7,15 @@ import ClientKit
 public struct FoodMapFeature {
     @ObservableState
     public struct State: Equatable {
-        public var meals: [MealSnapshot] = []
+        public var meals: [FoodEntrySnapshot] = []
         public var selectedMealID: UUID?
         public var isLoading = false
         public init() {}
 
-        public var pins: [MealSnapshot] {
-            meals.filter { !$0.cutouts.isEmpty && $0.place?.coordinate != nil }
+        public var pins: [FoodEntrySnapshot] {
+            meals.filter { $0.place?.coordinate != nil }
         }
-        public var selectedMeal: MealSnapshot? {
+        public var selectedMeal: FoodEntrySnapshot? {
             guard let id = selectedMealID else { return nil }
             return meals.first { $0.id == id }
         }
@@ -23,7 +23,7 @@ public struct FoodMapFeature {
 
     public enum Action: Equatable {
         case onAppear
-        case mealsLoaded([MealSnapshot])
+        case mealsLoaded([FoodEntrySnapshot])
         case mealsLoadFailed
         case pinTapped(UUID)
         case dismissCard
@@ -41,13 +41,13 @@ public struct FoodMapFeature {
             case .onAppear:
                 state.isLoading = true
                 return .run { send in
-                    await send(.mealsLoaded(try await persistence.allMeals()))
+                    await send(.mealsLoaded(try await persistence.allEntries()))
                 } catch: { _, send in
                     await send(.mealsLoadFailed)
                 }
             case let .mealsLoaded(meals):
                 state.isLoading = false
-                state.meals = meals.filter { !$0.cutouts.isEmpty }
+                state.meals = meals
                 if let selectedMealID = state.selectedMealID,
                    !state.meals.contains(where: { $0.id == selectedMealID }) {
                     state.selectedMealID = nil
@@ -63,18 +63,8 @@ public struct FoodMapFeature {
                 state.selectedMealID = nil
                 return .none
             case let .cutoutsDeleted(ids):
-                state.meals = state.meals.compactMap { meal in
-                    let remaining = meal.cutouts.filter { !ids.contains($0.id) }
-                    guard !remaining.isEmpty else { return nil }
-                    return MealSnapshot(
-                        id: meal.id,
-                        eatenAt: meal.eatenAt,
-                        place: meal.place,
-                        tags: meal.tags,
-                        rating: meal.rating,
-                        cutouts: remaining
-                    )
-                }
+                // A food and its record are the same row now, so this is a filter.
+                state.meals.removeAll { ids.contains($0.id) }
                 if let selectedMealID = state.selectedMealID,
                    !state.meals.contains(where: { $0.id == selectedMealID }) {
                     state.selectedMealID = nil
