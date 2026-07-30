@@ -422,6 +422,12 @@ public struct CollectionView: View {
                         // Tilt response goes on last and unanimated: the sensor
                         // stream is already smoothed, and a spring here would
                         // only add lag between the device and the board.
+                        .shadow(
+                            color: Color.appCherry.opacity(
+                                transformingStickerID == cutout.id ? 0.55 : 0
+                            ),
+                            radius: 14
+                        )
                         .scaleEffect(isRevealed && !isBusy ? 1.06 : 1)
                         .rotationEffect(.degrees(leanRotation))
                         .offset(x: lean.width, y: lean.height)
@@ -927,12 +933,6 @@ private struct FreeStickerDrag: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .overlay {
-                if isInteracting || isActive {
-                    StickerSelectionBoundary()
-                        .transition(.opacity)
-                }
-            }
             .scaleEffect(
                 liveScale * ((isInteracting || isActive) ? 1.025 : 1)
             )
@@ -1040,21 +1040,6 @@ private struct FreeStickerDrag: ViewModifier {
     }
 }
 
-private struct StickerSelectionBoundary: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: 24, style: .continuous)
-            .stroke(Color.appCard, lineWidth: 5)
-            .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(Color.appCherry.opacity(0.92), lineWidth: 1.5)
-            }
-            .padding(3)
-            .shadow(color: Color.appChocolate.opacity(0.14), radius: 3, y: 2)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-    }
-}
-
 /// The scale and angle readout, sized to sit on a sticker rather than banner
 /// across the screen. Two short numbers is all this needs to say.
 private struct StickerTransformBadge: View {
@@ -1080,6 +1065,11 @@ private struct StickerTransformBadge: View {
 /// The corner handle. One finger sets both size and angle: how far it is from the
 /// centre is the size, which way it points is the angle. A pinch would need two
 /// fingers inside a sticker barely wider than a thumb.
+///
+/// No outline is drawn around the sticker. A cutout keeps its own proportions
+/// inside a square slot, so the food is almost never square — any box would sit
+/// well outside it and read as the sticker having escaped its guide. The sticker
+/// being adjusted glows instead.
 private struct StickerTransformHandle: View {
     let center: CGPoint
     /// The sticker's visible side at scale 1.
@@ -1117,17 +1107,6 @@ private struct StickerTransformHandle: View {
 
     var body: some View {
         ZStack {
-            // Hugs the sticker: same size, same angle, same centre.
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(
-                    Color.appCherry.opacity(0.9),
-                    style: StrokeStyle(lineWidth: 2, dash: [6, 5])
-                )
-                .frame(width: side * scale, height: side * scale)
-                .rotationEffect(.degrees(rotationDegrees))
-                .position(center)
-                .allowsHitTesting(false)
-
             Image(systemName: "checkmark")
                 .font(.system(size: 12, weight: .black))
                 .foregroundStyle(.white)
