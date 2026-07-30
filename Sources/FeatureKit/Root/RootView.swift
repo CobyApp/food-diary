@@ -35,6 +35,7 @@ public struct RootView: View {
             }
         }
         .animation(.spring(response: 0.38, dampingFraction: 0.86), value: isCapturing)
+        .dismissesKeyboardOnTap()
         .sensoryFeedback(.selection, trigger: store.tab)
     }
 

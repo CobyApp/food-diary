@@ -216,6 +216,22 @@ enum FreeStickerBoardLayout {
     static let verticalInset: CGFloat = 18
     static let scaleRange = 0.68...1.5
 
+    /// Where the bin sits while a sticker is being carried: bottom centre, above
+    /// the floating tab bar.
+    static func trashCenter(width: CGFloat, height: CGFloat) -> CGPoint {
+        CGPoint(x: width / 2, y: height - 132)
+    }
+
+    /// Radius counted as "over the bin". Generous, because a sticker is dropped
+    /// with a fingertip covering it.
+    static let trashRadius: CGFloat = 62
+
+    /// Whether a sticker dropped at `point` lands on the bin.
+    static func isOverTrash(_ point: CGPoint, width: CGFloat, height: CGFloat) -> Bool {
+        let centre = trashCenter(width: width, height: height)
+        return hypot(point.x - centre.x, point.y - centre.y) <= trashRadius
+    }
+
     static func itemSide(width: CGFloat) -> CGFloat {
         min(max((width - 24) / CGFloat(columns), 84), 118)
     }
@@ -279,55 +295,17 @@ enum FreeStickerBoardLayout {
     ///
     /// The handle lives at the sticker's bottom-trailing corner, which is 45° out
     /// from centre in the sticker's own unrotated frame.
-    static func handlePosition(
-        center: CGPoint,
-        side: CGFloat,
-        scale: CGFloat,
-        rotationDegrees: Double
-    ) -> CGPoint {
-        let radians = rotationDegrees * .pi / 180
-        let half = side * scale / 2
-        return CGPoint(
-            x: center.x + half * CGFloat(cos(radians)) - half * CGFloat(sin(radians)),
-            y: center.y + half * CGFloat(sin(radians)) + half * CGFloat(cos(radians))
-        )
-    }
-
     /// Shortest way round from one angle to another, in degrees (-180...180).
     ///
     /// Needed because a handle swung past due-west jumps from 179° to -179°;
     /// subtracting raw angles would spin the sticker a full turn.
-    static func angleDelta(from start: Double, to end: Double) -> Double {
-        var delta = (end - start).truncatingRemainder(dividingBy: 360)
-        if delta > 180 { delta -= 360 }
-        if delta < -180 { delta += 360 }
-        return delta
-    }
-
     /// Scale after the handle has moved from `grabDistance` to `distance`.
     ///
     /// Relative to where the finger landed, not to the corner: grabbing the
     /// handle slightly off-centre must not resize the sticker before it moves.
-    static func scaled(
-        grabScale: Double,
-        grabDistance: CGFloat,
-        distance: CGFloat
-    ) -> Double {
-        guard grabDistance > 0.5 else { return clampedScale(grabScale) }
-        return clampedScale(grabScale * Double(distance / grabDistance))
-    }
-
     /// Angle of `point` measured from `center`, in degrees.
-    static func angle(of point: CGPoint, from center: CGPoint) -> Double {
-        atan2(Double(point.y - center.y), Double(point.x - center.x)) * 180 / .pi
-    }
-
     /// Distance between two points, floored so a grab at the exact centre cannot
     /// divide by zero.
-    static func distance(from center: CGPoint, to point: CGPoint) -> CGFloat {
-        max(hypot(point.x - center.x, point.y - center.y), 1)
-    }
-
     /// Where to drop a sticker being put back on the board from the drawer.
     ///
     /// Walks the default grid slots and takes the first one that is not already
@@ -407,11 +385,6 @@ enum FreeStickerBoardLayout {
         min(max(value, scaleRange.lowerBound), scaleRange.upperBound)
     }
 
-    static func snappedScale(_ value: Double) -> Double {
-        let value = clampedScale(value)
-        return abs(value - 1) <= 0.045 ? 1 : value
-    }
-
     static func normalizedRotation(_ degrees: Double) -> Double {
         var value = degrees.truncatingRemainder(dividingBy: 360)
         if value > 180 { value -= 360 }
@@ -419,9 +392,4 @@ enum FreeStickerBoardLayout {
         return value
     }
 
-    static func snappedRotation(_ degrees: Double) -> Double {
-        let value = normalizedRotation(degrees)
-        let nearestStep = (value / 15).rounded() * 15
-        return abs(value - nearestStep) <= 2.2 ? nearestStep : value
-    }
 }

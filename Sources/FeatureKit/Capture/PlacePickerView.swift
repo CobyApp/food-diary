@@ -64,6 +64,7 @@ public struct PlacePickerView: View {
                 .padding(24)
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle("식당 선택")
         .navigationBarTitleDisplayMode(.inline)
         .task { store.send(.task) }

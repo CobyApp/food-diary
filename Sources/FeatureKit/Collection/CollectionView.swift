@@ -7,19 +7,14 @@ public struct CollectionView: View {
     @State private var confirmingDeletion = false
     @State private var pendingSingleDeleteID: UUID?
     @State private var activeStickerID: UUID?
+    /// Where the carried sticker is right now, so the bin knows when it is over it.
+    @State private var carriedCenter: CGPoint?
+    @State private var isOverTrash = false
     @State private var stickerPlacements: [String: StickerBoardPlacement] = [:]
     @State private var showingBoardStylePicker = false
     @State private var showingCutoutDrawer = false
-    @State private var transformPreview: StickerTransformPreview?
-    /// The sticker showing its corner handle. Adjusting is deliberate rather than
-    /// something a stray pinch triggers.
-    @State private var transformingStickerID: UUID?
-    @State private var motion = ParallaxMotion()
     /// Measured height of the floating chrome, used as the board's top inset.
     @State private var controlsHeight: CGFloat = 0
-    /// Set only after the tilt has been held, so a passing wobble doesn't flash
-    /// every place name on the board.
-    @State private var revealedSide: StickerBoardMotion.BoardSide?
     @State private var offBoardIDs: Set<String> = []
     @AppStorage("collection.freeStickerBoard.v1") private var savedStickerPlacements = ""
     /// Cutouts taken off the board. Absence means on the board, so a newly saved
@@ -59,10 +54,7 @@ public struct CollectionView: View {
             loadOffBoardIDs()
             store.send(.onAppear)
             store.send(.streakOnAppear)
-            motion.start()
         }
-        .onDisappear { motion.stop() }
-        .task(id: tiltedSide) { await holdTiltToReveal() }
         .onChange(of: store.cutouts.map(\.id)) { _, ids in
             // A deleted food leaves both the board and the drawer.
             let validKeys = Set(ids.map(\.uuidString))
@@ -190,6 +182,39 @@ public struct CollectionView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+    }
+
+    /// The bin, out only while a sticker is being carried. It opens its lid when
+    /// the sticker is over it, so you know what letting go will do.
+    private var trashZone: some View {
+        VStack(spacing: 7) {
+            ZStack {
+                Circle()
+                    .fill(isOverTrash ? Color.appCherry : Color.appCard)
+                    .frame(width: isOverTrash ? 86 : 66, height: isOverTrash ? 86 : 66)
+                    .overlay {
+                        Circle().stroke(
+                            isOverTrash ? Color.appCard : Color.appCherry.opacity(0.55),
+                            style: StrokeStyle(lineWidth: 2.5, dash: isOverTrash ? [] : [5, 4])
+                        )
+                    }
+                    .softShadow()
+
+                Image(systemName: isOverTrash ? "trash.fill" : "trash")
+                    .font(.system(size: isOverTrash ? 30 : 24, weight: .black))
+                    .foregroundStyle(isOverTrash ? Color.appCard : Color.appCherry)
+                    .rotationEffect(.degrees(isOverTrash ? -12 : 0))
+            }
+
+            Text(isOverTrash ? "놓으면 삭제해요" : "여기로 끌어오면 삭제")
+                .font(.system(size: 11, weight: .black, design: .rounded))
+                .foregroundStyle(isOverTrash ? Color.appCherry : Color.appMuted)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Color.appCard.opacity(0.92), in: Capsule())
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     /// Every cutout ever saved. The board shows a chosen few; this is the drawer
@@ -350,24 +375,6 @@ public struct CollectionView: View {
                         height: height,
                         topInset: controlsHeight
                     )
-                    let isRevealed = StickerBoardMotion.isRevealed(
-                        xFraction: width > 0 ? Double(point.x / width) : 0.5,
-                        side: revealedSide
-                    )
-                    // A sticker under a finger, or mid-spill, already has motion
-                    // of its own — leaning it as well just fights that.
-                    let isBusy = activeStickerID == cutout.id
-                        || transformingStickerID == cutout.id
-                    let lean = isBusy
-                        ? CGSize.zero
-                        : StickerBoardMotion.lean(
-                            index: index,
-                            tiltX: motion.tiltX,
-                            tiltY: motion.tiltY
-                        )
-                    let leanRotation = isBusy
-                        ? 0
-                        : StickerBoardMotion.leanRotation(index: index, tiltX: motion.tiltX)
                     Button {
                         // Outside edit mode a sticker is just an object on the
                         // board; its actions live in the long-press menu.
@@ -411,91 +418,58 @@ public struct CollectionView: View {
                             }
                         }
                         .frame(width: side, height: side)
-                        .overlay(alignment: .top) {
-                            revealedPlaceChip(for: cutout, visible: isRevealed)
-                        }
                         .opacity(
                             store.isEditing && !store.selectedCutoutIDs.contains(cutout.id)
                                 ? 0.62
                                 : 1
                         )
-                        // Tilt response goes on last and unanimated: the sensor
-                        // stream is already smoothed, and a spring here would
-                        // only add lag between the device and the board.
-                        .shadow(
-                            color: Color.appCherry.opacity(
-                                transformingStickerID == cutout.id ? 0.55 : 0
-                            ),
-                            radius: 14
-                        )
-                        .scaleEffect(isRevealed && !isBusy ? 1.06 : 1)
-                        .rotationEffect(.degrees(leanRotation))
-                        .offset(x: lean.width, y: lean.height)
                     }
                     .buttonStyle(.plain)
                     .position(point)
                     .modifier(
                         FreeStickerDrag(
                             position: point,
-                            baseScale: savedPlacement?.displayScale ?? 1,
-                            baseRotation: savedPlacement?.rotation
+                            rotationDegrees: savedPlacement?.rotation
                                 ?? FreeStickerBoardLayout.defaultRotation(index: index),
                             enabled: !store.isEditing,
-                            isActive: activeStickerID == cutout.id,
                             onActiveChange: { active in
                                 activeStickerID = active ? cutout.id : nil
-                                if !active, transformPreview?.id == cutout.id {
-                                    transformPreview = nil
+                                if !active {
+                                    carriedCenter = nil
+                                    isOverTrash = false
                                 }
                             },
-                            onPreview: { scale, rotation, isScaling, isRotating in
-                                transformPreview = StickerTransformPreview(
-                                    id: cutout.id,
-                                    scale: scale,
-                                    rotation: rotation,
-                                    isScaling: isScaling,
-                                    isRotating: isRotating
+                            onDragChange: { centre in
+                                carriedCenter = centre
+                                let over = FreeStickerBoardLayout.isOverTrash(
+                                    centre, width: width, height: height
                                 )
+                                if over != isOverTrash {
+                                    isOverTrash = over
+                                    #if canImport(UIKit)
+                                    // Felt, not just seen: you know before you let go.
+                                    UIImpactFeedbackGenerator(style: .rigid)
+                                        .impactOccurred(intensity: over ? 1 : 0.4)
+                                    #endif
+                                }
                             },
                             onMove: { destination in
-                                let current = stickerPlacements[cutout.id.uuidString]
+                                if FreeStickerBoardLayout.isOverTrash(
+                                    destination, width: width, height: height
+                                ) {
+                                    // Dropped on the bin: ask first, and leave the
+                                    // sticker where it was until the answer comes.
+                                    pendingSingleDeleteID = cutout.id
+                                    confirmingDeletion = true
+                                    return
+                                }
                                 stickerPlacements[cutout.id.uuidString] =
                                     FreeStickerBoardLayout.placement(
                                         for: destination,
                                         width: width,
                                         height: height,
-                                        preserving: current
+                                        preserving: stickerPlacements[cutout.id.uuidString]
                                     )
-                                persistStickerPlacements()
-                            },
-                            onTransform: { scale, rotation in
-                                let key = cutout.id.uuidString
-                                var updated = stickerPlacements[key]
-                                    ?? FreeStickerBoardLayout.placement(
-                                        for: point,
-                                        width: width,
-                                        height: height
-                                    )
-                                if let scale {
-                                    updated.scale = FreeStickerBoardLayout.clampedScale(scale)
-                                }
-                                if let rotation {
-                                    updated.rotation =
-                                        FreeStickerBoardLayout.normalizedRotation(rotation)
-                                }
-                                let clampedPoint = FreeStickerBoardLayout.clamped(
-                                    CGPoint(
-                                        x: width * CGFloat(updated.xFraction),
-                                        y: CGFloat(updated.y)
-                                    ),
-                                    width: width,
-                                    height: height,
-                                    scale: updated.displayScale,
-                                    rotationDegrees: updated.rotation ?? 0
-                                )
-                                updated.xFraction = Double(clampedPoint.x / width)
-                                updated.y = Double(clampedPoint.y)
-                                stickerPlacements[key] = updated
                                 persistStickerPlacements()
                             }
                         )
@@ -507,11 +481,6 @@ public struct CollectionView: View {
                             persistStickerPlacements()
                         } label: {
                             Label("자리 원래대로", systemImage: "arrow.counterclockwise")
-                        }
-                        Button {
-                            transformingStickerID = cutout.id
-                        } label: {
-                            Label("크기·회전 조절", systemImage: "arrow.up.left.and.arrow.down.right")
                         }
                         Button {
                             removeFromBoard(cutout)
@@ -538,57 +507,19 @@ public struct CollectionView: View {
                     }
                 }
 
-                if let id = transformingStickerID,
-                   let index = cutouts.firstIndex(where: { $0.id == id }) {
-                    let placement = stickerPlacements[id.uuidString]
-                    let center = FreeStickerBoardLayout.point(
-                        for: placement,
-                        index: index,
-                        width: width,
-                        height: height,
-                        topInset: controlsHeight
-                    )
-                    let scale = placement?.displayScale ?? 1
-                    let rotation = placement?.rotation
-                        ?? FreeStickerBoardLayout.defaultRotation(index: index)
-                    // The sticker has no card behind it, so what is visible is the
-                    // frame minus StickerTile's padding.
-                    let visibleSide = side - StickerTileMetrics.contentInset * 2
 
-                    StickerTransformHandle(
-                        center: center,
-                        side: visibleSide,
-                        scale: scale,
-                        rotationDegrees: rotation,
-                        onChange: { newScale, newRotation in
-                            applyHandleTransform(
-                                for: id,
-                                scale: newScale,
-                                rotation: newRotation,
-                                center: center,
-                                width: width,
-                                height: height
-                            )
-                        },
-                        onEnded: {
-                            finishHandleTransform(for: id, width: width, height: height)
-                        },
-                        onDone: { transformingStickerID = nil }
-                    )
-                    .zIndex(2_000)
-
-                    if let transformPreview, transformPreview.id == id {
-                        StickerTransformBadge(preview: transformPreview)
-                            .position(
-                                x: center.x,
-                                y: max(14, center.y - visibleSide * scale / 2 - 18)
-                            )
-                            .zIndex(2_001)
-                    }
+                if activeStickerID != nil {
+                    trashZone
+                        .position(
+                            FreeStickerBoardLayout.trashCenter(width: width, height: height)
+                        )
+                        .transition(.scale(scale: 0.6).combined(with: .opacity))
+                        .zIndex(500)
                 }
             }
             .frame(width: width, height: height)
-            .coordinateSpace(.named("board"))
+            .animation(.spring(response: 0.32, dampingFraction: 0.7), value: activeStickerID != nil)
+            .animation(.spring(response: 0.26, dampingFraction: 0.6), value: isOverTrash)
         }
     }
 
@@ -670,51 +601,8 @@ public struct CollectionView: View {
     /// Position is left alone on purpose: re-clamping it on every change moved the
     /// sticker's centre mid-drag, which moved the very point the deltas are
     /// measured from. It is clamped once the finger lifts.
-    private func applyHandleTransform(
-        for id: UUID,
-        scale: Double,
-        rotation: Double,
-        center: CGPoint,
-        width: CGFloat,
-        height: CGFloat
-    ) {
-        let key = id.uuidString
-        var updated = stickerPlacements[key] ?? FreeStickerBoardLayout.placement(
-            for: center, width: width, height: height
-        )
-        updated.scale = scale
-        updated.rotation = rotation
-        stickerPlacements[key] = updated
-        transformPreview = StickerTransformPreview(
-            id: id,
-            scale: CGFloat(scale),
-            rotation: rotation,
-            isScaling: true,
-            isRotating: true
-        )
-    }
-
     /// Once the finger lifts: snap to the useful values, keep the sticker on the
     /// board at its new size, and save.
-    private func finishHandleTransform(for id: UUID, width: CGFloat, height: CGFloat) {
-        let key = id.uuidString
-        guard var updated = stickerPlacements[key] else { return }
-        updated.scale = FreeStickerBoardLayout.snappedScale(updated.scale ?? 1)
-        updated.rotation = FreeStickerBoardLayout.snappedRotation(updated.rotation ?? 0)
-        let clamped = FreeStickerBoardLayout.clamped(
-            CGPoint(x: width * CGFloat(updated.xFraction), y: CGFloat(updated.y)),
-            width: width,
-            height: height,
-            scale: updated.displayScale,
-            rotationDegrees: updated.rotation ?? 0
-        )
-        updated.xFraction = Double(clamped.x / width)
-        updated.y = Double(clamped.y)
-        stickerPlacements[key] = updated
-        transformPreview = nil
-        persistStickerPlacements()
-    }
-
     /// Takes a sticker off the board. The food itself stays in the drawer.
     private func removeFromBoard(_ cutout: FoodEntrySnapshot) {
         offBoardIDs.insert(cutout.id.uuidString)
@@ -760,45 +648,9 @@ public struct CollectionView: View {
     }
 
     /// Which half the device leans toward right now, before the hold debounce.
-    private var tiltedSide: StickerBoardMotion.BoardSide? {
-        StickerBoardMotion.revealedSide(tiltX: motion.tiltX, threshold: 0.55)
-    }
-
     /// Tilt and hold to read the place names on that half of the board. Driven by
     /// `.task(id:)`, so changing or releasing the tilt cancels a pending reveal.
-    private func holdTiltToReveal() async {
-        guard let tiltedSide else {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) { revealedSide = nil }
-            return
-        }
-        do {
-            try await Task.sleep(for: .milliseconds(300))
-        } catch {
-            return
-        }
-        withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
-            revealedSide = tiltedSide
-        }
-    }
-
     @ViewBuilder
-    private func revealedPlaceChip(for cutout: FoodEntrySnapshot, visible: Bool) -> some View {
-        let placeName = store.cutoutMealInfo[cutout.id]?.placeName ?? ""
-        if visible, !placeName.isEmpty {
-            Text(placeName)
-                .font(.appCaption)
-                .foregroundStyle(.appInk)
-                .lineLimit(1)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.appCard.opacity(0.95), in: Capsule())
-                .softShadow()
-                .fixedSize()
-                .offset(y: -11)
-                .transition(.scale(scale: 0.6).combined(with: .opacity))
-        }
-    }
-
     private var selectionToolbar: some View {
         HStack(spacing: 8) {
             if store.isEditing {
@@ -883,82 +735,39 @@ private extension Optional where Wrapped == String {
     var orEmpty: String { self ?? "" }
 }
 
-private struct StickerTransformPreview: Equatable {
-    let id: UUID
-    let scale: CGFloat
-    let rotation: Double
-    let isScaling: Bool
-    let isRotating: Bool
-}
-
+/// Drag a sticker around the board. That is the whole interaction: a sticker is
+/// something you move, and it answers with a tap you can feel.
 private struct FreeStickerDrag: ViewModifier {
     let position: CGPoint
-    let baseScale: CGFloat
-    let baseRotation: Double
+    let rotationDegrees: Double
     let enabled: Bool
-    let isActive: Bool
     let onActiveChange: (Bool) -> Void
-    let onPreview: (CGFloat, Double, Bool, Bool) -> Void
+    let onDragChange: (CGPoint) -> Void
     let onMove: (CGPoint) -> Void
-    let onTransform: (Double?, Double?) -> Void
 
     @GestureState private var translation: CGSize = .zero
-    @GestureState private var magnification: CGFloat = 1
-    @GestureState private var gestureRotation: Angle = .zero
     @GestureState private var isDragging = false
-    @GestureState private var isMagnifying = false
-    @GestureState private var isRotating = false
-    /// Latched for the whole gesture, because a two-finger pinch also feeds the
-    /// drag gesture: without this the sticker slides away while being resized,
-    /// and the stray translation is then saved as its new position.
-    @State private var isTransforming = false
-
-    private var isInteracting: Bool {
-        isDragging || isMagnifying || isRotating
-    }
-
-    private var liveScale: CGFloat {
-        CGFloat(
-            FreeStickerBoardLayout.clampedScale(
-                Double(baseScale * magnification)
-            )
-        )
-    }
-
-    private var liveRotation: Double {
-        FreeStickerBoardLayout.normalizedRotation(
-            baseRotation + gestureRotation.degrees
-        )
-    }
 
     func body(content: Content) -> some View {
         content
-            .scaleEffect(
-                liveScale * ((isInteracting || isActive) ? 1.025 : 1)
-            )
-            .rotationEffect(.degrees(liveRotation))
+            // Lifts a little while held, so it reads as picked up off the board.
+            .scaleEffect(isDragging ? 1.06 : 1)
+            .rotationEffect(.degrees(rotationDegrees))
             .shadow(
-                color: Color.appPinkInk.opacity((isInteracting || isActive) ? 0.24 : 0),
-                radius: (isInteracting || isActive) ? 16 : 0,
-                y: (isInteracting || isActive) ? 10 : 0
+                color: Color.appPinkInk.opacity(isDragging ? 0.24 : 0),
+                radius: isDragging ? 16 : 0,
+                y: isDragging ? 10 : 0
             )
-            // Translation comes last so a scaled sticker still follows the
-            // finger one-for-one instead of multiplying the drag distance.
-            .offset(isTransforming ? .zero : translation)
-            .animation(.spring(response: 0.24, dampingFraction: 0.72), value: isActive)
-            .animation(.spring(response: 0.22, dampingFraction: 0.78), value: isInteracting)
+            .offset(translation)
+            .animation(.spring(response: 0.24, dampingFraction: 0.72), value: isDragging)
             .highPriorityGesture(dragGesture, including: enabled ? .all : .none)
-            .simultaneousGesture(magnifyGesture, including: enabled ? .all : .none)
-            .simultaneousGesture(rotationGesture, including: enabled ? .all : .none)
-            .onChange(of: isInteracting) { _, active in
-                onActiveChange(active)
-                if active {
-                    UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-                } else {
-                    // Cleared only once every finger is up, so a pinch that ends
-                    // just before the drag does cannot let the move through.
-                    isTransforming = false
-                }
+            .onChange(of: isDragging) { _, dragging in
+                onActiveChange(dragging)
+                #if canImport(UIKit)
+                // One tap on pick-up, a softer one on set-down.
+                UIImpactFeedbackGenerator(style: dragging ? .rigid : .soft)
+                    .impactOccurred(intensity: dragging ? 0.9 : 0.6)
+                #endif
             }
     }
 
@@ -970,98 +779,23 @@ private struct FreeStickerDrag: ViewModifier {
             .updating($isDragging) { _, state, _ in
                 state = true
             }
+            .onChanged { value in
+                onDragChange(CGPoint(
+                    x: position.x + value.translation.width,
+                    y: position.y + value.translation.height
+                ))
+            }
             .onEnded { value in
-                guard !isTransforming else { return }
                 onMove(CGPoint(
                     x: position.x + value.translation.width,
                     y: position.y + value.translation.height
                 ))
             }
     }
-
-    private var magnifyGesture: some Gesture {
-        MagnificationGesture()
-            .updating($magnification) { value, state, _ in
-                state = value
-            }
-            .updating($isMagnifying) { _, state, _ in
-                state = true
-            }
-            .onChanged { value in
-                isTransforming = true
-                onPreview(
-                    CGFloat(
-                        FreeStickerBoardLayout.clampedScale(
-                            Double(baseScale * value)
-                        )
-                    ),
-                    liveRotation,
-                    true,
-                    isRotating
-                )
-            }
-            .onEnded { value in
-                let rawScale = Double(baseScale * value)
-                let snappedScale = FreeStickerBoardLayout.snappedScale(rawScale)
-                onTransform(snappedScale, nil)
-                if abs(snappedScale - rawScale) > 0.001 {
-                    UISelectionFeedbackGenerator().selectionChanged()
-                }
-            }
-    }
-
-    private var rotationGesture: some Gesture {
-        RotationGesture()
-            .updating($gestureRotation) { value, state, _ in
-                state = value
-            }
-            .updating($isRotating) { _, state, _ in
-                state = true
-            }
-            .onChanged { value in
-                isTransforming = true
-                onPreview(
-                    liveScale,
-                    FreeStickerBoardLayout.normalizedRotation(
-                        baseRotation + value.degrees
-                    ),
-                    isMagnifying,
-                    true
-                )
-            }
-            .onEnded { value in
-                let rawRotation = baseRotation + value.degrees
-                let snappedRotation = FreeStickerBoardLayout.snappedRotation(rawRotation)
-                onTransform(nil, snappedRotation)
-                if abs(snappedRotation - rawRotation) > 0.001 {
-                    UISelectionFeedbackGenerator().selectionChanged()
-                }
-            }
-    }
 }
 
 /// The scale and angle readout, sized to sit on a sticker rather than banner
 /// across the screen. Two short numbers is all this needs to say.
-private struct StickerTransformBadge: View {
-    let preview: StickerTransformPreview
-
-    var body: some View {
-        HStack(spacing: 5) {
-            Text(verbatim: "\(Int((preview.scale * 100).rounded()))%")
-            Text(verbatim: "\(Int(preview.rotation.rounded()))°")
-        }
-        .font(.system(size: 10, weight: .black, design: .rounded))
-        .monospacedDigit()
-        .foregroundStyle(.appInk)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
-        .background(Color.appCard.opacity(0.95), in: Capsule())
-        .overlay(Capsule().stroke(Color.appCherry.opacity(0.3), lineWidth: 1))
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-}
-
 /// The corner handle. One finger sets both size and angle: how far it is from the
 /// centre is the size, which way it points is the angle. A pinch would need two
 /// fingers inside a sticker barely wider than a thumb.
@@ -1070,96 +804,3 @@ private struct StickerTransformBadge: View {
 /// inside a square slot, so the food is almost never square — any box would sit
 /// well outside it and read as the sticker having escaped its guide. The sticker
 /// being adjusted glows instead.
-private struct StickerTransformHandle: View {
-    let center: CGPoint
-    /// The sticker's visible side at scale 1.
-    let side: CGFloat
-    let scale: CGFloat
-    let rotationDegrees: Double
-    let onChange: (Double, Double) -> Void
-    let onEnded: () -> Void
-    let onDone: () -> Void
-
-    /// Captured once when the finger lands, so the sticker follows the *change*
-    /// in the finger's position. Reading its absolute position instead snapped the
-    /// sticker to whatever size and angle the first touch implied, and left every
-    /// later move off by that same error.
-    @State private var grab: Grab?
-
-    private struct Grab {
-        let distance: CGFloat
-        let angle: Double
-        let scale: Double
-        let rotation: Double
-    }
-
-    private var handlePoint: CGPoint {
-        FreeStickerBoardLayout.handlePosition(
-            center: center, side: side, scale: scale, rotationDegrees: rotationDegrees
-        )
-    }
-
-    private var donePoint: CGPoint {
-        FreeStickerBoardLayout.handlePosition(
-            center: center, side: side, scale: scale, rotationDegrees: rotationDegrees + 180
-        )
-    }
-
-    var body: some View {
-        ZStack {
-            Image(systemName: "checkmark")
-                .font(.system(size: 12, weight: .black))
-                .foregroundStyle(.white)
-                .frame(width: 30, height: 30)
-                .background(Color.appInk.opacity(0.82), in: Circle())
-                .overlay(Circle().stroke(Color.appCard, lineWidth: 2))
-                .position(donePoint)
-                .onTapGesture { onDone() }
-
-            Image(systemName: "arrow.up.left.and.arrow.down.right")
-                .font(.system(size: 13, weight: .black))
-                .foregroundStyle(.appPinkInk)
-                .frame(width: 38, height: 38)   // a comfortable target, not a dot
-                .background(Color.appCard, in: Circle())
-                .overlay(Circle().stroke(Color.appCherry, lineWidth: 2))
-                .softShadow()
-                .position(handlePoint)
-                .gesture(dragHandle)
-        }
-    }
-
-    private var dragHandle: some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .named("board"))
-            .onChanged { value in
-                let start = grab ?? beginGrab(at: value.startLocation)
-                let distance = FreeStickerBoardLayout.distance(from: center, to: value.location)
-                let angle = FreeStickerBoardLayout.angle(of: value.location, from: center)
-                onChange(
-                    FreeStickerBoardLayout.scaled(
-                        grabScale: start.scale,
-                        grabDistance: start.distance,
-                        distance: distance
-                    ),
-                    FreeStickerBoardLayout.normalizedRotation(
-                        start.rotation
-                            + FreeStickerBoardLayout.angleDelta(from: start.angle, to: angle)
-                    )
-                )
-            }
-            .onEnded { _ in
-                grab = nil
-                onEnded()
-            }
-    }
-
-    private func beginGrab(at point: CGPoint) -> Grab {
-        let captured = Grab(
-            distance: FreeStickerBoardLayout.distance(from: center, to: point),
-            angle: FreeStickerBoardLayout.angle(of: point, from: center),
-            scale: Double(scale),
-            rotation: rotationDegrees
-        )
-        grab = captured
-        return captured
-    }
-}

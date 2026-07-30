@@ -28,7 +28,7 @@ public struct CaptureView: View {
                     case .finish: finishStep
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .transition(
                     .asymmetric(
                         insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -41,6 +41,7 @@ public struct CaptureView: View {
         .task { store.send(.tagsOnAppear) }
         .sheet(item: $store.scope(state: \.placePicker, action: \.placePicker)) { pickerStore in
             NavigationStack { PlacePickerView(store: pickerStore) }
+                .dismissesKeyboardOnTap()
         }
         .photosPicker(
             isPresented: $showingPhotoLibrary,
@@ -215,6 +216,8 @@ public struct CaptureView: View {
 
     private var sourceStep: some View {
         VStack(spacing: 18) {
+            // Top-aligned: a screen with two choices should not float them in
+            // the middle with dead space above and below.
             if store.isProcessing || isLoadingPhotoData {
                 Spacer(minLength: 0)
                 KitschLoadingView(
@@ -556,46 +559,25 @@ public struct CaptureView: View {
             .padding(.bottom, 40)
         }
         .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.interactively)
     }
 
+    /// Only which cutouts to keep. Their tags and rating come on the next step.
     private func candidateCard(index: Int, candidate: CaptureFeature.CutoutCandidate) -> some View {
-        VStack(spacing: 7) {
-            Button { store.send(.toggleCandidate(candidate.id)) } label: {
-                StickerTile(tint: .rotating(index)) {
-                    CutoutImage(data: candidate.pngData, cacheKey: candidate.id.uuidString)
-                }
-                .overlay(alignment: .topTrailing) {
-                    Image(systemName: candidate.isSelected ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(candidate.isSelected ? Color.appBlue : Color.appMuted)
-                        .padding(6)
-                }
-                .overlay(alignment: .bottomLeading) { decorationButton(candidate) }
-                .overlay(alignment: .bottomTrailing) { rotateButton(candidate) }
-                .opacity(candidate.isSelected ? 1 : 0.5)
+        Button { store.send(.toggleCandidate(candidate.id)) } label: {
+            StickerTile(tint: .rotating(index)) {
+                CutoutImage(data: candidate.pngData, cacheKey: candidate.id.uuidString)
             }
-            .buttonStyle(KitschPressStyle())
-
-            Button { store.send(.editCandidateTapped(candidate.id)) } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: "tag.fill").font(.system(size: 10, weight: .black))
-                    if candidate.tags.isEmpty, candidate.rating == nil {
-                        Text("정보 넣기")
-                    } else {
-                        Text(candidate.tags.first ?? L10n.text("별점만"))
-                            .lineLimit(1)
-                        if candidate.tags.count > 1 {
-                            Text(verbatim: "+\(candidate.tags.count - 1)")
-                        }
-                    }
-                }
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(.appBlueInk)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.appBlue.opacity(0.5), in: Capsule())
+            .overlay(alignment: .topTrailing) {
+                Image(systemName: candidate.isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(candidate.isSelected ? Color.appBlue : Color.appMuted)
+                    .padding(6)
             }
-            .buttonStyle(KitschPressStyle())
+            .overlay(alignment: .bottomLeading) { decorationButton(candidate) }
+            .overlay(alignment: .bottomTrailing) { rotateButton(candidate) }
+            .opacity(candidate.isSelected ? 1 : 0.5)
         }
+        .buttonStyle(KitschPressStyle())
     }
 
     private func decorationButton(_ candidate: CaptureFeature.CutoutCandidate) -> some View {
