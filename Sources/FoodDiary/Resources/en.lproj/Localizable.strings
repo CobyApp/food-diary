@@ -251,3 +251,10 @@
 // Drag to delete
 "놓으면 삭제해요" = "Let go to delete";
 "여기로 끌어오면 삭제" = "Drag here to delete";
+
+// Off the board vs deleted for good
+"놓으면 서랍으로 가요" = "Let go to send it to the drawer";
+"여기로 끌면 보드에서 내려요" = "Drag here to take it off the board";
+"완전 삭제" = "Delete for good";
+"이 음식을 완전히 삭제할까요?" = "Delete this food for good?";
+"보드에서 내리는 것과 달라요. 서랍에서도 사라지고 되돌릴 수 없어요." = "This is not the same as taking it off the board. It leaves the drawer too, and cannot be undone.";

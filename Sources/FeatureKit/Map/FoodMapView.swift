@@ -61,29 +61,6 @@ public struct FoodMapView: View {
                 .allowsHitTesting(false)
             }
 
-            if !store.pins.isEmpty {
-                HStack(spacing: 6) {
-                    KitschSparkle()
-                        .fill(Color.appCherry)
-                        .frame(width: 11, height: 11)
-                    Text(L10n.format("map.records", store.pins.count))
-                }
-                    .font(.appCaption)
-                    .foregroundStyle(.appInk)
-                    .padding(.horizontal, 13)
-                    .padding(.vertical, 8)
-                    .background(Color.appCard, in: Capsule())
-                    .overlay {
-                        Capsule().stroke(Color.appCherry.opacity(0.72), lineWidth: 2)
-                    }
-                    .rotationEffect(.degrees(1.5))
-                    .softShadow()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    .padding(.trailing, 16)
-                    .safeAreaPadding(.top, 10)
-                    .transition(.opacity)
-            }
-
             if store.isLoading && store.pins.isEmpty {
                 KitschLoadingView(
                     "지도를 정리하는 중",
@@ -103,22 +80,6 @@ public struct FoodMapView: View {
                 selectedCard(meal)
                     .padding(.horizontal, 16).padding(.bottom, 100)
                     .transition(.scale(scale: 0.96, anchor: .bottom).combined(with: .opacity))
-            } else if !store.pins.isEmpty && !store.isLoading {
-                Text("음식 스티커를 눌러 추억을 펼쳐보세요")
-                    .font(.appCaption)
-                    .foregroundStyle(.appInk)
-                    .padding(.horizontal, 15)
-                    .padding(.vertical, 10)
-                    .background(Color.appCard)
-                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .stroke(Color.appPinkInk.opacity(0.42), lineWidth: 1.5)
-                    }
-                    .rotationEffect(.degrees(-1))
-                    .softShadow()
-                    .padding(.bottom, 100)
-                    .transition(.opacity)
             }
         }
         .animation(.spring(duration: 0.35), value: store.selectedMealID)

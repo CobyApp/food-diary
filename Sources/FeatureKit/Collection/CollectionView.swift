@@ -9,7 +9,7 @@ public struct CollectionView: View {
     @State private var activeStickerID: UUID?
     /// Where the carried sticker is right now, so the bin knows when it is over it.
     @State private var carriedCenter: CGPoint?
-    @State private var isOverTrash = false
+    @State private var isOverRemoveZone = false
     @State private var stickerPlacements: [String: StickerBoardPlacement] = [:]
     @State private var showingBoardStylePicker = false
     @State private var showingCutoutDrawer = false
@@ -114,27 +114,19 @@ public struct CollectionView: View {
             .presentationBackground(Color.appMilk)
         }
         .confirmationDialog(
-            L10n.format(
-                "collection.delete.confirm",
-                pendingSingleDeleteID == nil ? store.selectedCutoutIDs.count : 1
-            ),
+            "이 음식을 완전히 삭제할까요?",
             isPresented: $confirmingDeletion,
             titleVisibility: .visible
         ) {
-            Button(
-                L10n.text(
-                    pendingSingleDeleteID == nil ? "선택한 누끼 삭제" : "이 음식 삭제"
-                ),
-                role: .destructive
-            ) {
+            Button("완전 삭제", role: .destructive) {
                 if let pendingSingleDeleteID {
                     store.send(.deleteCutoutsConfirmed([pendingSingleDeleteID]))
                     self.pendingSingleDeleteID = nil
-                } else {
-                    store.send(.deleteSelectedConfirmed)
                 }
             }
             Button("취소", role: .cancel) {}
+        } message: {
+            Text("보드에서 내리는 것과 달라요. 서랍에서도 사라지고 되돌릴 수 없어요.")
         }
         .alert(
             "삭제하지 못했어요",
@@ -147,8 +139,6 @@ public struct CollectionView: View {
         } message: {
             Text("잠시 후 다시 시도해주세요.")
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.82), value: store.isEditing)
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: store.selectedCutoutIDs)
     }
 
     /// One screen, no scrolling: a desktop does not scroll, and the drawer holds
@@ -164,51 +154,50 @@ public struct CollectionView: View {
                 freeStickerBoard
             }
 
-            if store.isEditing, !boardCutouts.isEmpty {
-                PillButton(
-                    store.isDeleting
-                        ? "삭제하는 중"
-                        : L10n.format(
-                            "collection.delete.count",
-                            store.selectedCutoutIDs.count
-                        ),
-                    enabled: !store.selectedCutoutIDs.isEmpty && !store.isDeleting
-                ) {
-                    pendingSingleDeleteID = nil
-                    confirmingDeletion = true
-                }
-                .padding(.horizontal, 18)
-                .padding(.bottom, 100)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+            if let id = store.selectedCutoutID,
+               let cutout = store.cutouts.first(where: { $0.id == id }) {
+                stickerCard(cutout)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, Self.tabBarInset + 8)
+                    .transition(
+                        .scale(scale: 0.96, anchor: .bottom).combined(with: .opacity)
+                    )
             }
         }
+        .animation(
+            .spring(response: 0.34, dampingFraction: 0.82),
+            value: store.selectedCutoutID
+        )
     }
 
-    /// The bin, out only while a sticker is being carried. It opens its lid when
-    /// the sticker is over it, so you know what letting go will do.
-    private var trashZone: some View {
+    /// Out only while a sticker is being carried. Dropping a sticker here takes it
+    /// off the board and back into the drawer — deliberately not a bin, because
+    /// nothing is deleted. Deleting a food for good happens in the drawer.
+    private var removeZone: some View {
         VStack(spacing: 7) {
             ZStack {
                 Circle()
-                    .fill(isOverTrash ? Color.appCherry : Color.appCard)
-                    .frame(width: isOverTrash ? 86 : 66, height: isOverTrash ? 86 : 66)
+                    .fill(isOverRemoveZone ? Color.appBlueInk : Color.appCard)
+                    .frame(width: isOverRemoveZone ? 86 : 66, height: isOverRemoveZone ? 86 : 66)
                     .overlay {
                         Circle().stroke(
-                            isOverTrash ? Color.appCard : Color.appCherry.opacity(0.55),
-                            style: StrokeStyle(lineWidth: 2.5, dash: isOverTrash ? [] : [5, 4])
+                            isOverRemoveZone ? Color.appCard : Color.appBlueInk.opacity(0.55),
+                            style: StrokeStyle(lineWidth: 2.5, dash: isOverRemoveZone ? [] : [5, 4])
                         )
                     }
                     .softShadow()
 
-                Image(systemName: isOverTrash ? "trash.fill" : "trash")
-                    .font(.system(size: isOverTrash ? 30 : 24, weight: .black))
-                    .foregroundStyle(isOverTrash ? Color.appCard : Color.appCherry)
-                    .rotationEffect(.degrees(isOverTrash ? -12 : 0))
+                Image(systemName: isOverRemoveZone
+                    ? "tray.and.arrow.down.fill"
+                    : "tray.and.arrow.down")
+                    .font(.system(size: isOverRemoveZone ? 30 : 24, weight: .black))
+                    .foregroundStyle(isOverRemoveZone ? Color.appCard : Color.appBlueInk)
+                    .rotationEffect(.degrees(isOverRemoveZone ? -12 : 0))
             }
 
-            Text(isOverTrash ? "놓으면 삭제해요" : "여기로 끌어오면 삭제")
+            Text(isOverRemoveZone ? "놓으면 서랍으로 가요" : "여기로 끌면 보드에서 내려요")
                 .font(.system(size: 11, weight: .black, design: .rounded))
-                .foregroundStyle(isOverTrash ? Color.appCherry : Color.appMuted)
+                .foregroundStyle(isOverRemoveZone ? Color.appBlueInk : Color.appMuted)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)
                 .background(Color.appCard.opacity(0.92), in: Capsule())
@@ -245,6 +234,7 @@ public struct CollectionView: View {
                                     addToBoard(cutout)
                                 }
                             } label: {
+                                VStack(spacing: 6) {
                                 StickerTile(tint: .rotating(index)) {
                                     CutoutImage(fileName: cutout.fileName)
                                 }
@@ -256,6 +246,9 @@ public struct CollectionView: View {
                                         .foregroundStyle(isOut ? Color.appCherry : Color.appMuted)
                                         .padding(6)
                                 }
+
+                                drawerCaption(for: cutout)
+                                }
                             }
                             .buttonStyle(KitschPressStyle())
                             .contextMenu {
@@ -264,7 +257,7 @@ public struct CollectionView: View {
                                     showingCutoutDrawer = false
                                     confirmingDeletion = true
                                 } label: {
-                                    Label("이 음식 삭제", systemImage: "trash")
+                                    Label("완전 삭제", systemImage: "trash")
                                 }
                             }
                         }
@@ -275,6 +268,71 @@ public struct CollectionView: View {
         }
         .scrollIndicators(.hidden)
         .animation(.spring(response: 0.32, dampingFraction: 0.8), value: offBoardIDs)
+    }
+
+    /// What a light tap opens: the same card a tapped map pin gives, so the two
+    /// screens answer a tap the same way.
+    private func stickerCard(_ cutout: FoodEntrySnapshot) -> some View {
+        let info = store.cutoutMealInfo[cutout.id]
+        return SoftCard {
+            HStack(alignment: .top, spacing: 12) {
+                StickerTile(tint: .pink) {
+                    CutoutImage(fileName: cutout.fileName, maxPixelDimension: 260)
+                }
+                .frame(width: 84, height: 84)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(
+                        (info?.placeName).flatMap { $0.isEmpty ? nil : $0 }
+                            ?? L10n.text("한 끼")
+                    )
+                    .font(.appTitle)
+                    .foregroundStyle(.appInk)
+                    .lineLimit(1)
+
+                    HStack(spacing: 6) {
+                        if let dateText = info?.dateText, !dateText.isEmpty {
+                            PastelChip(dateText, symbol: "calendar", tone: .blue)
+                        }
+                        if let rating = info?.rating {
+                            StarRating(rating: rating)
+                        }
+                    }
+
+                    if let tags = info?.tags, !tags.isEmpty {
+                        TagChipRow(tags, limit: 3)
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                Button { store.send(.dismissCutoutDetail) } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption.bold())
+                        .foregroundStyle(.appPinkInk)
+                        .frame(width: 30, height: 30)
+                        .background(Color.appTilePink, in: Circle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    /// A food's rating and tags under its picture, so the drawer says what each
+    /// sticker actually was.
+    @ViewBuilder
+    private func drawerCaption(for cutout: FoodEntrySnapshot) -> some View {
+        let info = store.cutoutMealInfo[cutout.id]
+        if info?.rating != nil || !(info?.tags ?? []).isEmpty {
+            VStack(spacing: 4) {
+                if let rating = info?.rating {
+                    StickerRatingBadge(rating: rating)
+                }
+                if let tags = info?.tags, !tags.isEmpty {
+                    TagChipRow(tags, limit: 2)
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -339,13 +397,6 @@ public struct CollectionView: View {
                 .accessibilityLabel(Text("리캡 만들기"))
             }
 
-            if store.isEditing {
-                selectionToolbar
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .background(Color.appCard.opacity(0.95), in: Capsule())
-                    .softShadow()
-            }
         }
         .padding(.horizontal, 18)
         .padding(.top, 6)
@@ -375,30 +426,8 @@ public struct CollectionView: View {
                         height: height,
                         topInset: controlsHeight
                     )
-                    Button {
-                        // Outside edit mode a sticker is just an object on the
-                        // board; its actions live in the long-press menu.
-                        guard store.isEditing else { return }
-                        store.send(.selectionToggled(cutout.id))
-                    } label: {
-                        StickerTile(tint: .rotating(index)) {
+                    StickerTile(tint: .rotating(index)) {
                             CutoutImage(fileName: cutout.fileName)
-                        }
-                        .overlay(alignment: .topTrailing) {
-                            if store.isEditing {
-                                Image(systemName:
-                                    store.selectedCutoutIDs.contains(cutout.id)
-                                        ? "checkmark.circle.fill"
-                                        : "circle"
-                                )
-                                .font(.title2.bold())
-                                .foregroundStyle(
-                                    store.selectedCutoutIDs.contains(cutout.id)
-                                        ? Color.appCherry
-                                        : Color.appMuted
-                                )
-                                .padding(7)
-                            }
                         }
                         .overlay(alignment: .bottomTrailing) {
                             if let symbol = CutoutDecoration(label: cutout.label).symbol {
@@ -418,34 +447,27 @@ public struct CollectionView: View {
                             }
                         }
                         .frame(width: side, height: side)
-                        .opacity(
-                            store.isEditing && !store.selectedCutoutIDs.contains(cutout.id)
-                                ? 0.62
-                                : 1
-                        )
-                    }
-                    .buttonStyle(.plain)
+                    .onTapGesture { store.send(.cutoutTapped(cutout.id)) }
                     .position(point)
                     .modifier(
                         FreeStickerDrag(
                             position: point,
                             rotationDegrees: savedPlacement?.rotation
                                 ?? FreeStickerBoardLayout.defaultRotation(index: index),
-                            enabled: !store.isEditing,
                             onActiveChange: { active in
                                 activeStickerID = active ? cutout.id : nil
                                 if !active {
                                     carriedCenter = nil
-                                    isOverTrash = false
+                                    isOverRemoveZone = false
                                 }
                             },
                             onDragChange: { centre in
                                 carriedCenter = centre
-                                let over = FreeStickerBoardLayout.isOverTrash(
+                                let over = FreeStickerBoardLayout.isOverRemoveZone(
                                     centre, width: width, height: height
                                 )
-                                if over != isOverTrash {
-                                    isOverTrash = over
+                                if over != isOverRemoveZone {
+                                    isOverRemoveZone = over
                                     #if canImport(UIKit)
                                     // Felt, not just seen: you know before you let go.
                                     UIImpactFeedbackGenerator(style: .rigid)
@@ -454,13 +476,12 @@ public struct CollectionView: View {
                                 }
                             },
                             onMove: { destination in
-                                if FreeStickerBoardLayout.isOverTrash(
+                                if FreeStickerBoardLayout.isOverRemoveZone(
                                     destination, width: width, height: height
                                 ) {
-                                    // Dropped on the bin: ask first, and leave the
-                                    // sticker where it was until the answer comes.
-                                    pendingSingleDeleteID = cutout.id
-                                    confirmingDeletion = true
+                                    // Off the board, into the drawer. The food is
+                                    // not deleted, so there is nothing to confirm.
+                                    removeFromBoard(cutout)
                                     return
                                 }
                                 stickerPlacements[cutout.id.uuidString] =
@@ -475,43 +496,13 @@ public struct CollectionView: View {
                         )
                     )
                     .zIndex(activeStickerID == cutout.id ? 100 : Double(index))
-                    .contextMenu {
-                        Button {
-                            stickerPlacements.removeValue(forKey: cutout.id.uuidString)
-                            persistStickerPlacements()
-                        } label: {
-                            Label("자리 원래대로", systemImage: "arrow.counterclockwise")
-                        }
-                        Button {
-                            removeFromBoard(cutout)
-                        } label: {
-                            Label("보드에서 내리기", systemImage: "tray.and.arrow.down")
-                        }
-                        Button {
-                            store.send(.beginSelection(cutout.id))
-                        } label: {
-                            Label("여러 개 선택", systemImage: "checkmark.circle")
-                        }
-                        Divider()
-                        Button(role: .destructive) {
-                            pendingSingleDeleteID = cutout.id
-                            confirmingDeletion = true
-                        } label: {
-                            Label("이 음식 삭제", systemImage: "trash")
-                        }
-                    } preview: {
-                        CutoutImage(fileName: cutout.fileName, maxPixelDimension: 320)
-                            .frame(width: 190, height: 190)
-                            .padding(16)
-                            .background(Color.appMilk)
-                    }
                 }
 
 
                 if activeStickerID != nil {
-                    trashZone
+                    removeZone
                         .position(
-                            FreeStickerBoardLayout.trashCenter(width: width, height: height)
+                            FreeStickerBoardLayout.removeZoneCenter(width: width, height: height)
                         )
                         .transition(.scale(scale: 0.6).combined(with: .opacity))
                         .zIndex(500)
@@ -519,7 +510,7 @@ public struct CollectionView: View {
             }
             .frame(width: width, height: height)
             .animation(.spring(response: 0.32, dampingFraction: 0.7), value: activeStickerID != nil)
-            .animation(.spring(response: 0.26, dampingFraction: 0.6), value: isOverTrash)
+            .animation(.spring(response: 0.26, dampingFraction: 0.6), value: isOverRemoveZone)
         }
     }
 
@@ -647,52 +638,6 @@ public struct CollectionView: View {
         savedStickerPlacements = encoded
     }
 
-    /// Which half the device leans toward right now, before the hold debounce.
-    /// Tilt and hold to read the place names on that half of the board. Driven by
-    /// `.task(id:)`, so changing or releasing the tilt cancels a pending reveal.
-    @ViewBuilder
-    private var selectionToolbar: some View {
-        HStack(spacing: 8) {
-            if store.isEditing {
-                Text(L10n.format("collection.selected.count", store.selectedCutoutIDs.count))
-                    .font(.appSection)
-                    .foregroundStyle(.appInk)
-                Spacer()
-                compactTextButton(
-                    store.selectedCutoutIDs.count == store.cutouts.count
-                        ? "선택 해제"
-                        : "전체 선택"
-                ) {
-                    store.send(.selectAllTapped)
-                }
-                compactTextButton("완료") {
-                    store.send(.editButtonTapped)
-                }
-            }
-        }
-    }
-
-    private func compactTextButton(
-        _ title: String,
-        systemImage: String? = nil,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                if let systemImage {
-                    Image(systemName: systemImage)
-                }
-                Text(LocalizedStringKey(title))
-            }
-        }
-        .buttonStyle(
-            KitschOutlineButtonStyle(
-                color: .appBlueInk,
-                verticalPadding: 8
-            )
-        )
-    }
-
     private func headerButton(
         systemImage: String,
         color: Color,
@@ -740,7 +685,6 @@ private extension Optional where Wrapped == String {
 private struct FreeStickerDrag: ViewModifier {
     let position: CGPoint
     let rotationDegrees: Double
-    let enabled: Bool
     let onActiveChange: (Bool) -> Void
     let onDragChange: (CGPoint) -> Void
     let onMove: (CGPoint) -> Void
@@ -760,7 +704,7 @@ private struct FreeStickerDrag: ViewModifier {
             )
             .offset(translation)
             .animation(.spring(response: 0.24, dampingFraction: 0.72), value: isDragging)
-            .highPriorityGesture(dragGesture, including: enabled ? .all : .none)
+            .highPriorityGesture(dragGesture)
             .onChange(of: isDragging) { _, dragging in
                 onActiveChange(dragging)
                 #if canImport(UIKit)

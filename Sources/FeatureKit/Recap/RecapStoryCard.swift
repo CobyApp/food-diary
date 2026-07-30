@@ -63,12 +63,6 @@ struct RecapStoryCard: View {
             }
 
             HStack(alignment: .lastTextBaseline, spacing: 8) {
-                Text(L10n.text("나의 맛있는 기록"))
-                    .font(.system(size: 34, weight: .black, design: .rounded))
-                    .foregroundStyle(.appInk)
-                    .shadow(color: theme.secondary.opacity(0.85), radius: 0, x: 2, y: 2)
-                    .minimumScaleFactor(0.78)
-                    .lineLimit(1)
                 Text(L10n.format("recap.story.count", mealCount))
                     .font(.system(size: 12, weight: .heavy, design: .rounded))
                     .foregroundStyle(.appChocolate)
@@ -123,18 +117,6 @@ struct RecapStoryCard: View {
                     .rotationEffect(.degrees(-8))
                     .position(x: 49, y: proxy.size.height - 34)
 
-                Text(L10n.text("recap.story.sticker"))
-                    .font(.system(size: 10, weight: .black, design: .rounded))
-                    .tracking(0.4)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 7)
-                    .background(theme.accent, in: Capsule())
-                    .overlay(Capsule().stroke(Color.appCard, lineWidth: 2))
-                    .rotationEffect(.degrees(7))
-                    .position(x: proxy.size.width - 58, y: 31)
-                    .zIndex(20)
-
                 StoryHeart()
                     .fill(theme.accent.opacity(0.82))
                     .frame(width: 22, height: 20)
@@ -184,14 +166,6 @@ struct RecapStoryCard: View {
 
     private var footer: some View {
         HStack {
-            HStack(spacing: 5) {
-                KitschSparkle()
-                    .fill(Color.appButter)
-                    .frame(width: 11, height: 11)
-                Text(L10n.text("얌키"))
-                    .font(.system(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(.appChocolate)
-            }
             Spacer()
             Text(verbatim: "@yumkie · MY FOOD NOTE")
                 .font(.system(size: 9, weight: .heavy, design: .rounded))

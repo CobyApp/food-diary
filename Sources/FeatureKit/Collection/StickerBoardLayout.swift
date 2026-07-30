@@ -216,20 +216,20 @@ enum FreeStickerBoardLayout {
     static let verticalInset: CGFloat = 18
     static let scaleRange = 0.68...1.5
 
-    /// Where the bin sits while a sticker is being carried: bottom centre, above
-    /// the floating tab bar.
-    static func trashCenter(width: CGFloat, height: CGFloat) -> CGPoint {
+    /// Where the drop zone sits while a sticker is being carried: bottom centre,
+    /// above the floating tab bar.
+    static func removeZoneCenter(width: CGFloat, height: CGFloat) -> CGPoint {
         CGPoint(x: width / 2, y: height - 132)
     }
 
-    /// Radius counted as "over the bin". Generous, because a sticker is dropped
+    /// Radius counted as "over the zone". Generous, because a sticker is dropped
     /// with a fingertip covering it.
-    static let trashRadius: CGFloat = 62
+    static let removeZoneRadius: CGFloat = 62
 
-    /// Whether a sticker dropped at `point` lands on the bin.
-    static func isOverTrash(_ point: CGPoint, width: CGFloat, height: CGFloat) -> Bool {
-        let centre = trashCenter(width: width, height: height)
-        return hypot(point.x - centre.x, point.y - centre.y) <= trashRadius
+    /// Whether a sticker dropped at `point` lands on the zone.
+    static func isOverRemoveZone(_ point: CGPoint, width: CGFloat, height: CGFloat) -> Bool {
+        let centre = removeZoneCenter(width: width, height: height)
+        return hypot(point.x - centre.x, point.y - centre.y) <= removeZoneRadius
     }
 
     static func itemSide(width: CGFloat) -> CGFloat {
