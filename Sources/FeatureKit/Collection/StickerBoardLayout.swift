@@ -293,26 +293,39 @@ enum FreeStickerBoardLayout {
         )
     }
 
-    /// Scale and rotation implied by having dragged the corner handle to `handle`.
+    /// Shortest way round from one angle to another, in degrees (-180...180).
     ///
-    /// One finger does both, the way a sticker editor works: how far the corner is
-    /// from the centre sets the size, and which way it points sets the angle. A
-    /// pinch needs two fingers inside a ~110pt sticker, which in practice cannot
-    /// be done.
-    static func handleTransform(
-        handle: CGPoint,
-        center: CGPoint,
-        side: CGFloat
-    ) -> (scale: Double, rotation: Double) {
-        let halfDiagonal = side * CGFloat(2.0.squareRoot()) / 2
-        guard halfDiagonal > 0 else { return (1, 0) }
-        let dx = handle.x - center.x
-        let dy = handle.y - center.y
-        let distance = hypot(dx, dy)
-        let scale = clampedScale(Double(distance / halfDiagonal))
-        // The handle starts 45° out, so that offset is not part of the rotation.
-        let angle = atan2(Double(dy), Double(dx)) * 180 / .pi - 45
-        return (scale, normalizedRotation(angle))
+    /// Needed because a handle swung past due-west jumps from 179° to -179°;
+    /// subtracting raw angles would spin the sticker a full turn.
+    static func angleDelta(from start: Double, to end: Double) -> Double {
+        var delta = (end - start).truncatingRemainder(dividingBy: 360)
+        if delta > 180 { delta -= 360 }
+        if delta < -180 { delta += 360 }
+        return delta
+    }
+
+    /// Scale after the handle has moved from `grabDistance` to `distance`.
+    ///
+    /// Relative to where the finger landed, not to the corner: grabbing the
+    /// handle slightly off-centre must not resize the sticker before it moves.
+    static func scaled(
+        grabScale: Double,
+        grabDistance: CGFloat,
+        distance: CGFloat
+    ) -> Double {
+        guard grabDistance > 0.5 else { return clampedScale(grabScale) }
+        return clampedScale(grabScale * Double(distance / grabDistance))
+    }
+
+    /// Angle of `point` measured from `center`, in degrees.
+    static func angle(of point: CGPoint, from center: CGPoint) -> Double {
+        atan2(Double(point.y - center.y), Double(point.x - center.x)) * 180 / .pi
+    }
+
+    /// Distance between two points, floored so a grab at the exact centre cannot
+    /// divide by zero.
+    static func distance(from center: CGPoint, to point: CGPoint) -> CGFloat {
+        max(hypot(point.x - center.x, point.y - center.y), 1)
     }
 
     /// Where to drop a sticker being put back on the board from the drawer.

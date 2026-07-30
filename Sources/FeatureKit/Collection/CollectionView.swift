@@ -554,15 +554,18 @@ public struct CollectionView: View {
                         side: visibleSide,
                         scale: scale,
                         rotationDegrees: rotation,
-                        onDrag: { location in
+                        onChange: { newScale, newRotation in
                             applyHandleTransform(
                                 for: id,
-                                handle: location,
+                                scale: newScale,
+                                rotation: newRotation,
                                 center: center,
-                                side: visibleSide,
                                 width: width,
                                 height: height
                             )
+                        },
+                        onEnded: {
+                            finishHandleTransform(for: id, width: width, height: height)
                         },
                         onDone: { transformingStickerID = nil }
                     )
@@ -656,46 +659,54 @@ public struct CollectionView: View {
         savedOffBoardIDs = encoded
     }
 
-    /// Reads a corner-handle drag back into the sticker's saved scale and angle.
+    /// Writes a live handle drag into the sticker's scale and angle.
+    ///
+    /// Position is left alone on purpose: re-clamping it on every change moved the
+    /// sticker's centre mid-drag, which moved the very point the deltas are
+    /// measured from. It is clamped once the finger lifts.
     private func applyHandleTransform(
         for id: UUID,
-        handle: CGPoint,
+        scale: Double,
+        rotation: Double,
         center: CGPoint,
-        side: CGFloat,
         width: CGFloat,
         height: CGFloat
     ) {
         let key = id.uuidString
-        let result = FreeStickerBoardLayout.handleTransform(
-            handle: handle,
-            center: center,
-            side: side
-        )
         var updated = stickerPlacements[key] ?? FreeStickerBoardLayout.placement(
-            for: center,
-            width: width,
-            height: height
+            for: center, width: width, height: height
         )
-        updated.scale = result.scale
-        updated.rotation = result.rotation
-        // A sticker grown near an edge has to stay reachable.
-        let clampedPoint = FreeStickerBoardLayout.clamped(
+        updated.scale = scale
+        updated.rotation = rotation
+        stickerPlacements[key] = updated
+        transformPreview = StickerTransformPreview(
+            id: id,
+            scale: CGFloat(scale),
+            rotation: rotation,
+            isScaling: true,
+            isRotating: true
+        )
+    }
+
+    /// Once the finger lifts: snap to the useful values, keep the sticker on the
+    /// board at its new size, and save.
+    private func finishHandleTransform(for id: UUID, width: CGFloat, height: CGFloat) {
+        let key = id.uuidString
+        guard var updated = stickerPlacements[key] else { return }
+        updated.scale = FreeStickerBoardLayout.snappedScale(updated.scale ?? 1)
+        updated.rotation = FreeStickerBoardLayout.snappedRotation(updated.rotation ?? 0)
+        let clamped = FreeStickerBoardLayout.clamped(
             CGPoint(x: width * CGFloat(updated.xFraction), y: CGFloat(updated.y)),
             width: width,
             height: height,
             scale: updated.displayScale,
             rotationDegrees: updated.rotation ?? 0
         )
-        updated.xFraction = Double(clampedPoint.x / width)
-        updated.y = Double(clampedPoint.y)
+        updated.xFraction = Double(clamped.x / width)
+        updated.y = Double(clamped.y)
         stickerPlacements[key] = updated
-        transformPreview = StickerTransformPreview(
-            id: id,
-            scale: updated.displayScale,
-            rotation: updated.rotation ?? 0,
-            isScaling: true,
-            isRotating: true
-        )
+        transformPreview = nil
+        persistStickerPlacements()
     }
 
     /// Takes a sticker off the board. The food itself stays in the drawer.
@@ -1071,35 +1082,47 @@ private struct StickerTransformBadge: View {
 /// fingers inside a sticker barely wider than a thumb.
 private struct StickerTransformHandle: View {
     let center: CGPoint
+    /// The sticker's visible side at scale 1.
     let side: CGFloat
     let scale: CGFloat
     let rotationDegrees: Double
-    let onDrag: (CGPoint) -> Void
+    let onChange: (Double, Double) -> Void
+    let onEnded: () -> Void
     let onDone: () -> Void
+
+    /// Captured once when the finger lands, so the sticker follows the *change*
+    /// in the finger's position. Reading its absolute position instead snapped the
+    /// sticker to whatever size and angle the first touch implied, and left every
+    /// later move off by that same error.
+    @State private var grab: Grab?
+
+    private struct Grab {
+        let distance: CGFloat
+        let angle: Double
+        let scale: Double
+        let rotation: Double
+    }
 
     private var handlePoint: CGPoint {
         FreeStickerBoardLayout.handlePosition(
-            center: center,
-            side: side,
-            scale: scale,
-            rotationDegrees: rotationDegrees
+            center: center, side: side, scale: scale, rotationDegrees: rotationDegrees
         )
     }
 
     private var donePoint: CGPoint {
         FreeStickerBoardLayout.handlePosition(
-            center: center,
-            side: side,
-            scale: scale,
-            rotationDegrees: rotationDegrees + 180
+            center: center, side: side, scale: scale, rotationDegrees: rotationDegrees + 180
         )
     }
 
     var body: some View {
         ZStack {
-            // Outline of what is being adjusted.
+            // Hugs the sticker: same size, same angle, same centre.
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.appCherry.opacity(0.9), style: StrokeStyle(lineWidth: 2, dash: [6, 5]))
+                .stroke(
+                    Color.appCherry.opacity(0.9),
+                    style: StrokeStyle(lineWidth: 2, dash: [6, 5])
+                )
                 .frame(width: side * scale, height: side * scale)
                 .rotationEffect(.degrees(rotationDegrees))
                 .position(center)
@@ -1122,10 +1145,42 @@ private struct StickerTransformHandle: View {
                 .overlay(Circle().stroke(Color.appCherry, lineWidth: 2))
                 .softShadow()
                 .position(handlePoint)
-                .gesture(
-                    DragGesture(minimumDistance: 0, coordinateSpace: .named("board"))
-                        .onChanged { onDrag($0.location) }
-                )
+                .gesture(dragHandle)
         }
+    }
+
+    private var dragHandle: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named("board"))
+            .onChanged { value in
+                let start = grab ?? beginGrab(at: value.startLocation)
+                let distance = FreeStickerBoardLayout.distance(from: center, to: value.location)
+                let angle = FreeStickerBoardLayout.angle(of: value.location, from: center)
+                onChange(
+                    FreeStickerBoardLayout.scaled(
+                        grabScale: start.scale,
+                        grabDistance: start.distance,
+                        distance: distance
+                    ),
+                    FreeStickerBoardLayout.normalizedRotation(
+                        start.rotation
+                            + FreeStickerBoardLayout.angleDelta(from: start.angle, to: angle)
+                    )
+                )
+            }
+            .onEnded { _ in
+                grab = nil
+                onEnded()
+            }
+    }
+
+    private func beginGrab(at point: CGPoint) -> Grab {
+        let captured = Grab(
+            distance: FreeStickerBoardLayout.distance(from: center, to: point),
+            angle: FreeStickerBoardLayout.angle(of: point, from: center),
+            scale: Double(scale),
+            rotation: rotationDegrees
+        )
+        grab = captured
+        return captured
     }
 }
