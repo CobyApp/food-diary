@@ -5,7 +5,6 @@ import Models
 
 public struct FoodMapView: View {
     @Bindable var store: StoreOf<FoodMapFeature>
-    @Environment(\.openURL) private var openURL
 
     public init(store: StoreOf<FoodMapFeature>) { self.store = store }
 
@@ -77,7 +76,7 @@ public struct FoodMapView: View {
             }
 
             if let meal = store.selectedMeal {
-                selectedCard(meal)
+                FoodInfoCard(entry: meal) { store.send(.dismissCard) }
                     .padding(.horizontal, 16).padding(.bottom, 100)
                     .transition(.scale(scale: 0.96, anchor: .bottom).combined(with: .opacity))
             }
@@ -98,112 +97,6 @@ public struct FoodMapView: View {
         .animation(.spring(response: 0.32, dampingFraction: 0.7), value: isSelected)
     }
 
-    private func selectedCard(_ meal: FoodEntrySnapshot) -> some View {
-        SoftCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 12) {
-                    StickerTile(tint: .pink) {
-                        CutoutImage(fileName: meal.fileName, maxPixelDimension: 260)
-                    }
-                    .frame(width: 96, height: 96)
-                    .rotationEffect(.degrees(-2))
-                    VStack(alignment: .leading, spacing: 6) {
-                        Button {
-                            openPlaceInMaps(meal)
-                        } label: {
-                            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                Text(meal.place?.name ?? L10n.text("한 끼"))
-                                    .font(.appTitle)
-                                    .foregroundStyle(.appInk)
-                                    .lineLimit(2)
-                                Image(systemName: "arrow.up.right")
-                                    .font(.caption.bold())
-                                    .foregroundStyle(.appPinkInk)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        if let address = meal.place?.address, !address.isEmpty {
-                            Text(address)
-                                .font(.appCaption)
-                                .foregroundStyle(.appMuted)
-                                .lineLimit(2)
-                        }
-                        HStack(spacing: 6) {
-                            PastelChip(
-                                meal.eatenAt.formatted(.dateTime.month().day()),
-                                symbol: "calendar",
-                                tone: .blue
-                            )
-                            if let rating = meal.rating {
-                                HStack(spacing: 2) {
-                                    ForEach(0..<rating, id: \.self) { _ in
-                                        Image(systemName: "star.fill")
-                                    }
-                                }
-                                .font(.caption2)
-                                .foregroundStyle(.appButterInk)
-                            }
-                        }
-                    }
-                    Spacer()
-                    Button { store.send(.dismissCard) } label: {
-                        Image(systemName: "xmark")
-                            .font(.caption.bold())
-                            .foregroundStyle(.appPinkInk)
-                            .frame(width: 30, height: 30)
-                            .background(Color.appTilePink, in: Circle())
-                            .overlay {
-                                Circle().stroke(
-                                    Color.appPinkInk.opacity(0.35),
-                                    lineWidth: 2
-                                )
-                            }
-                    }
-                    .buttonStyle(.plain)
-                }
-                if !meal.tags.isEmpty {
-                    TagChipRow(meal.tags, limit: 3)
-                        .font(.appBody)
-                        .foregroundStyle(.appInk)
-                        .lineLimit(3)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 9)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.appTileButter, in: RoundedRectangle(cornerRadius: 12))
-                }
-                Button {
-                    openPlaceInMaps(meal)
-                } label: {
-                    Label("지도 앱에서 가게 보기", systemImage: "arrow.up.right")
-                }
-                .buttonStyle(
-                    KitschFilledButtonStyle(
-                        color: .appBlueInk,
-                        verticalPadding: 11
-                    )
-                )
-            }
-        }
-        .overlay(alignment: .top) {
-            WashiTape(.appPink)
-                .offset(y: -7)
-        }
-    }
-
-    private func openPlaceInMaps(_ meal: FoodEntrySnapshot) {
-        guard let place = meal.place, let coordinate = place.coordinate else { return }
-        var components = URLComponents(string: "https://maps.apple.com/")
-        components?.queryItems = [
-            URLQueryItem(
-                name: "ll",
-                value: "\(coordinate.latitude),\(coordinate.longitude)"
-            ),
-            URLQueryItem(name: "q", value: place.name),
-        ]
-        if let url = components?.url {
-            openURL(url)
-        }
-    }
 }
 
 private struct FoodStickerMapPin: View {

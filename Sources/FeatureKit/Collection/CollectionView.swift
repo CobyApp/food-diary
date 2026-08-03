@@ -4,7 +4,6 @@ import Models
 
 public struct CollectionView: View {
     @Bindable var store: StoreOf<CollectionFeature>
-    @State private var confirmingDeletion = false
     @State private var pendingSingleDeleteID: UUID?
     @State private var activeStickerID: UUID?
     /// Where the carried sticker is right now, so the bin knows when it is over it.
@@ -47,7 +46,26 @@ public struct CollectionView: View {
 
             floatingControls
 
+            if let id = pendingSingleDeleteID,
+               store.cutouts.contains(where: { $0.id == id }) {
+                ConfirmCard(
+                    title: "이 음식을 완전히 삭제할까요?",
+                    message: "보드에서 내리는 것과 달라요. 서랍에서도 사라지고 되돌릴 수 없어요.",
+                    confirmTitle: "완전 삭제",
+                    onConfirm: {
+                        store.send(.deleteCutoutsConfirmed([id]))
+                        pendingSingleDeleteID = nil
+                    },
+                    onCancel: { pendingSingleDeleteID = nil }
+                )
+                .transition(.opacity)
+                .zIndex(2_000)
+            }
         }
+        .animation(
+            .spring(response: 0.3, dampingFraction: 0.86),
+            value: pendingSingleDeleteID
+        )
         .toolbar(.hidden, for: .navigationBar)
         .task {
             loadStickerPlacements()
@@ -113,21 +131,6 @@ public struct CollectionView: View {
             .presentationDragIndicator(.visible)
             .presentationBackground(Color.appMilk)
         }
-        .confirmationDialog(
-            "이 음식을 완전히 삭제할까요?",
-            isPresented: $confirmingDeletion,
-            titleVisibility: .visible
-        ) {
-            Button("완전 삭제", role: .destructive) {
-                if let pendingSingleDeleteID {
-                    store.send(.deleteCutoutsConfirmed([pendingSingleDeleteID]))
-                    self.pendingSingleDeleteID = nil
-                }
-            }
-            Button("취소", role: .cancel) {}
-        } message: {
-            Text("보드에서 내리는 것과 달라요. 서랍에서도 사라지고 되돌릴 수 없어요.")
-        }
         .alert(
             "삭제하지 못했어요",
             isPresented: Binding(
@@ -156,7 +159,7 @@ public struct CollectionView: View {
 
             if let id = store.selectedCutoutID,
                let cutout = store.cutouts.first(where: { $0.id == id }) {
-                stickerCard(cutout)
+                FoodInfoCard(entry: cutout) { store.send(.dismissCutoutDetail) }
                     .padding(.horizontal, 16)
                     .padding(.bottom, Self.tabBarInset + 8)
                     .transition(
@@ -255,7 +258,6 @@ public struct CollectionView: View {
                                 Button(role: .destructive) {
                                     pendingSingleDeleteID = cutout.id
                                     showingCutoutDrawer = false
-                                    confirmingDeletion = true
                                 } label: {
                                     Label("완전 삭제", systemImage: "trash")
                                 }
@@ -270,70 +272,25 @@ public struct CollectionView: View {
         .animation(.spring(response: 0.32, dampingFraction: 0.8), value: offBoardIDs)
     }
 
-    /// What a light tap opens: the same card a tapped map pin gives, so the two
-    /// screens answer a tap the same way.
-    private func stickerCard(_ cutout: FoodEntrySnapshot) -> some View {
-        let info = store.cutoutMealInfo[cutout.id]
-        return SoftCard {
-            HStack(alignment: .top, spacing: 12) {
-                StickerTile(tint: .pink) {
-                    CutoutImage(fileName: cutout.fileName, maxPixelDimension: 260)
-                }
-                .frame(width: 84, height: 84)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(
-                        (info?.placeName).flatMap { $0.isEmpty ? nil : $0 }
-                            ?? L10n.text("한 끼")
-                    )
-                    .font(.appTitle)
-                    .foregroundStyle(.appInk)
-                    .lineLimit(1)
-
-                    HStack(spacing: 6) {
-                        if let dateText = info?.dateText, !dateText.isEmpty {
-                            PastelChip(dateText, symbol: "calendar", tone: .blue)
-                        }
-                        if let rating = info?.rating {
-                            StarRating(rating: rating)
-                        }
-                    }
-
-                    if let tags = info?.tags, !tags.isEmpty {
-                        TagChipRow(tags, limit: 3)
-                    }
-                }
-
-                Spacer(minLength: 0)
-
-                Button { store.send(.dismissCutoutDetail) } label: {
-                    Image(systemName: "xmark")
-                        .font(.caption.bold())
-                        .foregroundStyle(.appPinkInk)
-                        .frame(width: 30, height: 30)
-                        .background(Color.appTilePink, in: Circle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    /// A food's rating and tags under its picture, so the drawer says what each
-    /// sticker actually was.
-    @ViewBuilder
+    /// A food's rating and tags under its picture.
+    ///
+    /// Always the same height, whether or not there is anything to show: the grid
+    /// sizes a row to its tallest cell, so a caption that varies left the rows
+    /// ragged.
     private func drawerCaption(for cutout: FoodEntrySnapshot) -> some View {
         let info = store.cutoutMealInfo[cutout.id]
-        if info?.rating != nil || !(info?.tags ?? []).isEmpty {
-            VStack(spacing: 4) {
-                if let rating = info?.rating {
-                    StickerRatingBadge(rating: rating)
-                }
-                if let tags = info?.tags, !tags.isEmpty {
-                    TagChipRow(tags, limit: 2)
-                }
+        return VStack(spacing: 3) {
+            if let rating = info?.rating {
+                StickerRatingBadge(rating: rating)
+            }
+            if let tags = info?.tags, !tags.isEmpty {
+                TagChipRow(tags, limit: 2)
             }
         }
+        .frame(height: Self.drawerCaptionHeight, alignment: .top)
     }
+
+    private static let drawerCaptionHeight: CGFloat = 46
 
     @ViewBuilder
     private var emptyBoard: some View {

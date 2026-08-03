@@ -62,15 +62,6 @@ struct RecapStoryCard: View {
                     .foregroundStyle(theme.accent)
             }
 
-            HStack(alignment: .lastTextBaseline, spacing: 8) {
-                Text(L10n.format("recap.story.count", mealCount))
-                    .font(.system(size: 12, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.appChocolate)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(theme.secondary, in: Capsule())
-                    .rotationEffect(.degrees(2))
-            }
         }
     }
 
@@ -83,7 +74,7 @@ struct RecapStoryCard: View {
                     borderOpacity: 0.42
                 )
                     .frame(width: proxy.size.width - 10, height: proxy.size.height - 18)
-                    .rotationEffect(.degrees(-1.1))
+                    .rotationEffect(.degrees(theme.recapStyle.surfaceTilt))
 
                 ForEach(Array(images.prefix(9).enumerated()), id: \.offset) { index, image in
                     let placement = placement(
@@ -222,6 +213,9 @@ struct RecapStoryCard: View {
             ]
         }
         let spec = specs[min(index, specs.count - 1)]
+        let style = theme.recapStyle
+        // Each board arranges its recap a little differently.
+        let wave = style.waveOffset(column: index % 3, canvasHeight: canvas.height)
         if index < boardPlacements.count, let saved = boardPlacements[index] {
             let sourceHeight = max(
                 340,
@@ -231,19 +225,22 @@ struct RecapStoryCard: View {
             let yFraction = min(max(CGFloat(saved.y) / sourceHeight, 0.17), 0.83)
             let savedScale = CGFloat(saved.scale ?? 1)
             let storySide = min(
-                max(spec.2 * savedScale, spec.2 * 0.68),
+                max(spec.2 * savedScale * style.sizeScale, spec.2 * 0.68),
                 min(canvas.width * 0.78, 260)
             )
             return (
-                CGPoint(x: canvas.width * xFraction, y: canvas.height * yFraction),
+                CGPoint(
+                    x: canvas.width * xFraction,
+                    y: canvas.height * yFraction + wave
+                ),
                 storySide,
-                saved.rotation ?? rotations[index % rotations.count]
+                saved.rotation ?? rotations[index % rotations.count] * style.tiltScale
             )
         }
         return (
-            CGPoint(x: canvas.width * spec.0, y: canvas.height * spec.1),
-            spec.2,
-            rotations[index % rotations.count]
+            CGPoint(x: canvas.width * spec.0, y: canvas.height * spec.1 + wave),
+            spec.2 * style.sizeScale,
+            rotations[index % rotations.count] * style.tiltScale
         )
     }
 }

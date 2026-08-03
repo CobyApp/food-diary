@@ -36,6 +36,33 @@ enum StickerBoardTheme: String, CaseIterable, Codable, Identifiable {
         }
     }
 
+    /// How this board arranges itself on a recap card. Each board has a character
+    /// on screen, and a recap that ignored it looked like the same card four times.
+    var recapStyle: RecapCollageStyle {
+        switch self {
+        // Playful and scattered, like stickers stuck on in a hurry.
+        case .strawberryCheck:
+            return RecapCollageStyle(
+                tiltScale: 1.2, sizeScale: 1, waveAmplitude: 0.02, surfaceTilt: -1.1
+            )
+        // A diary: straight rows, barely a tilt.
+        case .creamDiary:
+            return RecapCollageStyle(
+                tiltScale: 0.25, sizeScale: 0.94, waveAmplitude: 0, surfaceTilt: 0
+            )
+        // Pop: bigger, bolder, leaning hard.
+        case .lavenderPop:
+            return RecapCollageStyle(
+                tiltScale: 1.8, sizeScale: 1.1, waveAmplitude: 0.045, surfaceTilt: -2.4
+            )
+        // Soda: everything drifting on a gentle wave.
+        case .sodaBlue:
+            return RecapCollageStyle(
+                tiltScale: 0.8, sizeScale: 0.97, waveAmplitude: 0.07, surfaceTilt: 1.4
+            )
+        }
+    }
+
     var secondary: Color {
         switch self {
         case .strawberryCheck: return .appPink
@@ -43,6 +70,25 @@ enum StickerBoardTheme: String, CaseIterable, Codable, Identifiable {
         case .lavenderPop: return .appLavender
         case .sodaBlue: return .appBlue
         }
+    }
+}
+
+/// The knobs a board turns on its recap card.
+struct RecapCollageStyle: Equatable {
+    /// Multiplier on each sticker's tilt.
+    let tiltScale: Double
+    /// Multiplier on each sticker's size.
+    let sizeScale: CGFloat
+    /// Height of the wave the columns ride, as a fraction of the canvas.
+    let waveAmplitude: CGFloat
+    /// The board card's own rotation, in degrees.
+    let surfaceTilt: Double
+
+    /// Where a sticker in `column` sits on the wave.
+    func waveOffset(column: Int, canvasHeight: CGFloat) -> CGFloat {
+        guard waveAmplitude > 0 else { return 0 }
+        let phase = Double(column) * .pi / 2
+        return canvasHeight * waveAmplitude * CGFloat(sin(phase))
     }
 }
 
@@ -100,14 +146,22 @@ struct StickerBoardThemeBackground: View {
         case .lavenderPop:
             ZStack {
                 BoardPatternCanvas(kind: .sparkle, color: theme.accent.opacity(0.14))
-                Circle()
-                    .fill(Color.appPink.opacity(0.25))
-                    .frame(width: 190, height: 190)
-                    .offset(x: 130, y: -150)
-                Circle()
-                    .fill(Color.appBlue.opacity(0.18))
-                    .frame(width: 160, height: 160)
-                    .offset(x: -150, y: 190)
+                // Sized from the space given rather than fixed: at 190pt these
+                // blobs were larger than a swatch in the style sheet and pushed
+                // its layout apart.
+                GeometryReader { proxy in
+                    let blob = min(proxy.size.width, proxy.size.height)
+                    ZStack {
+                        Circle()
+                            .fill(Color.appPink.opacity(0.25))
+                            .frame(width: blob * 0.55, height: blob * 0.55)
+                            .position(x: proxy.size.width * 0.86, y: proxy.size.height * 0.1)
+                        Circle()
+                            .fill(Color.appBlue.opacity(0.18))
+                            .frame(width: blob * 0.46, height: blob * 0.46)
+                            .position(x: proxy.size.width * 0.08, y: proxy.size.height * 0.9)
+                    }
+                }
             }
         case .sodaBlue:
             BoardPatternCanvas(kind: .wave, color: theme.accent.opacity(0.14))
