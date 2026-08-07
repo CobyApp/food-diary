@@ -27,3 +27,7 @@ fastlane/test_output/
 # Tuist native package resolution / cache
 .package.resolved
 Tuist/.build/
+
+# Store screenshots are generated: Scripts/screenshots.sh rebuilds them, and the
+# PNGs are ~14MB per run. Drop real cutouts into fastlane/screenshots/source/.
+fastlane/screenshots/
