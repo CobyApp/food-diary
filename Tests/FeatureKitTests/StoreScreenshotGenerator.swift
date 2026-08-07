@@ -49,6 +49,9 @@ final class StoreScreenshotGenerator: XCTestCase {
             }
 
             let folder = root.appendingPathComponent(language, isDirectory: true)
+            // Cleared first: renaming or reordering posters otherwise leaves the old
+            // file behind, and a stale PNG in the folder gets uploaded with the rest.
+            try? FileManager.default.removeItem(at: folder)
             try FileManager.default.createDirectory(
                 at: folder, withIntermediateDirectories: true
             )
@@ -63,7 +66,7 @@ final class StoreScreenshotGenerator: XCTestCase {
             }
         }
 
-        XCTAssertEqual(written.count, Self.languages.count * 5)
+        XCTAssertEqual(written.count, Self.languages.count * 10)
         print("Store screenshots written to \(root.path):")
         written.forEach { print("  \($0)") }
     }
@@ -169,6 +172,33 @@ final class StoreScreenshotGenerator: XCTestCase {
         let view: AnyView
     }
 
+    /// Badges taken from the app's own achievement definitions, so each language
+    /// shows the names the app really uses.
+    private static var storeBadges: [(symbol: String, title: String, unlocked: Bool)] {
+        [
+            (
+                symbol: "sparkles.rectangle.stack.fill",
+                title: L10n.format("achievement.cutouts.title", 20),
+                unlocked: true
+            ),
+            (
+                symbol: "book.pages.fill",
+                title: L10n.format("achievement.meals.title", 10),
+                unlocked: true
+            ),
+            (
+                symbol: "flame.fill",
+                title: L10n.format("achievement.streak.title", 7),
+                unlocked: true
+            ),
+            (
+                symbol: "map.fill",
+                title: L10n.format("achievement.places.title", 10),
+                unlocked: false
+            ),
+        ]
+    }
+
     private func posters(language: String, foods: [StoreSampleFood]) -> [Poster] {
         let copy = StoreCopy.forLanguage(language)
         return [
@@ -205,6 +235,22 @@ final class StoreScreenshotGenerator: XCTestCase {
                 )
             ),
             Poster(
+                slug: "themes",
+                view: AnyView(
+                    StorePoster(headline: copy.themes, theme: .creamDiary) {
+                        StoreThemeScene(food: foods[0])
+                    }
+                )
+            ),
+            Poster(
+                slug: "map",
+                view: AnyView(
+                    StorePoster(headline: copy.map, theme: .sodaBlue) {
+                        StoreMapScene(foods: foods, place: copy.mapPlace)
+                    }
+                )
+            ),
+            Poster(
                 slug: "recap",
                 view: AnyView(
                     StorePoster(
@@ -224,6 +270,41 @@ final class StoreScreenshotGenerator: XCTestCase {
                                 .stroke(Color.appCard, lineWidth: 4)
                         }
                         .scaleEffect(0.95)
+                    }
+                )
+            ),
+            Poster(
+                slug: "game",
+                view: AnyView(
+                    StorePoster(headline: copy.game, theme: .strawberryCheck) {
+                        StoreGameScene(
+                            foods: foods,
+                            prompt: copy.gamePrompt,
+                            places: copy.gamePlaces
+                        )
+                    }
+                )
+            ),
+            Poster(
+                slug: "group",
+                view: AnyView(
+                    StorePoster(headline: copy.group, theme: .lavenderPop) {
+                        StoreGroupScene(
+                            foods: Array(foods.dropFirst(2)),
+                            rules: copy.groupRules,
+                            votingLabel: copy.votingLabel
+                        )
+                    }
+                )
+            ),
+            Poster(
+                slug: "achievements",
+                view: AnyView(
+                    StorePoster(headline: copy.achievements, theme: .creamDiary) {
+                        StoreAchievementScene(
+                            streakLabel: copy.streakLabel,
+                            badges: Self.storeBadges
+                        )
                     }
                 )
             ),
