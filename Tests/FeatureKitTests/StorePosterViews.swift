@@ -71,8 +71,8 @@ struct StoreBoardScene: View {
     let foods: [StoreSampleFood]
 
     private let spots: [(CGFloat, CGFloat, Double)] = [
-        (0.26, 0.17, -6), (0.72, 0.22, 5), (0.49, 0.48, -2),
-        (0.24, 0.72, 4), (0.75, 0.76, -5), (0.50, 0.94, 3),
+        (0.26, 0.15, -6), (0.72, 0.20, 5), (0.49, 0.45, -2),
+        (0.24, 0.70, 4), (0.75, 0.74, -5), (0.49, 0.90, 3),
     ]
 
     var body: some View {
@@ -92,7 +92,7 @@ struct StoreBoardScene: View {
                 }
             }
         }
-        .frame(height: 470)
+        .frame(height: 520)
     }
 }
 

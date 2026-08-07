@@ -72,20 +72,37 @@ struct StoreCopy {
 
 // MARK: - Sample food
 
-/// Stand-in cutouts, drawn rather than photographed.
+/// Sample food for the store shots, already wearing the app's sticker outline.
 ///
-/// Drop real cutout PNGs into `fastlane/screenshots/source/` (any names, sorted)
-/// and they are used instead — the store should show real food where possible.
+/// The outline is not baked into a saved cutout: the app stores the plain PNG and
+/// `CutoutImageLoader` draws the white border when it displays one. Passing a raw
+/// image straight to `CutoutImage(image:)` skips that loader, which is why an
+/// earlier pass produced borderless food. These go through the loader, so the
+/// screenshots show what the app shows.
+///
+/// Real cutouts come from `fastlane/screenshots/source/*.png` —
+/// `Scripts/make-cutouts.swift` writes them from photos. Drawn shapes stand in
+/// only when that folder is empty.
 struct StoreSampleFood: Identifiable {
     let id = UUID()
     let image: UIImage
 
-    static let all: [StoreSampleFood] = {
-        if let real = realCutouts(), real.count >= 3 { return real }
-        return drawn
-    }()
+    static func load() async -> [StoreSampleFood] {
+        let pngs = sourcePNGs() ?? drawnPNGs()
+        var foods: [StoreSampleFood] = []
+        for (index, data) in pngs.enumerated() {
+            // The app's own loader, so the border matches the app exactly.
+            guard let outlined = await CutoutImageLoader.shared.image(
+                data: data,
+                cacheKey: "store-sample-\(index)",
+                maxPixelDimension: 720
+            ) else { continue }
+            foods.append(StoreSampleFood(image: outlined))
+        }
+        return foods
+    }
 
-    private static func realCutouts() -> [StoreSampleFood]? {
+    private static func sourcePNGs() -> [Data]? {
         var url = URL(fileURLWithPath: #filePath)
         url.deleteLastPathComponent()
         url.deleteLastPathComponent()
@@ -96,21 +113,23 @@ struct StoreSampleFood: Identifiable {
             .appendingPathComponent("source")
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path)
         else { return nil }
-        let images = names.sorted()
+        let data = names.sorted()
             .filter { $0.lowercased().hasSuffix(".png") }
-            .compactMap { UIImage(contentsOfFile: folder.appendingPathComponent($0).path) }
-        return images.isEmpty ? nil : images.map { StoreSampleFood(image: $0) }
+            .compactMap { try? Data(contentsOf: folder.appendingPathComponent($0)) }
+        return data.isEmpty ? nil : data
     }
 
-    private static let drawn: [StoreSampleFood] = [
-        ("takeoutbag.and.cup.and.straw.fill", UIColor(Color.appCherry)),
-        ("birthday.cake.fill", UIColor(Color.appPinkInk)),
-        ("cup.and.saucer.fill", UIColor(Color.appChocolate)),
-        ("carrot.fill", UIColor(Color.appButterInk)),
-        ("fish.fill", UIColor(Color.appBlueInk)),
-        ("laurel.leading", UIColor(Color.appPinkInk)),
-    ].compactMap { symbol, tint in
-        symbolImage(symbol, tint: tint).map(StoreSampleFood.init(image:))
+    private static func drawnPNGs() -> [Data] {
+        [
+            ("takeoutbag.and.cup.and.straw.fill", UIColor(Color.appCherry)),
+            ("birthday.cake.fill", UIColor(Color.appPinkInk)),
+            ("cup.and.saucer.fill", UIColor(Color.appChocolate)),
+            ("carrot.fill", UIColor(Color.appButterInk)),
+            ("fish.fill", UIColor(Color.appBlueInk)),
+            ("laurel.leading", UIColor(Color.appPinkInk)),
+        ].compactMap { symbol, tint in
+            symbolImage(symbol, tint: tint)?.pngData()
+        }
     }
 
     private static func symbolImage(_ name: String, tint: UIColor) -> UIImage? {

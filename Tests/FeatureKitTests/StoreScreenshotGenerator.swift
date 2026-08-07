@@ -28,13 +28,15 @@ final class StoreScreenshotGenerator: XCTestCase {
 
     private static let languages = ["ko", "en", "ja", "zh-Hans"]
 
-    func test_generateStoreScreenshots() throws {
+    func test_generateStoreScreenshots() async throws {
         try XCTSkipUnless(
             ProcessInfo.processInfo.environment["GENERATE_STORE_SCREENSHOTS"] == "1",
             "Set GENERATE_STORE_SCREENSHOTS=1 to write store screenshots."
         )
 
         let root = try outputRoot()
+        let foods = await StoreSampleFood.load()
+        try XCTSkipIf(foods.isEmpty, "No sample food to render.")
         var written: [String] = []
 
         for language in Self.languages {
@@ -51,7 +53,7 @@ final class StoreScreenshotGenerator: XCTestCase {
                 at: folder, withIntermediateDirectories: true
             )
 
-            for (index, poster) in posters(language: language).enumerated() {
+            for (index, poster) in posters(language: language, foods: foods).enumerated() {
                 let url = folder.appendingPathComponent(
                     String(format: "%02d_%@.png", index + 1, poster.slug)
                 )
@@ -167,9 +169,8 @@ final class StoreScreenshotGenerator: XCTestCase {
         let view: AnyView
     }
 
-    private func posters(language: String) -> [Poster] {
+    private func posters(language: String, foods: [StoreSampleFood]) -> [Poster] {
         let copy = StoreCopy.forLanguage(language)
-        let foods = StoreSampleFood.all
         return [
             Poster(
                 slug: "board",
